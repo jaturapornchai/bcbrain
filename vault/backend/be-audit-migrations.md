@@ -1,0 +1,50 @@
+---
+title: "ไฟล์ migration และการสร้างตารางตอนรัน (Migrations / runtime DDL)"
+tags: [backend, migration, postgres, schema, ddl]
+aliases: ["0001_audit_schema.sql", "migrations", "golang-migrate", "ไม่มี migration runner", "CREATE TABLE IF NOT EXISTS", "ensure tables", "EnsurePosTables", "schema drift"]
+sources: ["backend/migrations/0001_audit_schema.sql:1", "backend/internal/application/process/pos_config.go:17", "backend/internal/application/process/pos_config.go:373", "backend/internal/adapter/inbound/http/etax/handler.go:592", "backend/internal/adapter/inbound/http/monitormap/handler.go:132", "backend/internal/platform/db/pool.go:16", "backend/README.md:85"]
+---
+
+# Migration และการสร้างตารางตอนรัน
+
+โฟลเดอร์ `backend/migrations/` มีไฟล์เดียวคือ `0001_audit_schema.sql` และ **ไม่มีโค้ด/สคริปต์ที่รันไฟล์นี้** — ตารางของโมดูลถูกสร้างตอนรันโดยโค้ด Go เอง (`CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ... IF NOT EXISTS`) ทำให้ไฟล์ SQL กับโค้ดจริงไม่ตรงกัน. คำอธิบายใน README/PLAN เรื่อง `golang-migrate` เป็นแผนเก่าที่ไม่มีในโค้ด.
+
+## ทำงานอย่างไร
+
+1. **ไฟล์ `0001_audit_schema.sql`** (160 บรรทัด): คอมเมนต์หัวไฟล์บอกว่า "ดึง DDL ของโมดูลที่เคยรันผ่าน `/query/exec` ออกมา เพราะ `NewWriteStatement` ห้าม DDL (BE-01 Task 3) ต้องใช้สคริปต์ migration" (`migrations/0001_audit_schema.sql:1-6`) ตรงกับเหตุผลใน [[adr-0006-query-exec-dml-only-guardrails]]. ข้างในมี 7 ตาราง (ทุกอันเป็น `IF NOT EXISTS`): `monitormap_tile_cache` (+ index `idx_monitormap_tile_zxy`), `posconfig`, `pos_shift_log`, `etax_document_log`, `workmonitor_desk_nodes`, `workmonitor_activity_logs`, `workmonitor_summary_projection`. ค่าเงิน/ยอดใช้ `NUMERIC(18,2)` ถูกตามกฎ ([[be-db-pool-manager]] อธิบายการอ่านกลับเป็นสตริงทศนิยม).
+2. **ชื่อไฟล์ไม่ตรงเนื้อหา**: ชื่อ "audit_schema" แต่ไม่มีตาราง audit; ตาราง `bc_audit_log` ไม่ถูกสร้างที่ใดในโค้ด/SQL ของ backend — แปลว่าตารางนี้มาจากฐานข้อมูล BCERP เดิม.
+3. **ไม่มีตัวรัน**: ไม่พบการอ้างถึง `migrations/` ใน Go, `Makefile` (เป้าหมาย `build/build-all/swagger/run/test/test-integration/vet/lint/tidy`), Dockerfile หรือ `deployments`; `go.mod` ไม่มี `golang-migrate` ([[be-deployment]]).
+4. **ตารางจริงถูกสร้างตอนรัน** โดยโค้ดแต่ละส่วน:
+
+| ที่สร้าง | ตาราง | จังหวะ |
+|---|---|---|
+| `process/pos_config.go:17,373` `EnsurePosTables` | `posconfig` ฯลฯ ของ POS | ครั้งแรกต่อ (Provider, ฐาน) ใน process (`posSeedDone`), seed ข้อมูลตัวอย่างเฉพาะฐาน `bcdemo`; error ของแต่ละ statement ถูกข้าม ("best effort") |
+| `etax/handler.go:592` | `etax_document_log` | ตอนใช้งาน eTax |
+| `monitormap/handler.go:132` | `monitormap_tile_cache` | ครั้งแรกต่อฐาน (`schemaOnce`) |
+| `platform/db/pool.go:16` `companySchemaSQL` | ตารางช่วยของบริษัท (`ic_opposite_unit`, `erp_initial` ฯลฯ) + `ALTER ... ADD COLUMN IF NOT EXISTS` | ทุกครั้งที่เปิด pool ใหม่ ([[be-db-pool-manager]]) |
+| `admin/workspace_google.go:36` | `bc_google_account`, `bc_google_workspace_db`, `bc_google_workspace_member` | ทุกคำขอของ workspace ([[be-workspace-google]]) |
+| `admin/handler.go`, `admin/menu_permissions.go`, `outbound/identity/postgres_repository.go:74` | คอลัมน์ `email`, `database_name` ฯลฯ, ตาราง `bc_tooltip` | ทุกคำขอที่เกี่ยวข้อง ([[be-admin-api]]) |
+
+5. **ผลคือ DDL ยังรันผ่าน connection ของแอป** (ผู้ใช้ DB ต้องมีสิทธิ์ CREATE/ALTER) — เส้นทางที่ client ส่ง DDL ผ่าน `/query/exec` ถูกปิดแล้ว แต่ handler ของโมดูลใช้ `AllowDDL`/pool ตรงได้ ([[be-query-gateway]]).
+
+## ข้อควรระวัง
+
+- **schema ในไฟล์ไม่เหมือนโค้ดจริง**: ตัวอย่างที่เทียบแล้ว — `monitormap_tile_cache` ในไฟล์ใช้คีย์หลัก `cache_key VARCHAR(255)` ส่วนโค้ด `monitormap/handler.go:132-134` ใช้ `tile_key VARCHAR(80)`; `etax_document_log.etax_doc_no` ในไฟล์เป็น `VARCHAR(60) UNIQUE` แต่โค้ด `etax/handler.go:592-595` ใช้ `varchar(50)` ไม่มี UNIQUE และยังสั่ง `DROP CONSTRAINT IF EXISTS etax_document_log_etax_doc_no_key` (`etax/handler.go:636`) เอา UNIQUE ออกโดยตั้งใจ. ถ้านำไฟล์ไปรันกับฐานใหม่ก่อน ตารางจะถูกสร้างด้วยโครงต่างจากที่โค้ดคาด และ `IF NOT EXISTS` จะทำให้โค้ดไม่แก้ให้ — ให้ถือโค้ด Go เป็นความจริง (ยังไม่ได้เทียบทุกคอลัมน์ของ `posconfig`/`pos_shift_log`).
+- `workmonitor_*` และ `pos_shift_log` ไม่พบ `CREATE TABLE` ในโค้ด Go ของ backend — มีเฉพาะในไฟล์ SQL นี้ (อาจถูกสร้างโดยโมดูลอื่น/เลิกใช้แล้ว; ยังไม่ยืนยัน).
+- ค่า default ในไฟล์ (เลขผู้เสียภาษี/รหัสเครื่องตัวอย่างของ `posconfig`) เป็นข้อมูลตัวอย่างฝังใน DDL — ไม่ควรใช้กับฐานจริง (ไม่คัดลอกค่าไว้ที่นี่).
+- ไม่มีระบบเวอร์ชัน/ตาราง `schema_migrations` — เปลี่ยน schema ของฐานลูกค้าที่มีอยู่ทำได้เฉพาะ `ADD COLUMN IF NOT EXISTS` ในโค้ด; การเปลี่ยนชนิด/ลบคอลัมน์ไม่มีกลไกรองรับ.
+- เอกสารที่ล้าสมัย: README/PLAN เขียนว่าใช้ `golang-migrate` สำหรับ control-plane และมีแพ็กเกจ `schema` (`README.md:85,104,131`, `docs/PLAN.md:81,100,234`) — ในโค้ดไม่มี; control-plane จริงคือไฟล์ JSON ([[be-provider-registry]], [[adr-0001-provider-config-json-files]]).
+- ตาราง `etax_document_log` ถูกจัดเป็น "ตารางเงิน" ในนโยบายล็อกการเขียน ([[be-query-write-policy]]).
+
+## ที่มาในโค้ด
+
+- `backend/migrations/0001_audit_schema.sql:1-160` — DDL 7 ตาราง.
+- `backend/internal/application/process/pos_config.go:17-30,373-400` — `posConfigDDL`, `EnsurePosTables`.
+- `backend/internal/adapter/inbound/http/etax/handler.go:590-600` — DDL `etax_document_log`.
+- `backend/internal/adapter/inbound/http/monitormap/handler.go:128-140` — DDL `monitormap_tile_cache`.
+- `backend/internal/platform/db/pool.go:16-148,216-218` — DDL ตอนเปิด pool.
+- `backend/Makefile` — ไม่มีเป้าหมาย migrate.
+
+## ดูเพิ่ม
+
+[[backend-overview]] · [[be-db-pool-manager]] · [[be-deployment]] · [[be-hexagonal-architecture]] · [[adr-0006-query-exec-dml-only-guardrails]] · [[adr-index]]

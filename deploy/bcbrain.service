@@ -1,0 +1,22 @@
+[Unit]
+Description=BC Brain (brain.bcsmethai.com) — Next.js standalone + MCP, port 3951
+After=network.target
+
+[Service]
+Type=simple
+Environment=PORT=3951
+Environment=HOSTNAME=127.0.0.1
+Environment=NODE_ENV=production
+WorkingDirectory=/opt/bcbrain
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+# least privilege: throwaway user, read-only system, no privilege escalation
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

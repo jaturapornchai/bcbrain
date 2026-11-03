@@ -1,0 +1,13 @@
+# สมอง BC (BC Brain)
+
+> Knowledge vault of the BC Ai Account system (Go backend, Next.js frontend, accounting logic, team standards), extracted read-only from the source code as Obsidian markdown. Mostly Thai.
+
+## For AI agents
+- MCP endpoint (Streamable HTTP): https://brain.bcsmethai.com/mcp
+- Public and read-only: no key or auth header needed.
+- Tools: `ask_brain(question)`, `search_brain(query, limit?)`, `read_note(slug)`, `list_notes(folder?, tag?)`
+- Answer only from note content and cite `[[slug]]` plus the source paths each note lists.
+
+## Pages
+- [Home: 3D neural map](https://brain.bcsmethai.com/)
+- [All notes](https://brain.bcsmethai.com/n)
