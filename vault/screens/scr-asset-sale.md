@@ -2,11 +2,11 @@
 title: "บันทึกการขายสินทรัพย์ (AssetSaleScreen)"
 tags: [screens, transaction]
 aliases: ["AssetSaleScreen", "ขายสินทรัพย์", "บันทึกการขายสินทรัพย์", "8005", "menu_asset_sale", "trans_flag 1802", "ASS"]
-sources: ["frontend/account/transaction/AssetSaleScreen.tsx:2", "frontend/account/transaction/AssetSaleScreen.tsx:30", "frontend/account/transaction/AssetSaleScreen.tsx:50", "frontend/account/transaction/AssetSaleScreen.tsx:107", "frontend/account/transaction/AssetSaleScreen.tsx:176", "frontend/account/transaction/AssetSaleScreen.tsx:230", "frontend/account/transaction/AssetSaleScreen.tsx:263", "frontend/account/tabs/screenRegistry.tsx:1112", "backend/internal/application/process/fa_sale.go:159", "backend/internal/application/process/fa_sale.go:218"]
+sources: ["frontend/account/transaction/AssetSaleScreen.tsx:2", "frontend/account/transaction/AssetSaleScreen.tsx:30", "frontend/account/transaction/AssetSaleScreen.tsx:50", "frontend/account/transaction/AssetSaleScreen.tsx:107", "frontend/account/transaction/AssetSaleScreen.tsx:176", "frontend/account/transaction/AssetSaleScreen.tsx:230", "frontend/account/transaction/AssetSaleScreen.tsx:263", "frontend/account/tabs/screenRegistry.tsx:1112", "backend/internal/application/process/fa_sale.go:159", "backend/internal/application/process/fa_sale.go:214"]
 ---
 # บันทึกการขายสินทรัพย์ (เมนู 8005)
 
-จอขายสินทรัพย์ถาวร (กลุ่มเมนู "ค่าเสื่อม" รหัส 8) บันทึกลงตาราง **`as_trans` / `as_trans_detail`** ที่ `trans_flag = 1802` (ไม่ใช่ `ic_trans`) ถอดแบบจาก C# `BCERPSO._saleAssets` (screen code `ASS`) เป็นจอเฉพาะ ไม่ผ่าน [[scr-universal-trans]] ผลทางบัญชีและภาษีดู [[doc-asset-sale]] ส่วนการโอนค่าเสื่อมเข้าบัญชีดู [[doc-asset-depreciation-transfer]]
+จอขายสินทรัพย์ถาวร (กลุ่มเมนู "ค่าเสื่อม" รหัส 8) บันทึกลงตาราง **`as_trans` / `as_trans_detail`** ที่ `trans_flag = 1802` (ไม่ใช่ `ic_trans`) (screen code `ASS`, `AssetSaleScreen.tsx:56,210`) เป็นจอเฉพาะ ไม่ผ่าน [[scr-universal-trans]] ผลทางบัญชีและภาษีดู [[doc-asset-sale]] ส่วนการโอนค่าเสื่อมเข้าบัญชีดู [[doc-asset-depreciation-transfer]]
 
 หัวใจของจอ: **หน้าจอรับค่าอย่างเดียว** (รหัสสินทรัพย์ + ราคาขาย + หัวเอกสาร) ส่วนค่าเสื่อมสะสม มูลค่าตามบัญชี VAT กำไร/ขาดทุน และรายการบัญชีคำนวณฝั่ง Go ทั้งหมด (`AssetSaleScreen.tsx:2-6`)
 
@@ -16,7 +16,7 @@ sources: ["frontend/account/transaction/AssetSaleScreen.tsx:2", "frontend/accoun
 ## โครงจอ
 แบ่งซ้าย/ขวาด้วย `ResizableSplit` (`storageKey="bc_asset_sale_split"`, กว้างเริ่มต้น 480):
 - **ซ้าย: รายการเอกสาร** ใช้ `TransDocListPane` ร่วมกับจอ transaction (หัวคอลัมน์ฝั่งคู่ค้าเขียนว่า "รหัสลูกหนี้ / ชื่อลูกหนี้") ช่วงวันที่เริ่มต้น = 1 ม.ค. ของปีนี้ถึงวันนี้ ค้นด้วยเลขที่เอกสาร / รหัสลูกหนี้ / ชื่อลูกหนี้ แสดงสูงสุด 500 แถว (`:103-120`)
-- **ขวา: เอกสาร** ใช้ `ScreenFrame` มีปุ่ม **บันทึก** · **ปิดหน้าจอ** (ในโหมดแก้ไขปุ่มนี้คือยกเลิกการแก้ไข) · **แก้ไข** · **เพิ่มใหม่** · **ลบ** และ "ปิดหน้าจอ" ปิดแท็บเมื่อมี `onClose` (`:316-344`) กลไกร่วมของจอรายการ+เอกสารดู [[scr-data-list-and-lookup]]
+- **ขวา: เอกสาร** ใช้ `ScreenFrame` ขณะแก้ไขมีปุ่ม **บันทึก** กับ **ปิดหน้าจอ** (ในโหมดนี้ปุ่มหลังคือยกเลิกการแก้ไข) ขณะไม่แก้ไขมี **แก้ไข** · **เพิ่มใหม่** · **ลบ** และ "ปิดหน้าจอ" ที่ปิดแท็บเมื่อมี `onClose` (`:316-344`) กลไกร่วมของจอรายการ+เอกสารดู [[scr-data-list-and-lookup]]
 
 ## ส่วนหัวเอกสาร
 | ช่อง | หมายเหตุ |
@@ -44,16 +44,16 @@ sources: ["frontend/account/transaction/AssetSaleScreen.tsx:2", "frontend/accoun
 
 ## ภาษีถูกหัก ณ ที่จ่าย และรายการบัญชี
 - ใต้ตารางมี `JournalTaxTabs` แท็บ `whtOut` (ภาษีหัก ณ ที่จ่ายฝั่งผู้ขายที่ถูกหัก) แก้ได้ขณะแก้ไข ใช้ lookup ตารางเฉพาะของแท็บนั้น ดู [[scr-trans-header-and-tabs]] และ [[term-wht]] ส่งค่าไปเป็น `wht` ตอนบันทึกเพื่อให้ backend เขียน `gl_wht_list` (`:6`, `:552-564`)
-- **รายการบัญชี**: เลือก "สมุดรายวัน" (จาก `gl_journal_book`, ค่าเริ่มต้น `04`) ตารางผลลัพธ์รหัสบัญชี · ชื่อบัญชี · เดบิต · เครดิต พร้อมข้อความ "กำไร/ขาดทุนจากการขายสินทรัพย์ <จำนวน>" และสถานะ "เดบิต = เครดิต (สมดุล)" เทียบสตริงยอดเดบิต/เครดิตที่ backend ส่ง (`:565-613`) ตารางนี้อ่านอย่างเดียว กลไก GL ดู [[term-gl-journal]]
+- **รายการบัญชี**: เลือก "สมุดรายวัน" (จาก `gl_journal_book`, ค่าเริ่มต้น `04`) ตารางผลลัพธ์รหัสบัญชี · ชื่อบัญชี · เดบิต · เครดิต พร้อมข้อความ "กำไรจากการขายสินทรัพย์ N" หรือ "ขาดทุนจากการขายสินทรัพย์ N" ตามเครื่องหมายของผลลัพธ์ (`:577`) และสถานะ "เดบิต = เครดิต (สมดุล)" ตรวจจากสตริงยอดเดบิต/เครดิตที่ backend ส่ง (`:565-613`) ตารางนี้อ่านอย่างเดียว กลไก GL ดู [[term-gl-journal]]
 
 ## การบันทึก / การลบ
 - **บันทึก** (Ctrl+S; Esc = ยกเลิกการแก้ไข ผ่าน `useShortcuts` `:264`): ต้องมีเลขที่เอกสารและสินทรัพย์อย่างน้อย 1 รายการ แล้ว `POST` `op: "save"` พร้อม `oldDocNo` (ถ้าเป็นการแก้เอกสารเดิม) และ `wht` เสร็จแล้วโหลดรายการ+เอกสารใหม่ (`:235-247`)
-- ฝั่ง Go ตรวจ (`fa_sale.go:218-275`): ต้องมีรหัสลูกหนี้ ("กรุณาป้อน รหัสลูกค้า"), วันที่ถูกต้อง, ประเภทภาษี/ประเภทการขายในช่วง, วันเครดิต, **สินทรัพย์ 1-500 รายการ**, รหัสสินทรัพย์ไม่ซ้ำในเอกสาร, ราคาขายถูกต้อง, อัตราภาษี 0-100, เลขที่เอกสารไม่ซ้ำ ("มีอยู่แล้ว") และต่อสินทรัพย์ (`:300-315`): ไม่พบสินทรัพย์ / ขายไปแล้วในเอกสารอื่น / ยังไม่กำหนดรหัสบัญชีสินทรัพย์และค่าเสื่อม; ต้องมีผังบัญชีกำไร(ขาดทุน)จากการจำหน่าย (`:368`); รายการบัญชีต้องสมดุล (`:374`)
-- **ลบ** (ลบได้ทีละเอกสาร ผ่าน dialog ยืนยัน "ลบเอกสารขายสินทรัพย์ ... ใช่หรือไม่? (ลบรายการบัญชีและคืนสถานะสินทรัพย์)") ส่ง `op: "delete"` ผลสำเร็จ "ลบเอกสาร ... แล้ว สินทรัพย์กลับเป็นสถานะยังไม่ขาย" (`:248-263`) — **ลบจริง** ไม่ใช่ออกใบยกเลิก
-- สิทธิ์: ฝั่ง HTTP ตัดสิทธิ์ตาม `op` (`preview` ไม่ต้องสิทธิ์เขียน) `permission.go:118` ดู [[proc-permission-rights]]
+- ฝั่ง Go ตรวจรูปแบบข้อมูลก่อน (`normalizeAssetSale` `fa_sale.go:214-284`): เฉพาะตอนบันทึกต้องมีรหัสลูกหนี้ ("กรุณาป้อน รหัสลูกค้า" `:231`), วันที่ถูกต้อง, ประเภทภาษี/ประเภทการขายในช่วง 0-3, วันเครดิต 0-9999, **สินทรัพย์ 1-500 รายการ** (`:240`), รหัสสินทรัพย์ไม่ซ้ำในเอกสาร, ราคาขายเป็นตัวเลขไม่ติดลบ, อัตราภาษี 0-100 แล้วตรวจต่อสินทรัพย์ (`loadSaleAssets` `:286-320`): ไม่พบสินทรัพย์ / ขายไปแล้วในเอกสารอื่น / ยังไม่กำหนดรหัสบัญชีสินทรัพย์และบัญชีค่าเสื่อมสะสม จากนั้นตอนบันทึกตรวจว่าสมุดรายวันมีจริง, งวดบัญชียังเปิด (`checkOpenPeriod`), เลขที่เอกสารไม่ซ้ำกับ `as_trans`/`gl_journal` ("มีอยู่แล้ว" `:461`) และเลขที่ใบกำกับภาษีไม่ซ้ำ (`checkTaxDocNo`) ทั้งหมดอยู่ในทรานแซกชันเดียวที่ล็อกด้วย advisory lock (`assetSaleTx` `fa_sale.go:401-484`) ต้องมีผังบัญชีที่ใช้ลงรายการ รวมบัญชีกำไร(ขาดทุน)จากการจำหน่ายที่ค้นจากชื่อบัญชี (`:349`, ตรวจว่ามีในผัง `:364-371`) และรายการบัญชีต้องสมดุล (`:373-375`)
+- **ลบ** (ลบได้ทีละเอกสาร ผ่าน dialog ยืนยัน "ลบเอกสารขายสินทรัพย์ ... ใช่หรือไม่? (ลบรายการบัญชีและคืนสถานะสินทรัพย์)") ส่ง `op: "delete"` ผลสำเร็จ "ลบเอกสาร ... แล้ว สินทรัพย์กลับเป็นสถานะยังไม่ขาย" (`:248-263`) — **ลบจริง** ไม่ใช่ออกใบยกเลิก ฝั่ง Go ตรวจว่าเอกสารมีอยู่และงวดบัญชียังเปิดก่อนลบ (`fa_sale.go:417-430`)
+- สิทธิ์: ฝั่ง HTTP ตัดสิทธิ์ตาม `op` — `preview` ใช้สิทธิ์อ่าน, `delete` ใช้สิทธิ์ลบ, อื่น ๆ (บันทึก) ใช้สิทธิ์เขียน (`permission.go:118-128`) ดู [[proc-permission-rights]]
 
 ## ข้อควรระวัง
-- **ลูกหนี้ไม่มีเครื่องหมาย \* บนจอ** แต่ backend บังคับ ("กรุณาป้อน รหัสลูกค้า") จึงเพิ่งเจอข้อผิดพลาดตอนกดบันทึก (`AssetSaleScreen.tsx:368` เทียบ `fa_sale.go:231`)
+- **ลูกหนี้ไม่มีเครื่องหมาย \* บนจอ** แต่ backend บังคับ ("กรุณาป้อน รหัสลูกค้า") จึงเพิ่งเจอข้อผิดพลาดตอนกดบันทึก (`AssetSaleScreen.tsx:368` ดูคู่กับ `fa_sale.go:231`)
 - **ไม่มีแท็บรับชำระ** (เช็ค/โอน/มัดจำ) แม้เลือกประเภทการขายเป็นเงินสด — คอมเมนต์ท้ายหัวไฟล์ระบุว่ายังไม่ทำ (`:7`)
 - สินทรัพย์ที่เลือกซ้ำในเอกสารเดียวกันถูกปฏิเสธที่ backend ไม่ใช่ที่จอ
 - ตัวเลขต่อแถว/ยอดรวมเป็นสตริงทศนิยมจาก backend แสดงผ่าน `formatMoneyDisplay` ไม่คำนวณในหน้าจอ ตรงกับ [[fe-numeric-money]]
@@ -62,6 +62,6 @@ sources: ["frontend/account/transaction/AssetSaleScreen.tsx:2", "frontend/accoun
 ## ที่มาในโค้ด
 - `frontend/account/transaction/AssetSaleScreen.tsx:2-6` หัวไฟล์; `:30-33` `API`/`FLAG = 1802`; `:48-51` ชนิดการขาย/ภาษี; `:103-120` รายการเอกสาร; `:129-180` เปิดเอกสาร; `:181-191` payload; `:192-207` preview; `:208-216` เลขที่เอกสาร; `:217-263` เริ่มใหม่/ยกเลิก/บันทึก/ลบ; `:264` คีย์ลัด (Ctrl+S / Esc); `:271` กรองสินทรัพย์ที่ยังไม่ขาย; `:316-344` แถบเครื่องมือ; `:346-404` หัวเอกสาร; `:405-484` ตาราง; `:485-551` ยอดรวม; `:552-613` WHT/รายการบัญชี; `:614-646` lookup/dialog
 - `frontend/account/tabs/screenRegistry.tsx:1112`
-- `backend/internal/application/process/fa_sale.go:159` คำนวณ; `:218-275` ตรวจ input; `:300-315` ตรวจสินทรัพย์; `:368-374` ผังบัญชี/สมดุล; `:379` ตัวจัดการ op
-- `backend/internal/adapter/inbound/http/process/permission.go:118`; `workflow_handler.go:80`
+- `backend/internal/application/process/fa_sale.go:159` คำนวณ (`calcAssetSale`); `:214-284` ตรวจ input; `:286-320` ตรวจสินทรัพย์; `:321-376` ผังบัญชี/สมดุล; `:382` `AssetSale`; `:401-484` ตัวจัดการ op
+- `backend/internal/adapter/inbound/http/process/permission.go:118-128`; `workflow_handler.go:80`
 - ดูเพิ่ม: [[fe-transaction-screens]] · [[tbl-as-trans]] · [[tbl-as-trans-detail]] · [[screens-overview]]

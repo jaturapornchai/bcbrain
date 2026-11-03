@@ -2,7 +2,7 @@
 title: "กำหนดรายละเอียดบริษัท (CompanyProfileForm)"
 tags: [screens, config]
 aliases: ["CompanyProfileForm", "1001", "menu_company_profile", "ข้อมูลบริษัท", "company profile", "SchemaForm", "FieldControl"]
-sources: ["frontend/account/config/CompanyProfileForm.tsx:28", "frontend/account/config/CompanyProfileForm.tsx:69", "frontend/account/config/CompanyProfileForm.tsx:107", "frontend/src/config/schemas/companyProfile.ts:10", "frontend/account/form/SchemaForm.tsx:281", "frontend/account/form/FieldControl.tsx:36", "frontend/shared/layout/ScreenHeader.tsx:47", "frontend/account/tabs/screenRegistry.tsx:261", "frontend/src/config/bcMenu.ts:279"]
+sources: ["frontend/account/config/CompanyProfileForm.tsx:28", "frontend/account/config/CompanyProfileForm.tsx:69", "frontend/account/config/CompanyProfileForm.tsx:107", "frontend/src/config/schemas/companyProfile.ts:10", "frontend/account/form/SchemaForm.tsx:281", "frontend/account/form/FieldControl.tsx:24", "frontend/shared/layout/ScreenHeader.tsx:47", "frontend/account/tabs/screenRegistry.tsx:261", "frontend/src/config/bcMenu.ts:315"]
 ---
 # กำหนดรายละเอียดบริษัท (CompanyProfileForm)
 
@@ -12,7 +12,7 @@ sources: ["frontend/account/config/CompanyProfileForm.tsx:28", "frontend/account
 
 ## วิธีเปิด
 - เมนู `1001` `menu_company_profile` "กำหนดรายละเอียดบริษัท" หมวด "เริ่มต้น > ตั้งค่าองค์กร พนักงาน และเอกสาร" (รหัสหมวด 1001-1023) — ลงทะเบียนมือใน `screenRegistry.tsx:261` เปิดเป็นแท็บ (`mode: "tab"`)
-- เป็นเมนูเฉพาะผู้ดูแล: อยู่ใน `ADMIN_ONLY_MENU_SET` (`bcMenu.ts:279`) ผู้ใช้ทั่วไปเข้าไม่ได้ กลไกดู [[fe-screen-registry-menu]]
+- เป็นเมนูเฉพาะผู้ดูแล: อยู่ใน `ADMIN_ONLY_MENU_SET` (`bcMenu.ts:315`) ผู้ใช้ทั่วไปเข้าไม่ได้ กลไกดู [[fe-screen-registry-menu]]
 - สิทธิ์ในจอ: ใช้ `useScreenRights()` ถ้าไม่มีสิทธิ์ "แก้ไขข้อมูล" ปุ่มบันทึกถูกปิด และถ้าเรียก `save()` จะขึ้นกล่อง "ไม่มีสิทธิ์บันทึกข้อมูล" (`CompanyProfileForm.tsx:31,70-79,183`)
 
 ## ช่องข้อมูลสำคัญและ validation
@@ -50,7 +50,7 @@ sources: ["frontend/account/config/CompanyProfileForm.tsx:28", "frontend/account
 
 ## API / process actions
 - โหลด: `queryList("SELECT * FROM erp_company_profile LIMIT 1")` — ถ้าไม่มีแถวใช้ฟอร์มว่าง (`CompanyProfileForm.tsx:49-58`)
-- บันทึก: `queryExecBatch(["DELETE FROM erp_company_profile", insert …])` ใน transaction เดียว — **ลบทั้งตารางแล้วใส่แถวใหม่** ตามพฤติกรรม BC เดิม (`CompanyProfileForm.tsx:107-116`). SQL insert สร้างจาก `buildInsertSql` ซึ่งใส่ทุกคอลัมน์ใน schema ยกเว้นชนิด label/image/blank/heading (`bc-query-builder.ts:263-287`). กลไก: [[fe-query-client-sql-builder]]
+- บันทึก: `queryExecBatch(["DELETE FROM erp_company_profile", insert …])` ใน transaction เดียว — **ลบทั้งตารางแล้วใส่แถวใหม่** (`CompanyProfileForm.tsx:107-116`). SQL insert สร้างจาก `buildInsertSql` ซึ่งใส่ทุกคอลัมน์ใน schema ยกเว้นชนิด label/image/blank/heading (`bc-query-builder.ts:263-287`). กลไก: [[fe-query-client-sql-builder]]
 - หลังสำเร็จขึ้น "บันทึกข้อมูลเสร็จเรียบร้อย โปรแกรมจะปิดหน้าจอนี้ให้" แล้วปิดแท็บ (`:134-144`)
 
 ## ตารางที่ข้อมูลลงไป
@@ -63,9 +63,9 @@ sources: ["frontend/account/config/CompanyProfileForm.tsx:28", "frontend/account
 
 ## ที่มาในโค้ด
 - `frontend/account/config/CompanyProfileForm.tsx:28-244` — จอทั้งหมด (โหลด 49, บันทึก 69-145, ปิด 147-173, แผนที่ 213-226)
-- `frontend/src/config/schemas/companyProfile.ts:10-145` — schema ฟิลด์ (อ้างอิง `BCERPConfig/_companyProfile.cs` ตามคอมเมนต์บรรทัด 6)
+- `frontend/src/config/schemas/companyProfile.ts:10-145` — schema ฟิลด์
 - `frontend/account/form/SchemaForm.tsx:10-58,78-110,281` — ซ่อนตามรุ่น + การวาดแถว
 - `frontend/account/form/FieldControl.tsx:36-296` — ตัววาดช่องแต่ละชนิด
 - `frontend/shared/layout/ScreenHeader.tsx:47-64` — คีย์ลัด Ctrl+S / Esc
-- `frontend/account/tabs/screenRegistry.tsx:261`, `frontend/src/config/bcMenu.ts:279`
+- `frontend/account/tabs/screenRegistry.tsx:261`, `frontend/src/config/bcMenu.ts:315`
 - ดูเพิ่ม: [[scr-options]] · [[fe-screen-registry-menu]] · [[fe-query-client-sql-builder]] · [[fe-numeric-money]] · [[screens-overview]]

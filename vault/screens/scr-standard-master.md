@@ -12,7 +12,7 @@ sources: ["frontend/account/tabs/screenRegistry.tsx:152", "frontend/account/mast
 
 ## วิธีเปิด
 เมนูที่ config เป็น MASTER (ไม่มี `detail`) จะถูกสร้างเป็น StandardMasterScreen แบบ tab ผ่าน `createMasterScreen` (`frontend/account/tabs/screenRegistry.tsx:152-166`); ถ้า config มี `detail` จะไปจอ [[scr-master-detail]] แทน
-เมนูที่ลงทะเบียนมือใน BASE_SCREENS มาก่อน จะไม่ถูกทับด้วย config นี้ (`screenRegistry.tsx:1013`)
+เมนูที่ลงทะเบียนมือใน BASE_SCREENS มาก่อน จะไม่ถูกทับด้วย config นี้ (`screenRegistry.tsx:1013-1014`)
 รายการเมนู MASTER ทั้ง 75 (รหัส `menu_key` ชื่อไทย) จัดตามหมวดในเมนู:
 - ตั้งค่าองค์กร พนักงาน เอกสาร (1001-1023): 1003 `menu_setup_currency` กำหนดสกุลเงิน · 1004 `menu_setup_branch` กำหนดรายละเอียดสาขา · 1005 `menu_setup_department_list` กำหนดรายละเอียดแผนก · 1010 `menu_setup_staff_mis` กำหนดผู้ใช้ระบบ MIS · 1011 `menu_setup_doc_group` กำหนดกลุ่มเอกสาร · 1013 `menu_setup_transport` กำหนดประเภทการขนส่ง · 1014 `menu_setup_ar_logistic_area` กำหนดเขตการขนส่ง · 1022 `menu_setup_qr_payment` กำหนดค่า QR Code Payment
 - ตั้งค่าสินค้าคงคลัง (1024-1047): 1025 `menu_setup_ic_shelf` กำหนดพื้นที่เก็บสินค้า · 1028 `menu_setup_ic_group_main` กำหนดกลุ่มสินค้าหลัก · 1029 `menu_setup_ic_group_sub` กำหนดกลุ่มสินค้าย่อย · 1030 `menu_setup_ic_group_sub2` กำหนดกลุ่มสินค้าย่อย2 · 1031 `menu_setup_ic_category` กำหนดหมวดสินค้า · 1032 `menu_setup_ic_brand` กำหนดยี่ห้อสินค้า · 1033 `menu_setup_ic_model` กำหนดรุ่นสินค้า · 1034 `menu_setup_ic_color` กำหนดสีสินค้า · 1035 `menu_setup_ic_size` กำหนดขนาดสินค้า · 1036 `menu_setup_ic_pattern` กำหนดรูปแบบสินค้า · 1037 `menu_setup_ic_grade` กำหนดเกรดสินค้า · 1038 `menu_setup_ic_design` กำหนดรูปทรงสินค้า · 1039 `menu_setup_ic_class` กำหนดระดับสินค้า · 1040 `menu_setup_ic_dimension_name` กำหนดชื่อมิติสินค้า · 1041 `menu_setup_ic_dimension` กำหนดมิติสินค้า · 1042 `menu_manufacturer_list` กำหนดผู้ผลิต · 1043 `menu_setup_ic_account_group` กำหนดกลุ่มบัญชีสินค้า · 1044 `menu_setup_ic_issue_type` กำหนดประเภทการเบิก · 1045 `menu_setup_stk_adjust` กำหนดสาเหตุการปรับปรุง · 1046 `menu_setup_ic_close_reason` กำหนดเหตุผลการปิดสินค้า · 1047 `menu_setup_ic_import_duty_point` กำหนดพิกัดศุลกากร
@@ -85,7 +85,7 @@ sources: ["frontend/account/tabs/screenRegistry.tsx:152", "frontend/account/mast
 - ข้อมูลเอกสารแต้ม 6008/6010 ไม่ผ่านเส้นทาง INSERT/UPDATE ปกติ แต่ผ่าน API ฝั่ง Go
 
 ## ที่มาในโค้ด
-- `frontend/account/tabs/screenRegistry.tsx:152-166,1013` — เลือก StandardMasterScreen/MasterDetailScreen ตาม `config.detail`; BASE_SCREENS มาก่อน config
+- `frontend/account/tabs/screenRegistry.tsx:152-166,1013-1014` — เลือก StandardMasterScreen/MasterDetailScreen ตาม `config.detail`; BASE_SCREENS มาก่อน config
 - `frontend/src/config/schemas/icMasterSchemas.ts:4-60` — ชนิด `MasterFieldDef`, `MasterScreenConfig`
 - `frontend/account/master/StandardMasterScreen.tsx:63-80,186-199,283-305` — ตัวแปร config, extraFields, โหลดรายการ
 - `frontend/account/master/StandardMasterScreen.tsx:513-682` — บันทึก (ตรวจ, INSERT, UPDATE)

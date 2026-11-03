@@ -29,7 +29,7 @@ sources: ["backend/internal/application/process/report_hierarchy.go:51", "backen
 5. ชื่อไฟล์: `<menuKey>_<yyyymmdd_hhmm>.pdf` (ใช้ `bc_report` ถ้าไม่มี menuKey)
 6. ฟอนต์ไทย 2 ไฟล์ฝังด้วย `//go:embed` จากโฟลเดอร์ `fonts/`: `thai-regular.ttf`, `thai-bold.ttf`
 7. การตัดบรรทัดไทย: แบ่งตาม grapheme cluster และโทเค็นคำ (`splitIntoGraphemeClusters`, `segmentThaiTokens`, `wrapTextToLines`), ปรับสระ/วรรณยุกต์บน (`normalizeThaiUpstairsMarks`), คำนวณความกว้างคอลัมน์ให้ตัวเลขไม่ถูกตัด (`fitPDFNumbers`, `widenPDFNumericColumns`) และนับเลขหน้าแบบ "X/Y" โดยทำ 2 รอบ (`pdfPageBreakBefore` ใช้ทั้งสองรอบ)
-8. `pageBreakColumn` (ตั้งโดยตัวสร้างรายงาน) ทำให้ขึ้นหน้าใหม่เมื่อค่าคอลัมน์เปลี่ยน (C# `new_page_by_ar_code`)
+8. `pageBreakColumn` (ตั้งโดยตัวสร้างรายงาน) ทำให้ขึ้นหน้าใหม่เมื่อค่าคอลัมน์เปลี่ยน (`report_pdf.go:833`)
 
 ## จุดที่ต้องระวัง
 - ข้อความหัวบริษัทเริ่มต้นใน `loadCompanyHeaderInfo` เป็นค่าฮาร์ดโค้ด ใช้เมื่อไม่มี `erp_company_profile`
@@ -48,7 +48,7 @@ sources: ["backend/internal/application/process/report_hierarchy.go:51", "backen
 - `backend/internal/application/process/report_pdf.go:111` - `RenderReportPDF`
 - `backend/internal/application/process/report_pdf.go:318` - `resolvePaperDimensions`
 - `backend/internal/application/process/report_pdf.go:525` - `buildReportPDFBytes`
-- `backend/internal/application/process/report_pdf.go:1298` - `pdfPageBreakBefore`
+- `backend/internal/application/process/report_pdf.go:1319` - `pdfPageBreakBefore`
 - `backend/internal/adapter/inbound/http/process/handler.go:270` - handler `RenderReportPDF`
 
 ## ดูเพิ่ม

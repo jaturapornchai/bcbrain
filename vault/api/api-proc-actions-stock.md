@@ -2,7 +2,7 @@
 title: "API สต็อกสินค้า (Process stock actions: stock/rebuild, stocktools/*, point-recal, check-ic-trans, ai-smart-reorder)"
 tags: [api, process, stock]
 aliases: ["/api/v1/process/stock/rebuild","/api/v1/process/stocktools/{action}","stock/rebuild","stocktools","docnonext","serialcountsave","lotamountsave","lotautorun","notcountedrun","hiddencostsave","stockbeginningsave","pointdocsave","checkpricesave","point-recal","check-ic-trans","ai-smart-reorder"]
-sources: ["backend/internal/adapter/inbound/http/router.go:130","backend/internal/adapter/inbound/http/router.go:162","backend/internal/adapter/inbound/http/process/handler.go:19","backend/internal/adapter/inbound/http/process/handler.go:41","backend/internal/adapter/inbound/http/process/stocktools_handler.go:23","backend/internal/adapter/inbound/http/process/stocktools_handler.go:89","backend/internal/adapter/inbound/http/process/permission.go:24","backend/internal/adapter/inbound/http/process/permission.go:68","backend/internal/application/process/service.go:548","backend/internal/application/process/stock_tools.go:49","backend/internal/application/process/stock_lot.go:347","backend/internal/application/process/sysproc_tools.go:47"]
+sources: ["backend/internal/adapter/inbound/http/router.go:130","backend/internal/adapter/inbound/http/router.go:162","backend/internal/adapter/inbound/http/process/handler.go:19","backend/internal/adapter/inbound/http/process/handler.go:41","backend/internal/adapter/inbound/http/process/stocktools_handler.go:23","backend/internal/adapter/inbound/http/process/stocktools_handler.go:89","backend/internal/adapter/inbound/http/process/permission.go:24","backend/internal/adapter/inbound/http/process/permission.go:68","backend/internal/application/process/service.go:559","backend/internal/application/process/stock_tools.go:49","backend/internal/application/process/stock_lot.go:347","backend/internal/application/process/sysproc_tools.go:47"]
 ---
 
 # API สต็อกสินค้า (stock/rebuild, stocktools/*, workflow สต็อก)
@@ -12,7 +12,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:130","backend/interna
 ## stock/rebuild
 
 - **เมธอด + path**: `POST /api/v1/process/stock/rebuild` (router.go:130, 171)
-- **สิทธิ์**: `itemCodes` ไม่ว่าง (rebuild เฉพาะสินค้าที่เพิ่งบันทึก) = Write; ทั้งฐาน = Admin (permission.go:68-72). บอดี้ ≤ 16 MB; ถ้า `Content-Length` เป็น 0 ใช้ค่าว่างทั้งหมดได้ (handler.go:49)
+- **สิทธิ์**: `itemCodes` ไม่ว่าง (rebuild เฉพาะสินค้าที่เพิ่งบันทึก) = Write; ทั้งฐาน = Admin (permission.go:68-73). บอดี้ ≤ 16 MB; ถ้า `Content-Length` เป็น 0 ใช้ค่าว่างทั้งหมดได้ (handler.go:49)
 - **Request** (handler.go:32-38):
 
 ```json
@@ -20,7 +20,7 @@ POST /api/v1/process/stock/rebuild     (Authorization: Bearer <token>)
 {"itemCodes":["<itemCode>"],"processCommand":"","updateUnitRatio":true,"action":"","flowCommand":""}
 ```
 
-- **action** (service.go:575-): ค่าว่าง = คำนวณ `ic_inventory.balance_qty` + ต้นทุนเฉลี่ยเคลื่อนที่ (`sum_of_cost`, `average_cost`) ใหม่ทุก/บางสินค้า พร้อม backfill การโอนคลังและ `updateUnitRatio` (ค่าเริ่มต้น true) ปรับ stand_value/divide_value; `update_trans_detail` = ปรับ ic_trans_detail; `recheck_trans_flow` / `recheck_doc_flow` (ใช้ `flowCommand`) = ตรวจกระแสเอกสารใหม่; `check_so_doc_success` = ปิดใบสั่งขาย (flag 36) ที่ใบ 37/44 อ้างอิงรับครบแล้ว (service.go:692-712). ทั้งหมดอยู่ใน transaction เดียว timeout 60 วินาที (service.go:553)
+- **action** (`rebuildStockWithOptionsTx` service.go:588-627): ค่าว่าง = คำนวณ `ic_inventory.balance_qty` + ต้นทุนเฉลี่ยเคลื่อนที่ (`sum_of_cost`, `average_cost`) ใหม่ทุก/บางสินค้า พร้อม backfill การโอนคลังและ `updateUnitRatio` (ค่าเริ่มต้น true) ปรับ stand_value/divide_value; `update_trans_detail` = ปรับ ic_trans_detail; `recheck_trans_flow` / `recheck_doc_flow` (ใช้ `flowCommand`) = ตรวจกระแสเอกสารใหม่; `check_so_doc_success` = คำนวณ `doc_success` ของใบสั่งขาย (flag 36) จากจำนวนที่ใบ 37/44 อ้างอิง (`checkSODocSuccessTx` service.go:705-724). `flowCommand` รับ 4 รูปแบบ (service.go:742-786): `SELECT ...` (อ่านอย่างเดียว ใช้คอลัมน์แรกเป็นเลขที่เอกสาร), `docno=<เลขที่>`, `จาก:ถึง` (ช่วง `doc_no`) หรือรายการคั่นด้วย `,`. ทั้งหมดอยู่ใน transaction เดียว timeout 60 วินาที (service.go:565)
 - **Response 200**: `{"ok":true,"data":{"itemsProcessed":<n>,"rowsUpdated":<n>}}` (service.go:44-47). `processCommand` ที่กรองแล้วไม่เหลือสินค้า = คืน `itemsProcessed:0` (มี `rowsUpdated` ของการปรับอัตราส่วนหน่วย)
 - **ตาราง**: erp_option, ic_trans_detail, ic_trans, ic_inventory, cb_trans, cb_trans_detail, ap_ar_trans, ap_ar_trans_detail, ic_unit_use
 - **ผู้เรียก**: `rebuildStock()` ที่ query-client.ts:72 (หลังบันทึกเอกสารสต็อก ส่ง `itemCodes`), `account/process/SystemProcessWorkbenchScreen.tsx:624` (ส่ง `processCommand`, `updateUnitRatio`, `action`, `flowCommand`); Next route `src/app/api/process/stock/rebuild`
@@ -47,7 +47,7 @@ POST /api/v1/process/stock/rebuild     (Authorization: Bearer <token>)
 | `lotautorun` | แปลงผลต่างใบนับกับยอดบัญชีเป็นเอกสารปรับ (66 เพิ่ม / 68 ลด) และทำเครื่องหมายใบนับ | `docNos[]`, `docFormatCode`, `downDocFormatCode`, `ignoreLot` | ic_trans, ic_trans_detail, ic_trans_detail_lot, ap_ar_trans_detail, erp_account_period, gl_journal | :140 → stock_lot.go:617 | Write / 4 MB |
 | `notcountedlist` | สินค้าในคลังที่เลือกซึ่งไม่ถูกนับใน `docNos` แต่ยอดไม่เป็นศูนย์ | `docNos[]`, `dateEnd`, `docTime`, `whCodes[]`, `docFormatCode`, `downDocFormatCode` | ic_trans_detail, ic_inventory | :144 → stock_lot.go:883 | Read / 4 MB |
 | `notcountedrun` | สร้างเอกสารปรับ (66/68) เพื่อล้างยอดสินค้าที่ไม่ได้นับ | ฟิลด์เดียวกับ list | ic_trans, ic_trans_detail, ic_inventory, erp_doc_format(+_gl) | :148 → stock_lot.go:901 | Write / 4 MB |
-| `itemnextcode` | รหัสสินค้าที่ C# ใส่ให้หลังออกจากช่องรหัส | `code`, `date` | erp_doc_format, ic_inventory, erp_doc_format_gl | :152 → stock_tools.go:652 | Read / 4 MB |
+| `itemnextcode` | รหัสสินค้าถัดไปที่หน้าจอใส่ให้หลังออกจากช่องรหัส | `code`, `date` | erp_doc_format, ic_inventory, erp_doc_format_gl | :152 → stock_tools.go:652 | Read / 4 MB |
 | `stockbeginningsave` | บันทึกเอกสารยอดยกมา (ซ้ำได้) แล้ว rebuild สต็อก/ต้นทุน/ซีเรียลของสินค้าที่แตะ; ล้มเหลว = rollback ทั้งหมด | `isNew`, `docNo`, `docDate`, `docTime`, `docFormatCode`, `docRef`, `whFrom`, แถวสินค้า | ic_trans, ic_trans_detail, ic_inventory, erp_company_profile, erp_branch_list | :156 → stock_beginning.go:307 | **Add** (isNew) / **Edit** / 24 MB |
 | `stockbeginningdelete` | ลบเอกสารยอดยกมาและสิ่งที่ลงไว้ แล้วคำนวณสต็อก/ซีเรียลใหม่ | `docNo` | ic_trans, ic_trans_detail, ic_trans_serial_number, gl_journal(+_detail), ic_trans_detail_lot | :160 → stock_beginning.go:356 | Delete / 4 MB |
 | `checkpricesave` | เปลี่ยนราคาบาร์โค้ด (transaction เดียว เก็บราคาเดิมใน log) | `barcode`, `newPrice` (string ทศนิยม) | ic_inventory_barcode, erp_option | :168 → check_price.go:48 | Write / 4 MB |
@@ -55,7 +55,7 @@ POST /api/v1/process/stock/rebuild     (Authorization: Bearer <token>)
 | `pointdocdelete` | ลบหัวเอกสาร 801/802 ใน transaction เดียว | `transFlag`, `docNos[]` | ic_trans, erp_option, ic_trans_detail | :176 → point_doc.go:160 | Delete / 4 MB |
 | `itemsaved` | รีเฟรชคอลัมน์สินค้าที่คำนวณและยอดคงเหลือของสินค้าที่เพิ่งบันทึก | `itemCode` | ic_inventory, ic_inventory_detail, ic_trans_detail | :180 → stock_tools.go:530 | Write / 4 MB |
 
-คอลัมน์ path ใช้ `:<บรรทัด>` = บรรทัดของ `case` ใน `stocktools_handler.go`. เพดาน 8 MB ของ `serialcountsave`/`lotamountsave` อยู่ที่ stocktools_handler.go:108,116 และ 24 MB ของ `stockbeginningsave` ที่ :156.
+คอลัมน์ path ใช้ `:<บรรทัด>` = บรรทัดของ `case` ใน `stocktools_handler.go`. เพดาน 8 MB ของ `serialcountsave`/`lotamountsave` อยู่ที่ stocktools_handler.go:109,117 และ 24 MB ของ `stockbeginningsave` ที่ :157.
 
 - ตัวอย่าง:
 
@@ -75,10 +75,10 @@ POST /api/v1/process/stocktools/docnonext     (Authorization: Bearer <token>)
 | action | หน้าที่ | input สำคัญ | ตาราง | path:line | สิทธิ์ |
 |---|---|---|---|---|---|
 | `workflow/point-recal` | คำนวณคะแนนสะสมใหม่จากการขาย POS (flag 44, `is_pos=1`, ไม่ยกเลิก) ในช่วงวันที่; เอกสาร 801/802 ที่คีย์มือไม่ถูกแตะ | `dateFrom`, `dateTo` | erp_option, ic_trans, sum_point, pos_point_period, ic_trans_detail, ic_inventory_detail, cb_trans | workflow_handler.go:101 → sysproc_tools.go:152 | Write (permission.go:51) |
-| `workflow/check-ic-trans` | นับแถวที่แต่ละการตรวจของ C# พบ และเมื่อ `apply:true` รันคำสั่งซ่อมของการตรวจนั้น (แยก savepoint ต่อการตรวจ) | `apply`, `indexes[]` | (ตามคำสั่งตรวจ/ซ่อมแต่ละข้อ) | :94 → sysproc_tools.go:47 | `apply:false` = Read, `apply:true` = Admin (permission.go:96-101) |
+| `workflow/check-ic-trans` | นับแถวที่แต่ละการตรวจพบ (รายการตรวจอยู่ใน `sysproc_ic_checks_data.go`) และเมื่อ `apply:true` รันคำสั่งซ่อมของการตรวจนั้น (แยก savepoint ต่อการตรวจ) | `apply`, `indexes[]` | (ตามคำสั่งตรวจ/ซ่อมแต่ละข้อ) | :94 → sysproc_tools.go:47 | `apply:false` = Read, `apply:true` = Admin (permission.go:96-101) |
 | `workflow/ai-smart-reorder` | แนะนำการสั่งซื้อซ้ำจากยอดคงเหลือสุทธิ หน่วยมาตรฐานและหน่วยขนาน (`*big.Rat`, ไม่เรียก LLM) | `onlyParallel` | ic_opposite_unit, ic_trans_detail, ic_trans, ic_inventory | :152 → ai_copilot.go:945 | ไม่อยู่ใน routeRights = **Admin** |
 
-- ผลลัพธ์: point-recal `{"docs":<n>,"updated":<n>}`; check-ic-trans อาร์เรย์ `{index,name,auto,repairable,count,updated,error?}` (ถ้า `apply:true` ไม่ส่ง `indexes` ซ่อมชุดที่ C# `_startProcess` ตั้ง `auto`); ai-smart-reorder `{totalItemsAnalyzed,parallelItemsCount,needReorderCount,items[]}`
+- ผลลัพธ์: point-recal `{"docs":<n>,"updated":<n>}`; check-ic-trans อาร์เรย์ `{index,name,auto,repairable,count,updated,error?}` (ถ้า `apply:true` ไม่ส่ง `indexes` ซ่อมเฉพาะการตรวจที่ตั้ง `auto: true`); ai-smart-reorder `{totalItemsAnalyzed,parallelItemsCount,needReorderCount,items[]}`
 - ผู้เรียก: `SystemProcessWorkbenchScreen.tsx:483` (check-ic-trans นับ), `:705` (ซ่อม), `:710` (point-recal), `:339` (ai-smart-reorder)
 
 ## ที่มาในโค้ด
@@ -86,9 +86,9 @@ POST /api/v1/process/stocktools/docnonext     (Authorization: Bearer <token>)
 - `backend/internal/adapter/inbound/http/router.go:126-208` (route ทั้งสอง prefix)
 - `backend/internal/adapter/inbound/http/process/handler.go:19,32-88` (maxJSONBody, rebuildStockRequest, RebuildStock)
 - `backend/internal/adapter/inbound/http/process/stocktools_handler.go:23-37,89-190` (serve + StockTools)
-- `backend/internal/adapter/inbound/http/process/permission.go:24-52,68-72,81-86,96-101`
+- `backend/internal/adapter/inbound/http/process/permission.go:24-52,68-73,81-86,96-101`
 - `backend/internal/adapter/inbound/http/process/workflow_handler.go:25,94-115,152`
-- `backend/internal/application/process/service.go:33-47,548-573,575-` (RebuildStock และ action)
+- `backend/internal/application/process/service.go:33-47,556-627,705-805` (`RebuildStock`, `rebuildStockWithOptionsTx`, `checkSODocSuccessTx`, `recheckDocFlowTx`)
 - `backend/internal/application/process/{stock_tools,stock_lot,stock_beginning,hidden_cost,point_doc,check_price,doc_no_next,sysproc_tools,ai_copilot}.go` (บรรทัดตามตาราง)
 - `frontend/src/lib/query-client.ts:72-84`; `frontend/src/lib/doc-no.ts:21`; `frontend/src/app/api/process/{stock/rebuild,stocktools/[action]}/route.ts`
 - `frontend/account/master/*.tsx`, `frontend/account/transaction/StockBeginningBalanceScreen.tsx`, `frontend/account/process/SystemProcessWorkbenchScreen.tsx`

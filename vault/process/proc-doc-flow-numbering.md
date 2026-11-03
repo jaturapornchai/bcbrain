@@ -2,7 +2,7 @@
 title: "สถานะต่อเนื่องของเอกสาร กราฟโยงเอกสาร และเลขที่เอกสารถัดไป (Doc flow & numbering)"
 tags: [process, document, doc-flow, numbering, erp_doc_format, advisory-lock]
 aliases: ["docFlowTx", "flowRules", "used_status", "doc_success", "approve_status", "doc/flow", "DocFlow graph", "NextDocNo", "nextDocNo", "erp_doc_format", "autoRunPattern", "เลขที่เอกสารถัดไป"]
-sources: ["backend/internal/application/process/doc_flow.go:9", "backend/internal/application/process/doc_flow.go:91", "backend/internal/application/process/doc_flow.go:146", "backend/internal/application/process/doc_flow.go:239", "backend/internal/application/process/doc_flow.go:470", "backend/internal/application/process/doc_flow_graph.go:16", "backend/internal/application/process/doc_flow_graph.go:269", "backend/internal/application/process/doc_flow_graph.go:809", "backend/internal/application/process/doc_cancel.go:391", "backend/internal/application/process/doc_no_next.go:59", "backend/internal/application/process/stock_tools.go:701"]
+sources: ["backend/internal/application/process/doc_flow.go:14", "backend/internal/application/process/doc_flow.go:91", "backend/internal/application/process/doc_flow.go:146", "backend/internal/application/process/doc_flow.go:239", "backend/internal/application/process/doc_flow.go:470", "backend/internal/application/process/doc_flow_graph.go:16", "backend/internal/application/process/doc_flow_graph.go:269", "backend/internal/application/process/doc_flow_graph.go:809", "backend/internal/application/process/doc_cancel.go:391", "backend/internal/application/process/doc_no_next.go:59", "backend/internal/application/process/stock_tools.go:701"]
 ---
 
 # สถานะต่อเนื่องของเอกสาร กราฟโยงเอกสาร และเลขที่เอกสารถัดไป (Doc flow & numbering)
@@ -12,15 +12,15 @@ sources: ["backend/internal/application/process/doc_flow.go:9", "backend/interna
 ## ทำงานอย่างไร
 
 ### 1. เครื่องคำนวณสถานะ (`doc_flow.go`)
-- พอร์ตจาก C# `_docFlowThread._docFlowProcess` (คอมเมนต์หัวไฟล์ อ้าง cs:1970-3230)
+- หลักการ (คอมเมนต์หัวไฟล์ `doc_flow.go:14-17`): หลังบันทึก/ลบ/ยกเลิก/อนุมัติเอกสาร ระบบคำนวณ `last_status`, `used_status`, `used_status_2`, `doc_success`, `approve_status` ของเอกสารนั้นและเอกสารที่มันชี้ไปใหม่ จากแถวดิบที่อ้างถึงเท่านั้น จึงรันซ้ำได้ผลเท่าเดิม
 - `docFlowTx(tx, docNos)`: คิวเอกสาร -> หา `trans_flag` ทุกตัวของเอกสาร (`docTransFlags`) -> `deriveDocFlow` ทีละ flag -> หาเอกสารต้นทางที่เอกสารนี้ชี้ไป (`docFlowSources`) ต่อคิว (ใช้ `seen` กันวน ไม่มีเพดานจำนวน) คืนจำนวนแถวที่สถานะเปลี่ยน
-- `deriveDocFlow`: ถ้า flag เป็น "เอกสารต้นฉบับที่มีเอกสารยกเลิก" (`cancelFlagOf`) คำนวณ `last_status` ก่อน (`deriveLastStatus`) แล้วใช้กฎของ flag (`flowRules[flag]`) ผ่าน `applyFlowRule`
-- `last_status` ของต้นฉบับ = 1 เมื่อ `is_cancel = 1` หรือมีเอกสาร flag ยกเลิกที่ `doc_ref` ชี้มา (กรอง `cancel_type` ตาม `cancelTypeFilter` ที่ `doc_flow.go:234`: ยกเลิกรายสินค้าไม่นับเป็นยกเลิกทั้งใบ) แล้วเขียนค่าเดียวกันลงบรรทัด/ซีเรียล/ap_ar/cb ที่เกี่ยวข้อง (`ic_trans_detail`, `ic_trans_serial_number`, `ap_ar_trans_detail`, `cb_trans`, `cb_trans_detail`)
+- `deriveDocFlow`: ถ้า flag เป็น "เอกสารหลักที่มีเอกสารยกเลิก" (`cancelFlagOf`) คำนวณ `last_status` ก่อน (`deriveLastStatus`) แล้วใช้กฎของ flag (`flowRules[flag]`) ผ่าน `applyFlowRule`
+- `last_status` ของเอกสารหลัก = 1 เมื่อ `is_cancel = 1` หรือมีเอกสาร flag ยกเลิกที่ `doc_ref` ชี้มา (กรอง `cancel_type` ตาม `cancelTypeFilter` ที่ `doc_flow.go:234`: ยกเลิกรายสินค้าไม่นับเป็นยกเลิกทั้งใบ) แล้วเขียนค่าเดียวกันลงบรรทัด/ซีเรียล/ap_ar/cb ที่เกี่ยวข้อง (`ic_trans_detail`, `ic_trans_serial_number`, `ap_ar_trans_detail`, `cb_trans`, `cb_trans_detail`)
 - `flowRules` (map ต่อ flag) นิยาม SQL ของ `used`, `used2`, จำนวนบรรทัด/จำนวนรวม/จำนวนที่ถูกลด และโหมด `doc_success` (`successNew`, `successExact`, `successItems`, `successPR`); ตัวอย่างที่อ่านได้จากโค้ด: flag 2 ใบขอซื้อ (อนุมัติ flag 4), 6 ใบสั่งซื้อ (อนุมัติ 8), 30 ใบเสนอราคา, 34 ใบจอง (อนุมัติ 38), 36 ใบสั่งขาย (อนุมัติ 52), 10/11/40/110 มัดจำ/เงินล่วงหน้า (`depositRule`), 12/315/87/99/250/260 กลุ่มที่ถูกวางบิล (`billedRule`)
 - `approve_status` (`approveSQL`): เอกสารอนุมัติอัตโนมัติ (`auto_approved = 1`) = 1; มีเอกสารอนุมัติและ `not_approve_1 = 0` = 1; `not_approve_1 = 1` = 2; ไม่มีเอกสารอนุมัติ ใช้ผลจาก `erp_credit_approved_logs` หรือค่า ELSE (ใบจอง/ใบสั่งขาย = 1)
 - การตัดสิน `doc_success` ใช้ `*big.Rat` (`flowDocSuccess`, `itemsDocSuccess`, `poUsedUp`) ไม่ใช้ float
-- `recheckAllDocFlow`: ตรวจทั้งบริษัท (คำนวณ `last_status` ของต้นฉบับทุกใบก่อน เพราะกฎอ่านสถานะของเอกสารอื่น แล้วค่อยใช้กฎของทุก flag); เรียกจากงานสร้างสต็อกใหม่ (`service.go:786`)
-- ข้อจำกัดที่โค้ดระบุ (`ponytail`): flag ใบเบิก/ขอโอน IC (122/56/124) และ ap_ar_trans 213/235 ยังไม่พอร์ต
+- `recheckAllDocFlow`: ตรวจทั้งบริษัท (คำนวณ `last_status` ของเอกสารหลักทุกใบก่อน เพราะกฎอ่านสถานะของเอกสารอื่น แล้วค่อยใช้กฎของทุก flag); เรียกจากงานสร้างสต็อกใหม่ (`service.go:786`)
+- ข้อจำกัดที่โค้ดระบุ (`ponytail`): flag ใบเบิก/ขอโอน IC (122/56/124) และ ap_ar_trans 213/235 ยังไม่ได้คำนวณสถานะ (`doc_flow.go:89`)
 
 ### 2. กราฟโยงเอกสาร (`POST /process/doc/flow`)
 - Input `DocFlowInput`: `docNo`, `transFlag`, `kind`; ว่าง `docNo` -> "กรุณาระบุเลขที่เอกสาร"; สิทธิ์ `read`
@@ -44,7 +44,7 @@ sources: ["backend/internal/application/process/doc_flow.go:9", "backend/interna
 - ผลลัพธ์ของ `flowRules` ขึ้นกับตัวเลือกบริษัท `purchase_request_approve_until_end` (โหมด `successPR`)
 
 ## ที่มาในโค้ด
-- `backend/internal/application/process/doc_flow.go:9-17` - ที่มา C# และหลักการคำนวณจากแถวดิบ
+- `backend/internal/application/process/doc_flow.go:14-17` - หลักการคำนวณจากแถวดิบ
 - `backend/internal/application/process/doc_flow.go:91-132` - `flowRules` และ `init()` เพิ่มกฎ flag ที่ได้แต่ `used_status_2`
 - `backend/internal/application/process/doc_flow.go:146` - `docFlowTx`
 - `backend/internal/application/process/doc_flow.go:180` - `deriveDocFlow`

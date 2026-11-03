@@ -2,7 +2,7 @@
 title: "ตั้งค่าและควบคุมระบบขายหน้าร้าน POS (PosSetupAndControlScreen)"
 tags: [screens, pos]
 aliases: ["PosSetupAndControlScreen", "createPosSetupScreen", "กำหนดค่าเริ่มต้น POS", "กำหนดรหัสเครื่อง POS", "กำหนดคุณสมบัติของเครื่อง POS", "กำหนดเงื่อนไขสะสมแต้ม", "กำหนดค่าเครื่องรูดบัตรเครดิต", "รายละเอียดคูปอง", "ออกแบบหน้าจอขาย POS", "1016", "1017", "1018", "1019", "1020", "1021", "1050", "1051", "1074", "menu_config_pos_startup", "menu_config_pos_machine", "client_design"]
-sources: ["frontend/account/pos/PosSetupAndControlScreen.tsx:37", "frontend/account/pos/PosSetupAndControlScreen.tsx:134", "frontend/account/pos/PosSetupAndControlScreen.tsx:177", "frontend/account/pos/PosSetupAndControlScreen.tsx:362", "frontend/account/pos/PosSetupAndControlScreen.tsx:488", "frontend/account/pos/PosSetupAndControlScreen.tsx:758", "frontend/account/pos/PosSetupAndControlScreen.tsx:816", "frontend/account/pos/PosSetupAndControlScreen.tsx:1083", "frontend/account/pos/PosSetupAndControlScreen.tsx:4705", "frontend/account/tabs/screenRegistry.tsx:133", "frontend/account/tabs/screenRegistry.tsx:1285", "frontend/src/config/bcMenu.ts:61"]
+sources: ["frontend/account/pos/PosSetupAndControlScreen.tsx:37", "frontend/account/pos/PosSetupAndControlScreen.tsx:134", "frontend/account/pos/PosSetupAndControlScreen.tsx:177", "frontend/account/pos/PosSetupAndControlScreen.tsx:362", "frontend/account/pos/PosSetupAndControlScreen.tsx:488", "frontend/account/pos/PosSetupAndControlScreen.tsx:758", "frontend/account/pos/PosSetupAndControlScreen.tsx:816", "frontend/account/pos/PosSetupAndControlScreen.tsx:1083", "frontend/account/pos/PosSetupAndControlScreen.tsx:4705", "frontend/account/tabs/screenRegistry.tsx:133", "frontend/account/tabs/screenRegistry.tsx:1285", "frontend/src/config/bcMenu.ts:44"]
 ---
 # ตั้งค่าและควบคุมระบบขายหน้าร้าน POS (PosSetupAndControlScreen)
 
@@ -19,17 +19,17 @@ sources: ["frontend/account/pos/PosSetupAndControlScreen.tsx:37", "frontend/acco
 | 1019 | กำหนดเงื่อนไขสะสมแต้ม (`menu_pos_point_rate`) | `loyalty` |
 | 1020 | กำหนดค่าเครื่องรูดบัตรเครดิต (`menu_edc_config`) | `qr` เฉพาะส่วน EDC |
 | 1021 | กำหนดค่าจอแสดงผล QR Code (`menu_usb_qr_display_config`) | `qr` เฉพาะส่วนจอ QR |
-| 1050 | ออกแบบหน้าจอขาย POS (`client_design`) | `machines` เฉพาะ "สตูดิโอออกแบบหน้าจอขาย" (`isClientDesignMenu`, `screenRegistry.tsx:1285-1292`) |
+| 1050 | ออกแบบหน้าจอขาย POS (`client_design`) | `machines` เฉพาะ "สตูดิโอออกแบบหน้าจอขาย" (`isClientDesignMenu` `PosSetupAndControlScreen.tsx:379`; ทางเข้าในทะเบียนหน้าจอ `screenRegistry.tsx:1283-1292`) |
 | 1051 | Download ระบบเสียงพูด (`menu_pos_sound_download_install`) | `startup` เฉพาะส่วนตั้งค่าเสียง |
 | 1074 | รายละเอียดคูปอง (`menu_coupon_list`) | `coupons` ส่วนเพิ่ม/แก้ไข + รายการ |
 
-เมนูที่ลงทะเบียนในโค้ดแต่ **ไม่โผล่ในเมนู ERP** เพราะโหนดแม่ `menu_so_pos_sub` มี tag เป็น `&2&` ไม่มี `&13&` จึงถูกตัดโดย `removeByVersion` (`bcMenu.ts:40-69`; ชื่อเมนูใน `bcMenu.json`): `menu_coupon_generate` (สร้างคูปองแบบเร็ว), `menu_save_pos_receive_money` (รับเงินทอนเปิดกะ), `menu_save_send_money_pos` (ส่งเงินปิดกะ), `pos_invoice_list_pos`, `pos_full_invoide_list_pos` (ใบกำกับภาษีเต็มรูป) และ `pos_invoice_cancel_pos` (ยกเลิกใบกำกับอย่างย่อ) แท็บ `promotions` ก็เช่นกัน ในเมนูรหัส 2015 `pos_promotion_formula` ใช้จอ master-detail ของ ERP แท็บโปรโมชั่นของจอนี้เปิดได้จากหน้าตั้งค่าในพื้นที่ `/pos` เท่านั้น ([[scr-pos-demo-workspace]]) กลไกเมนูดู [[fe-screen-registry-menu]]
+เมนูที่ลงทะเบียนในโค้ดแต่ **ไม่โผล่ในเมนู ERP** เพราะโหนดแม่ `menu_so_pos_sub` มี tag เป็น `&2&` ไม่มี `&13&` จึงถูกตัดโดย `removeByVersion` (`bcMenu.ts:44-74`; ชื่อเมนูใน `bcMenu.json`): `menu_coupon_generate` (สร้างคูปองแบบเร็ว), `menu_save_pos_receive_money` (รับเงินทอนเปิดกะ), `menu_save_send_money_pos` (ส่งเงินปิดกะ), `pos_invoice_list_pos`, `pos_full_invoide_list_pos` (ใบกำกับภาษีเต็มรูป) และ `pos_invoice_cancel_pos` (ยกเลิกใบกำกับอย่างย่อ) แท็บ `promotions` ก็เช่นกัน ในเมนูรหัส 2015 `pos_promotion_formula` ใช้จอ master-detail ของ ERP แท็บโปรโมชั่นของจอนี้เปิดได้จากหน้าตั้งค่าในพื้นที่ `/pos` เท่านั้น ([[scr-pos-demo-workspace]]) กลไกเมนูดู [[fe-screen-registry-menu]]
 
 ## แถบปุ่มและโหมดแก้ไข (`:1083-1182`)
-- แถวหัว: ชื่อจอ "หน้าจอบันทึก/แก้ไขข้อมูลและควบคุมระบบขายหน้าร้าน (BC Ai POS)", ข้อความสถานะสีเขียว, ข้อความ "ซิงก์ข้อมูลล่าสุดกับ BC Ai POS แล้ว" / "บันทึกล่าสุด <เวลา>", ป้าย "โหมดดูข้อมูล" / "โหมดแก้ไข" และลิงก์ **เปิดจอขายแคชเชียร์ POS (/pos)**
+- แถวหัว: ชื่อจอ "หน้าจอบันทึก/แก้ไขข้อมูลและควบคุมระบบขายหน้าร้าน (BC Ai POS Integration)" (`:1086`), ข้อความสถานะสีเขียว, ข้อความ "ซิงก์ข้อมูลล่าสุดกับ BC Ai POS แล้ว" / "บันทึกล่าสุด <เวลา>", ป้าย "โหมดดูข้อมูล" / "โหมดแก้ไข" และลิงก์ **เปิดจอขายแคชเชียร์ POS (/pos)**
 - โหมดดูข้อมูล มีปุ่ม **แก้ไข** (ต้องมี `rights.canEdit`), **เพิ่มใหม่** (`canAdd`), **ลบ** (`canDelete`) และ **ปิดหน้าจอ** (ถ้ามี `onClose`) สิทธิ์จาก `useScreenRights` ดู [[proc-permission-rights]]
 - **เพิ่มใหม่** ในแท็บเครื่อง POS เติมค่าให้ฟอร์ม: รหัส `POS-0<N+1>`, ชื่อ "จุดแคชเชียร์หน้าร้าน #N+1", รูปแบบเลขเอกสาร `ABB<N>-@YY@MM-#####` (ย่อ), `TAX<N>-@YY@MM-#####` (เต็มรูป), `CNM<N>-@YY@MM-#####` (ยกเลิก), เครื่องพิมพ์ "Thermal 80mm Auto-Cut", ระดับราคา 1 (`:1125-1141`)
-- โหมดแก้ไข เหลือปุ่ม **บันทึก** กับปุ่มที่ป้ายว่า **ปิดหน้าจอ** แต่ทำงานแค่ `setIsEditing(false)` คือ "ออกจากโหมดแก้ไขโดยไม่บันทึก" ไม่ใช่ปิดแท็บ
+- โหมดแก้ไข เหลือปุ่ม **บันทึก** กับปุ่มที่ป้ายว่า **ปิดหน้าจอ** แต่ทำงานแค่ `setIsEditing(false)` คือออกจากโหมดแก้ไขโดยไม่บันทึก ไม่ใช่ปิดแท็บ (`:1171-1174`)
 - ไม่มีคีย์ลัด (ไม่ใช้ `ScreenHeader`) สิทธิ์อ่านอย่างเดียวบันทึกไม่ได้ ขึ้น `คุณไม่มีสิทธิ์ "เพิ่ม/แก้ไขข้อมูล" ในหน้าจอนี้ ...` (`:759-762`)
 
 ## แท็บ startup: กำหนดค่าเริ่มต้น POS (1016, 1051)
@@ -44,8 +44,8 @@ sources: ["frontend/account/pos/PosSetupAndControlScreen.tsx:37", "frontend/acco
 1. **ทะเบียนรหัสเครื่อง POS และอุปกรณ์**: ตารางเครื่อง (คลิกแถวเพื่อแก้) และฟอร์ม รหัสเครื่อง, ชื่อจุดขาย, เลขทะเบียน RD Terminal ID, รหัสชุดค่า POS, คลังและที่เก็บตัดสต็อกประจำเครื่อง, ระดับราคา 1-9, รหัสแบบฟอร์มใบเสร็จ, ชื่อเครื่องพิมพ์, จอฝั่งลูกค้า, ลิ้นชักอัตโนมัติ, ประเภทการพิมพ์, สำเนาใบเสร็จอิเล็กทรอนิกส์, อนุญาตขายเชื่อ/สถานะ (`:2055-2290`)
 2. **รูปแบบเลขที่เอกสารประจำเครื่อง**: เลขที่เอกสารย่อ/เต็มรูป/ยกเลิก/รับเงินทอนเปิดกะ/ส่งเงินปิดกะ, รหัสเอกสารและเลขรัน, ขายเชื่อ, ลำดับรายงานสรุปยอดขาย, ข้อความหัวบิลประจำเครื่อง และการตั้ง KBank QR API (`:2319-2440`) รูปแบบเลขใช้ตัวแปร `@YY@MM-#####` (แบ็กเอนด์ตรวจ doc_format ซ้ำ/ไม่มี `#` แล้วตอบ 400 ที่จอแสดงตรง ๆ `:804`) หลักเลขเอกสารดู [[proc-doc-flow-numbering]]
 3. **สถานะซิงก์เครื่อง POS และรหัสเชื่อมเครื่อง** (`:1782-1935`): สรุป "รอคำนวณสต็อก N รายการ", "บิลผิดพลาด N บิล", ปุ่ม **ประมวลผลบิลที่ผิดพลาดใหม่** (`POST /api/pos/bills/reprocess`), ปุ่ม **รีเฟรช** และตารางเครื่อง (สถานะ, ซิงก์ล่าสุด, พบเครื่องล่าสุด, บิลรอส่ง, บิลผิดพลาด, เวอร์ชันแอป) แต่ละแถวมีปุ่ม **สร้างรหัสเชื่อมเครื่อง** เปิดหน้าต่างยืนยัน แล้วเรียก `POST /api/pos/devices/<เครื่อง>/pair` ได้รหัสที่แสดง **ครั้งเดียว** พร้อมปุ่ม "คัดลอกรหัส" (`:1007-1037`, ข้อความ "รหัสนี้แสดงครั้งเดียว") รีเฟรชอัตโนมัติเป็นช่วง ๆ (`:1929`)
-- เมนู 1018 (`isPosScreenMenu`, `:2476-2778`): 5 ส่วนย่อย กำหนดทั่วไปและเครื่องพิมพ์ (รหัสเครื่อง, รูปแบบ/ฟอร์มใบเสร็จ, ชนิดเครื่องพิมพ์, พอร์ตลิ้นชัก, เครื่องพิมพ์ใบกำกับเต็มรูป) / จอแสดงผล (หน้าจอหลัก, หน้าจอที่ 2, จำนวนรายการค้นหาสูงสุด) / ฟอนต์ใบเสร็จ (หัว, รายการ, ท้าย, กว้างกระดาษ px) / ระบบเสียง / จอแสดงผลลูกค้า (พอร์ต, Baud Rate, Parity, จำนวนตัวอักษรต่อบรรทัด)
-- เมนู 1050 (`isClientDesignMenu`, `:2778-2884`): "สตูดิโอออกแบบหน้าจอขาย POS และปุ่มลัดสินค้า" ตั้งรหัสผังหน้าจอขาย, ชื่อรูปแบบ, ความละเอียด, รูปแบบการจัดวาง, จำนวนคอลัมน์/แถวปุ่มสินค้าด่วน, ขนาดตัวอักษรยอดรวม, ธีมสี (ตาราง `pos_screen_define`, `:2783`)
+- เมนู 1018 (`isPosScreenMenu`, `:2476-2778`): 5 ส่วนย่อย กำหนดทั่วไปและเครื่องพิมพ์ (รหัสเครื่อง, รูปแบบ/ฟอร์มใบเสร็จ, ชนิดเครื่องพิมพ์, พอร์ตลิ้นชัก, เครื่องพิมพ์ใบกำกับเต็มรูป) / จอแสดงผล (หน้าจอหลัก, หน้าจอที่ 2, จำนวนรายการค้นหาสูงสุด) / ฟอนต์ใบเสร็จ (หัว, รายการ, ท้าย, กว้างกระดาษ px) / ระบบเสียง / จอแสดงผลลูกค้า (พอร์ต, Baud Rate, พาริตี, จำนวนตัวอักษรต่อบรรทัด)
+- เมนู 1050 (`isClientDesignMenu`, `:2778-2884`): หัวส่วน "สตูดิโอออกแบบหน้าจอขาย POS & ปุ่มลัดสินค้าทัชสกรีน (POS Client Screen Designer)" (`:2783`) ตั้งรหัสผังหน้าจอขาย, ชื่อรูปแบบ, ความละเอียด, รูปแบบการจัดวาง, จำนวนคอลัมน์/แถวปุ่มสินค้าด่วน, ขนาดตัวอักษรยอดรวม, ธีมสี (ตาราง `pos_screen_define`, `:2783`)
 - **ลบเครื่อง**: ถามยืนยัน "มีข้อมูลที่ต้องลบจำนวน: 1 รายการ ต้องการลบ <รหัส> จริงหรือไม่" (ค่าเริ่มต้น = ไม่ลบ) แล้วรัน `DELETE FROM pos_id WHERE UPPER(machinecode)=UPPER(...)` ผ่าน `queryExec` ตรง ๆ (`:826-840`)
 
 ## แท็บ loyalty: เงื่อนไขสะสมแต้ม (1019)
@@ -53,8 +53,8 @@ sources: ["frontend/account/pos/PosSetupAndControlScreen.tsx:37", "frontend/acco
 
 ## แท็บ qr: QR และเครื่องรูดบัตร (1020, 1021)
 - ทั่วไป: PromptPay / Thai QR มาตรฐาน EMVCo: รหัสเครื่อง, รูปแบบสร้าง QR, ชื่อร้านค้า (Merchant Name), รหัสพร้อมเพย์ e-Wallet, Biller ID 15 หลัก, Terminal ID, Store ID (`:4007-4090`)
-- 1020 EDC: พอร์ตเครื่องรูดบัตร (และ KTB), รูปแบบเครื่อง, Baud Rate, Parity/Data/Stop (`:4099-4180`)
-- 1021 จอ QR: พอร์ต, Baud Rate, Parity/Data/Stop (`:4185-4245`)
+- 1020 EDC: พอร์ตเครื่องรูดบัตร (และ KTB), รูปแบบเครื่อง, Baud Rate, พาริตี/Data/Stop (`:4099-4180`)
+- 1021 จอ QR: พอร์ต, Baud Rate, พาริตี/Data/Stop (`:4185-4245`)
 - บันทึกส่ง `section: "qr"`
 
 ## แท็บ coupons: คูปอง (1074)
@@ -88,6 +88,6 @@ sources: ["frontend/account/pos/PosSetupAndControlScreen.tsx:37", "frontend/acco
 
 ## ที่มาในโค้ด
 - `frontend/account/pos/PosSetupAndControlScreen.tsx:37-45` แท็บ; `:134-145` เลือกแท็บจากชื่อเมนู; `:177-198` `callPos`; `:362-386` ตัวแปรโหมดเมนู; `:488-540` bootstrap; `:758-856` บันทึก/ลบ; `:858-967` คูปองชุดและโปรโมชั่น; `:969-1080` ยกเลิกบิล, เชื่อมเครื่อง, ประมวลผลบิลใหม่; `:1083-1182` แถบปุ่ม; `:1214-1752` startup; `:1753-2884` machines; `:2884-3598` promotions; `:3598-4001` loyalty; `:4001-4248` qr; `:4248-4500` coupons; `:4500-4705` shifts; `:4705-4948` bills + หน้าต่างเชื่อมเครื่อง
-- `frontend/account/tabs/screenRegistry.tsx:133-145,812-980,1285-1292` — การผูกเมนู
-- `frontend/src/config/bcMenu.ts:40-69` — กรองเมนูตาม tag
+- `frontend/account/tabs/screenRegistry.tsx:133-145,812-980,1283-1292` — การผูกเมนู
+- `frontend/src/config/bcMenu.ts:44-74` — กรองเมนูตาม tag
 - ดูเพิ่ม: [[scr-pos-demo-workspace]] · [[fe-process-pos-screens]] · [[scr-universal-trans]] · [[screens-overview]]

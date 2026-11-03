@@ -2,7 +2,7 @@
 title: "ภาพรวมระบบบัญชี BC AI Account (Accounting Overview)"
 tags: [accounting, hub, overview]
 aliases: ["ภาพรวมบัญชี", "flow บัญชี", "เอกสารลงบัญชีอย่างไร", "เอกสารไป GL", "accounting flow"]
-sources: ["backend/internal/application/process/trans.go:267", "backend/internal/application/process/trans.go:510", "backend/internal/application/process/trans.go:593", "backend/internal/application/process/service.go:1007", "backend/internal/application/process/service.go:1378"]
+sources: ["backend/internal/application/process/trans.go:267", "backend/internal/application/process/trans.go:510", "backend/internal/application/process/trans.go:593", "backend/internal/application/process/service.go:1018", "backend/internal/application/process/service.go:1389"]
 ---
 
 # ภาพรวมระบบบัญชี BC AI Account
@@ -22,9 +22,9 @@ saveTransTx (trans.go:510)  = ลบแถวเดิมของเอกส�
    ic_trans + ic_trans_detail + VAT/WHT + cb_trans (แท็บจ่าย) + มัดจำ
    v
 rebuildTransDerived (trans.go:593)
-   |- rebuildStockTx      -> balance_qty, average_cost, sum_of_cost  (service.go:1007)
+   |- rebuildStockTx      -> balance_qty, average_cost, sum_of_cost  (service.go:1018)
    |- SyncTransferPair    -> 422 โอนเงินออก สร้างคู่ 420
-   |- rebuildGLTx         -> gl_journal / gl_journal_detail          (service.go:1378)
+   |- rebuildGLTx         -> gl_journal / gl_journal_detail          (service.go:1389)
    |     ใช้ template (erp_doc_format_gl) ก่อน ถ้าไม่มีจึงใช้ standard
    |- syncStockTransferIn -> 72 โอนออก / 70 โอนเข้า
    '- RebuildChequeStatus -> cb_chq_list.status
@@ -78,8 +78,8 @@ COMMIT  (ล้มที่ขั้นใดก็ rollback ทั้งหม�
 - `backend/internal/application/process/trans.go:267` SaveTrans
 - `backend/internal/application/process/trans.go:510` saveTransTx
 - `backend/internal/application/process/trans.go:593` rebuildTransDerived
-- `backend/internal/application/process/service.go:1007` rebuildStockTx
-- `backend/internal/application/process/service.go:1378` rebuildGLTx
+- `backend/internal/application/process/service.go:1018` rebuildStockTx
+- `backend/internal/application/process/service.go:1389` rebuildGLTx
 
 ## ดูเพิ่ม
 - [[index]]

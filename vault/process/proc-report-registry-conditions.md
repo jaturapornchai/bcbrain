@@ -7,7 +7,7 @@ sources: ["backend/internal/application/process/report_menu.go:28", "backend/int
 
 # ทะเบียนรายงานรายเมนูและเงื่อนไขกรอง (Menu report registry & conditions)
 
-รายงานแต่ละเมนูของ BC คือฟังก์ชัน `menuReportFunc` ที่ลงทะเบียนไว้ใน map `menuReports` ด้วย key เป็น `menuKey` ตัวพิมพ์เล็ก ให้ 1 เมนู = 1 รายงานที่พอร์ตมาจากคลาส C# ของเมนูนั้น หน้าจอกรองเงื่อนไขไม่ได้ฮาร์ดโค้ด แต่ backend เป็นผู้ประกาศรายการ `ReportCondition` กลับไปให้ frontend วาด
+รายงานแต่ละเมนูของ BC คือฟังก์ชัน `menuReportFunc` ที่ลงทะเบียนไว้ใน map `menuReports` ด้วย key เป็น `menuKey` ตัวพิมพ์เล็ก ให้ 1 เมนู = 1 รายงาน หน้าจอกรองเงื่อนไขไม่ได้ฮาร์ดโค้ด แต่ backend เป็นผู้ประกาศรายการ `ReportCondition` กลับไปให้ frontend วาด
 
 ## ทำงานอย่างไร
 
@@ -18,9 +18,9 @@ sources: ["backend/internal/application/process/report_menu.go:28", "backend/int
 - `reportParams` ส่งให้ตัวสร้าง: `MenuKey`, `Title`, `DateFrom/DateTo` (YYYY-MM-DD), `FromCode/ToCode`, `OrderBy`, `Keyword`, `KwLike` (`%คำ%`), `ViewDetail`, `Username`, `Opt` (ค่า options ดิบ)
 
 ### รูปแบบของรายงานกลุ่มสินค้า (`icRun`)
-- แต่ละรายงานเป็น `icSpec` (`code`, `category` = คลาส C# ต้นฉบับ, `subtitle`, `codeLabel`, `cols`, `sql`, `opts`, `cost`, `optCol`, `rangeInSQL`, `perm`)
+- แต่ละรายงานเป็น `icSpec` (`code`, `category` (ส่งออกเป็น `ReportCategory` ของผลรายงาน, `report_menu_ic.go:71`), `subtitle`, `codeLabel`, `cols`, `sql`, `opts`, `cost`, `optCol`, `rangeInSQL`, `perm`)
 - SQL ทุกตัวขึ้นต้นด้วย CTE `prm` (`icPrm`): `$1`=`d1` วันเริ่ม, `$2`=`d2` วันสิ้นสุด, `$3`=`fc` จากรหัส, `$4`=`tc` ถึงรหัส, `$5`=`kw`, `$6`=`kl`, `$7`=`o` (JSON ของ options) -- แต่ละ `$n` ต้องถูกอ้างครั้งเดียว (คอมเมนต์: pgx ปฏิเสธ param ที่ไม่ได้ใช้) ส่วน SQL ที่เหลืออ่านจาก `prm.d1`, `prm.fc` ฯลฯ
-- `icRun` รองรับรายงานสรุป + รายงานรายละเอียด (`ViewDetail` สลับไป spec ที่ 2 ตาม C# `_displayDetail`)
+- `icRun` รองรับรายงานสรุป + รายงานรายละเอียด (`ViewDetail` สลับไป spec ที่ 2 ถ้ามี; ผลบอก `SupportsDetail`/`ViewDetailActive`)
 - ฟังก์ชันช่วย SQL: `icCodeRange(col)` (ช่วงรหัสไม่สนตัวพิมพ์), `icKw(...)` (ILIKE `prm.kl`)
 - ถ้า `cost != icCostNone` และ `itemCostHidden` เป็นจริง จะตัดคอลัมน์ต้นทุนผ่าน `icHideCosts`; ถ้า spec ใช้ `perm` ตั้ง `permGuarded` (ตัวรายงานกรองคลัง/ที่เก็บตามสิทธิ์ ดู [[proc-wh-shelf-permission]])
 - `icAllSpecs` เก็บทุก spec ไว้ให้ unit test ตรวจ SQL/คอลัมน์โดยไม่ต้องใช้ DB
@@ -44,7 +44,7 @@ sources: ["backend/internal/application/process/report_menu.go:28", "backend/int
 ### ช่วงรหัสหลายแถว (`ranges` / `multi`)
 - `parseCodeRanges("A..B,C")`: สูงสุด `maxCodeRangeRows = 50` แถว, ต้องมีค่า "จาก" ไม่ว่าง, "ถึง" ว่าง = เท่ากับค่า "จาก" พอดี; `cleanCode` ตัด control char, `,`, `:`, `..` และจำกัด `maxCodeLen = 40` rune
 - `codeRange.sql(col, bind)`: `upper(col) = upper($n)` หรือ `BETWEEN` แบบไม่สนตัวพิมพ์ (bind แทน placeholder)
-- `parseCodeMulti`: ตัวพิมพ์ใหญ่ ไม่ซ้ำ จำกัด `maxCodeRangeRows*4`; ทุกแถวถูกติ๊กหรือไม่ติ๊กเลย = ไม่กรอง (ตาม C#)
+- `parseCodeMulti`: ตัวพิมพ์ใหญ่ ไม่ซ้ำ จำกัด `maxCodeRangeRows*4`; ทุกแถวถูกติ๊กหรือไม่ติ๊กเลย = ไม่กรอง
 - สมุดรายวัน GL: `glfaBooks` ผูกเป็น `$8::text[]` (`glfaBookPrm`/`glfaBookCond`)
 
 ## จุดที่ต้องระวัง
@@ -60,7 +60,7 @@ sources: ["backend/internal/application/process/report_menu.go:28", "backend/int
 - `backend/internal/application/process/report_options.go:91-122` - ฟังก์ชันสร้างชิ้น SQL `opt*`
 - `backend/internal/application/process/report_code_ranges.go:22-107` - `codeRange`, `parseCodeRanges`, `parseCodeMulti`
 - `backend/internal/application/process/report_menu_ic.go:20` - `icPrm`
-- `backend/internal/application/process/report_menu_ic.go:23-36` - `icSpec`
+- `backend/internal/application/process/report_menu_ic.go:23-35` - `icSpec`
 - `backend/internal/application/process/report_menu_ic.go:41-77` - `icRun`
 
 ## ดูเพิ่ม

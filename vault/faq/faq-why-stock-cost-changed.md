@@ -2,7 +2,7 @@
 title: "ทำไมต้นทุนของเอกสารเก่าเปลี่ยนเอง ทั้งที่ไม่ได้แก้เอกสารนั้น"
 tags: [faq, ic, stock, cost, moving-average, troubleshoot]
 aliases: ["ต้นทุนขายเปลี่ยนเอง", "ต้นทุนเฉลี่ยเปลี่ยน", "why did cost change", "sum_of_cost เปลี่ยน", "บันทึกซื้อย้อนหลังแล้วต้นทุนขายเปลี่ยน", "rebuildTransDerived", "rebuildStockTx", "average_cost เปลี่ยน"]
-sources: ["backend/internal/application/process/trans.go:593", "backend/internal/application/process/service.go:1007", "backend/internal/application/process/service.go:1162", "backend/internal/application/process/service.go:286", "backend/internal/application/process/service.go:1459", "backend/internal/application/process/service.go:1278"]
+sources: ["backend/internal/application/process/trans.go:593", "backend/internal/application/process/service.go:1018", "backend/internal/application/process/service.go:1173", "backend/internal/application/process/service.go:286", "backend/internal/application/process/service.go:1470", "backend/internal/application/process/service.go:1289"]
 ---
 # ทำไมต้นทุนของเอกสารเก่าเปลี่ยนเอง ทั้งที่ไม่ได้แก้เอกสารนั้น
 
@@ -37,8 +37,8 @@ sources: ["backend/internal/application/process/trans.go:593", "backend/internal
 
 ## ที่มาในโค้ด
 - `backend/internal/application/process/trans.go:593` `rebuildTransDerived` คำนวณสต็อกใหม่ แล้วสร้าง GL ของเอกสารนี้ใหม่
-- `backend/internal/application/process/service.go:1007` `rebuildStockTx` คำนวณใหม่ต่อรหัสสินค้า
-- `backend/internal/application/process/service.go:1162` ลำดับวันที่ เวลา และ `calc_flag` ที่ใช้ไล่รายการ
+- `backend/internal/application/process/service.go:1018` `rebuildStockTx` คำนวณใหม่ต่อรหัสสินค้า
+- `backend/internal/application/process/service.go:1173` ลำดับวันที่ เวลา และ `calc_flag` ที่ใช้ไล่รายการ
 - `backend/internal/application/process/service.go:286` เริ่มนับใหม่เมื่อจำนวนสะสม ≤0
-- `backend/internal/application/process/service.go:1459` GL เอกสารสต็อกใช้ผลรวม `sum_of_cost` เมื่อ `total_amount` = 0
-- `backend/internal/application/process/service.go:1278` อัปเดต `ic_inventory.average_cost`
+- `backend/internal/application/process/service.go:1470` GL เอกสารสต็อกใช้ผลรวม `sum_of_cost` เมื่อ `total_amount` = 0
+- `backend/internal/application/process/service.go:1289` อัปเดต `ic_inventory.average_cost`

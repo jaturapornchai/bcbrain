@@ -7,7 +7,7 @@ sources: ["backend/internal/application/process/province_load.go:3", "backend/in
 
 # โหลดข้อมูลจังหวัด/อำเภอ/ตำบลมาตรฐาน (Province Load)
 
-เมนู `menu_setup_province_auto` (C# `BCERPConfig/_provinceLoadFromWebControl`) ให้ผู้ใช้ติ๊กเลือกจังหวัดจากรายการมาตรฐาน แล้วระบบเขียนจังหวัด อำเภอ ตำบลของจังหวัดนั้นลง `erp_province`, `erp_amper`, `erp_tambon` ฝั่ง C# เคยอ่านจากเว็บเซอร์วิส ฝั่งนี้แทนด้วยไฟล์ JSON ที่ฝังในไบนารี (`//go:embed`) จึงไม่เรียกเครือข่ายภายนอก
+เมนู `menu_setup_province_auto` ให้ผู้ใช้ติ๊กเลือกจังหวัดจากรายการมาตรฐาน แล้วระบบเขียนจังหวัด อำเภอ ตำบลของจังหวัดนั้นลง `erp_province`, `erp_amper`, `erp_tambon` ข้อมูลมาตรฐานมาจากไฟล์ JSON ที่ฝังในไบนารี (`//go:embed`) จึงไม่เรียกเครือข่ายภายนอก
 
 ## ทำงานอย่างไร
 

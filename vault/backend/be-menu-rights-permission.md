@@ -19,7 +19,7 @@ sources: ["backend/internal/adapter/inbound/http/middleware/permission.go:62", "
 4. `UserRepository.MenuRights` (`outbound/identity/postgres_repository.go:69`): ก่อนอ่านจะรัน `ALTER TABLE ... ADD COLUMN IF NOT EXISTS database_name` กับ `bc_permissions_user` และ `bc_permissions_group` **ทุกครั้ง** (`:74-75`) แล้ว `UNION ALL`:
    - แถวของผู้ใช้เอง: `bc_permissions_user` (`usercode`) กรอง `database_name` ตรงกับบริษัทหรือว่าง โดยให้แถวที่ตรงบริษัทมาก่อน แล้วเอา `roworder` ล่าสุด 1 แถว.
    - แถวของกลุ่มที่ผู้ใช้อยู่: `bc_permissions_group` ผ่าน `bc_user_and_group` (`group_code`/`user_code`).
-5. แต่ละแถวมี blob `image_file` → `DecodeMenuRights` (`menu_rights.go:48`): ตัด BOM UTF-8; ถ้าขึ้นต้น `{` อ่านเป็น JSON `{"menus":[{"code","read","add","edit","delete"}]}`; ไม่ใช่ก็แปลงจาก XML ของ C# เดิม (`_submeid`, `_isRead`, `_isAdd`, `_isEdit`, `_isDelete`); อ่านไม่ได้ = ไม่ให้สิทธิ์.
+5. แต่ละแถวมี blob `image_file` → `DecodeMenuRights` (`menu_rights.go:48`): ตัด BOM UTF-8; ถ้าขึ้นต้น `{` อ่านเป็น JSON `{"menus":[{"code","read","add","edit","delete"}]}`; ไม่ใช่ก็แปลงจาก XML รูปแบบเก่าผ่าน `legacyMenuXML` (`menu_rights.go:25-33`; แอตทริบิวต์ `_submeid`, `_isRead`, `_isAdd`, `_isEdit`, `_isDelete`); อ่านไม่ได้ = ไม่ให้สิทธิ์.
 
 ## `/process` — แมปสิทธิ์ต่อ route
 

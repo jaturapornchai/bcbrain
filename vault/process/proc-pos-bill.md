@@ -49,7 +49,7 @@ sources: ["backend/internal/application/process/pos_bill.go:20", "backend/intern
 
 ### ยกเลิกบิล `CancelPosBill` (:575)
 - เรียกจาก `PosShiftAction` เมื่อ `action = "cancel_bill"` (`pos_config.go:997`): ตั้ง `cancelled_at`, `cancel_reason`, `cancelled_by` บนแถว inbox (เครื่องยกเลิกได้เฉพาะบิลของตัวเอง) แล้วประมวลผลบิลซ้ำ -- เก็บเป็นเหตุการณ์ดิบเพื่อให้การสร้างใหม่จาก inbox ยังคงยกเลิก
-- `cancelPosBillTx` (:601) ตามคอมเมนต์อ้างอิง C# `_cancelBillForm.cs:126-142`: ตั้ง `last_status = 1` (และ `is_cancel = 1` ที่หัว) ใน `ic_trans`, `ic_trans_detail`, `cb_trans_detail` ของ flag 44; ลบแล้วเพิ่มหัวเอกสาร `trans_flag = 45` เลข `left('CNM-' || doc_no, 25)` ที่ `doc_ref` ชี้บิลเดิม; แล้ว `rebuildGLTx` ให้บิลที่ยกเลิกไม่มีรายการบัญชี ข้อความเหตุผลเริ่มต้น "ยกเลิกบิลขาย POS"
+- `cancelPosBillTx` (:601): ตั้ง `last_status = 1` (และ `is_cancel = 1` ที่หัว) ใน `ic_trans`, `ic_trans_detail`, `cb_trans_detail` ของ flag 44; ลบแล้วเพิ่มหัวเอกสาร `trans_flag = 45` เลข `left('CNM-' || doc_no, 25)` ที่ `doc_ref` ชี้บิลเดิม; แล้ว `rebuildGLTx` ให้บิลที่ยกเลิกไม่มีรายการบัญชี ข้อความเหตุผลเริ่มต้น "ยกเลิกบิลขาย POS"
 
 ### แต้มสมาชิกและคูปอง (สร้างใหม่ ไม่ลดทีละรายการ)
 - `rebuildPosCustomerPoints` (:636): `point_balance` = max(0, ผลรวม `sum_point` ของ `ic_trans` ที่ `last_status = 0` และไม่ยกเลิก (flag 412 ติดลบ; นับเอกสาร POS หรือ flag 44, 410, 412) ลบด้วยผลรวม `cb_trans.point_qty` ของเอกสารที่ยังไม่ถูกยกเลิก) ดูเทียบ [[proc-sysproc-tools]] (`point-recal` ที่คำนวณ `sum_point` ใหม่ย้อนหลัง)

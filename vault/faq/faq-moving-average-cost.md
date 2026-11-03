@@ -2,7 +2,7 @@
 title: "ต้นทุนสินค้าคิดแบบไหน ถัวเฉลี่ยเคลื่อนที่คำนวณยังไง"
 tags: [faq, ic, stock, cost, moving-average]
 aliases: ["ต้นทุนถัวเฉลี่ยคิดยังไง", "moving average cost", "ต้นทุนเฉลี่ยเคลื่อนที่", "average_cost", "sum_of_cost", "CalculateMovingAverage", "ต้นทุนขายคิดจากอะไร", "item_price_decimal"]
-sources: ["backend/internal/application/process/service.go:189", "backend/internal/application/process/service.go:268", "backend/internal/application/process/service.go:286", "backend/internal/application/process/service.go:327", "backend/internal/application/process/service.go:974", "backend/internal/application/process/service.go:1162"]
+sources: ["backend/internal/application/process/service.go:189", "backend/internal/application/process/service.go:268", "backend/internal/application/process/service.go:286", "backend/internal/application/process/service.go:327", "backend/internal/application/process/service.go:985", "backend/internal/application/process/service.go:1173"]
 ---
 # ต้นทุนสินค้าคิดแบบไหน ถัวเฉลี่ยเคลื่อนที่คำนวณยังไง
 
@@ -37,8 +37,8 @@ sources: ["backend/internal/application/process/service.go:189", "backend/intern
 
 ## ข้อควรระวัง
 - ช่อง "ประเภทต้นทุน" (`cost_type`) ในการ์ดสินค้าไม่มีผลต่อการคำนวณ ทุกตัวคิดแบบถัวเฉลี่ย (ดู [[faq-cost-type-fifo-lot]])
-- เอกสารปรับปรุงเพิ่ม 66 ที่มีจำนวน: มูลค่าสต็อกคิดจากจำนวน × ต้นทุนเฉลี่ย แต่ GL มาตรฐานเดบิตสินค้าคงเหลือด้วยยอดรวมหัวเอกสาร ทั้งสองจึงอาจไม่เท่ากัน โค้ดเขียนไว้ว่าเป็นช่องว่างที่รอลุงจืดตัดสิน (`service.go:2153`)
-- ขั้นเติม `sum_of_cost` ให้บรรทัด 58 ที่ไม่มีราคา ใช้ `ROUND(...,2)` ตายตัว ไม่ได้ใช้จำนวนทศนิยมจาก `erp_option` (`service.go:1052`)
+- เอกสารปรับปรุงเพิ่ม 66 ที่มีจำนวน: มูลค่าสต็อกคิดจากจำนวน × ต้นทุนเฉลี่ย แต่ GL มาตรฐานเดบิตสินค้าคงเหลือด้วยยอดรวมหัวเอกสาร ทั้งสองจึงอาจไม่เท่ากัน โค้ดเขียนไว้ว่าเป็นช่องว่างที่รอลุงจืดตัดสิน (`service.go:2164`)
+- ขั้นเติม `sum_of_cost` ให้บรรทัด 58 ที่ไม่มีราคา ใช้ `ROUND(...,2)` ตายตัว ไม่ได้ใช้จำนวนทศนิยมจาก `erp_option` (`service.go:1063`)
 
 ## ดูเพิ่ม
 - [[acc-inventory-cost-moving-average]]
@@ -53,5 +53,5 @@ sources: ["backend/internal/application/process/service.go:189", "backend/intern
 - `backend/internal/application/process/service.go:268` 66, 48 และ 58/60 เข้าที่ต้นทุนเฉลี่ย
 - `backend/internal/application/process/service.go:286` จำนวนสะสม ≤0 ให้เริ่มนับใหม่จากรายการรับ
 - `backend/internal/application/process/service.go:327` หลังจ่ายออกจนจำนวน ≤0 ตั้งมูลค่าสะสมเป็น 0
-- `backend/internal/application/process/service.go:974` อ่าน `item_price_decimal` / `item_amount_decimal`
-- `backend/internal/application/process/service.go:1162` ลำดับการไล่รายการเคลื่อนไหว
+- `backend/internal/application/process/service.go:985` อ่าน `item_price_decimal` / `item_amount_decimal`
+- `backend/internal/application/process/service.go:1173` ลำดับการไล่รายการเคลื่อนไหว

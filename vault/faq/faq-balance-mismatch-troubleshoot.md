@@ -2,7 +2,7 @@
 title: "ยอดในรายงานไม่ตรงกับงบทดลอง (สต็อก ลูกหนี้ เจ้าหนี้) ต้องเช็กอะไรบ้าง"
 tags: [faq, troubleshooting, stock, ar, ap, gl, reconcile]
 aliases: ["ยอดไม่ตรง", "กระทบยอด", "reconcile", "สต็อกไม่ตรง GL", "ลูกหนี้ไม่ตรงงบทดลอง", "มูลค่าสินค้าคงเหลือไม่ตรง", "menu_ic_recalc", "menu_gl_process", "ประมวลผลจากข้อมูลรายวัน"]
-sources: ["frontend/src/config/bcMenu.json:2580", "frontend/src/config/bcMenu.json:9504", "backend/internal/application/process/trans.go:593", "backend/internal/application/process/service.go:1459", "backend/internal/application/process/service.go:2153", "backend/internal/application/process/service.go:1414", "backend/internal/application/process/report_menu_ap_ar.go:1084", "backend/internal/application/process/gl_template.go:1096"]
+sources: ["frontend/src/config/bcMenu.json:2580", "frontend/src/config/bcMenu.json:9504", "backend/internal/application/process/trans.go:593", "backend/internal/application/process/service.go:1470", "backend/internal/application/process/service.go:2164", "backend/internal/application/process/service.go:1425", "backend/internal/application/process/report_menu_ap_ar.go:1084", "backend/internal/application/process/gl_template.go:1096"]
 ---
 # ยอดในรายงานไม่ตรงกับงบทดลอง (สต็อก ลูกหนี้ เจ้าหนี้) ต้องเช็กอะไรบ้าง
 
@@ -50,8 +50,8 @@ sources: ["frontend/src/config/bcMenu.json:2580", "frontend/src/config/bcMenu.js
 - `frontend/src/config/bcMenu.json:2580` เมนู `menu_ic_recalc` "คำนวณยอดสต๊อกใหม่"
 - `frontend/src/config/bcMenu.json:9504` เมนู `menu_gl_process` "ประมวลผลจากข้อมูลรายวัน"
 - `backend/internal/application/process/trans.go:593` `rebuildTransDerived` ทำ GL ใหม่ให้เฉพาะเอกสารที่บันทึก
-- `backend/internal/application/process/service.go:1459` เอกสารสต็อกยอด 0 ใช้ต้นทุนของบรรทัดเป็นยอด GL
-- `backend/internal/application/process/service.go:2153` คอมเมนต์ Known gap ของ GL ใบปรับปรุงเพิ่ม 66
-- `backend/internal/application/process/service.go:1414` ลบหัว GL ที่ไม่มีบรรทัดก่อนสร้างใหม่
+- `backend/internal/application/process/service.go:1470` เอกสารสต็อกยอด 0 ใช้ต้นทุนของบรรทัดเป็นยอด GL
+- `backend/internal/application/process/service.go:2164` คอมเมนต์ Known gap ของ GL ใบปรับปรุงเพิ่ม 66
+- `backend/internal/application/process/service.go:1425` ลบหัว GL ที่ไม่มีบรรทัดก่อนสร้างใหม่
 - `backend/internal/application/process/report_menu_ap_ar.go:1084` `arCheckBalanceReport` วงเงินลบยอดคงค้างตามสูตรสถานะ
 - `backend/internal/application/process/gl_template.go:1096` `glTemplateOnlyFlags` 72 ลง GL เฉพาะเมื่อมีแม่แบบ

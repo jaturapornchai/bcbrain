@@ -7,7 +7,7 @@ sources: ["backend/internal/adapter/inbound/http/process/workflow_handler.go:18"
 
 # กลุ่ม route workflow เมนูกระบวนการระบบ (Workflow Menus)
 
-`POST /process/workflow/{action}` (และ `/api/v1/process/workflow/{action}`) เป็น route รวมของ "เมนูกระบวนการ" ที่พอร์ตมาจาก BC Account (C#): เปลี่ยนรหัส, ผ่านรายการบัญชี, ตรวจข้อมูล, ปิดงวด/ปิดปี, ดู log ตรวจสอบ, ตัดค่าเสื่อมสินทรัพย์, เครื่องมือระบบ, โหลดจังหวัด และผู้ช่วย AI handler ตัวเดียวคือ `Handler.Workflow` ใช้ `switch` ตาม `{action}` (ไม่ใช้ helper `serve` แบบกลุ่มอื่น) ดู [[proc-dispatcher]]
+`POST /process/workflow/{action}` (และ `/api/v1/process/workflow/{action}`) เป็น route รวมของ "เมนูกระบวนการ" ของ BC Account: เปลี่ยนรหัส, ผ่านรายการบัญชี, ตรวจข้อมูล, ปิดงวด/ปิดปี, ดู log ตรวจสอบ, ตัดค่าเสื่อมสินทรัพย์, เครื่องมือระบบ, โหลดจังหวัด และผู้ช่วย AI handler ตัวเดียวคือ `Handler.Workflow` ใช้ `switch` ตาม `{action}` (ไม่ใช้ helper `serve` แบบกลุ่มอื่น) ดู [[proc-dispatcher]]
 
 ## ทำงานอย่างไร
 
@@ -34,7 +34,7 @@ sources: ["backend/internal/adapter/inbound/http/process/workflow_handler.go:18"
 
 ### ตัวช่วยร่วมใน `workflow.go` (ใช้ซ้ำทั่วทั้งกลุ่ม process)
 - `withTx` (:28): เปิด transaction บนฐานข้อมูลบริษัท (`companyPool`) หมดเวลา 120 วินาที commit เมื่อ `fn` สำเร็จ ไม่เช่นนั้น rollback
-- `writeProcessLog` (:65): INSERT ลงตาราง `logs` ตามแบบ C# `_createLog`: `function_type = 2`, `function_code = 2` (Update), `computer_name = 'WEB'`, `guid` สุ่ม 32 ตัวอักษร, ตัดความยาว `menu_name` 100, `user_code` 35, `doc_no` 100, `data1` (JSON รายละเอียด) 5000 เพื่อให้เมนูตรวจสอบรายการ (`menu_audit_trans`) เห็นว่าใครรันกระบวนการ ใช้โดย [[proc-hidden-cost]], [[proc-sysproc-tools]], [[proc-province-load]] ฯลฯ
+- `writeProcessLog` (:65): INSERT ลงตาราง `logs`: `function_type = 2`, `function_code = 2` (Update), `computer_name = 'WEB'`, `guid` สุ่ม 32 ตัวอักษร, ตัดความยาว `menu_name` 100, `user_code` 35, `doc_no` 100, `data1` (JSON รายละเอียด) 5000 เพื่อให้เมนูตรวจสอบรายการ (`menu_audit_trans`) เห็นว่าใครรันกระบวนการ ใช้โดย [[proc-hidden-cost]], [[proc-sysproc-tools]], [[proc-province-load]] ฯลฯ
 - `writeMasterLog` (:350): ลง `master_logs` สำหรับการเปลี่ยนรหัส ดู [[proc-change-code]]
 - `columnExists` (:77): เช็ก `information_schema.columns` ใน schema ปัจจุบัน -- ใช้ข้ามตารางที่ฐานลูกค้าไม่มี
 - `validDate` (:86) ตรวจ `YYYY-MM-DD`; `clip` ตัดตามจำนวนตัวอักษร (rune); `newGUID` สร้างรหัส hex 32 ตัวอักษร (เทียบ `Guid.ToString("N")`)

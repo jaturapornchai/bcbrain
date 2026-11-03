@@ -7,7 +7,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:152","backend/interna
 
 # API ข้อมูลหลัก (master / master-detail / itemmaster / itemdetail / barcode / docpicture / itempicture / modifyprice)
 
-กลุ่ม action ที่เขียน/อ่านข้อมูลหลักของ ERP (สินค้า บาร์โค้ด รูปภาพ ราคา กริดย่อย) โดยตรวจกฎจาก C# ฝั่ง Go แล้วเขียนใน transaction เดียว. ทุก action เป็น `POST /api/v1/process/<group>/<action>` (และ `/process/...` ชื่อซ้ำ) ยกเว้น 2 route `GET .../image`. ภาพรวม prefix, envelope `{"ok":true,"data":...}`, กฎสิทธิ์ `routeRights` อยู่ที่ [[api-process-run]]; แนวคิดข้อมูลหลักที่ [[proc-master-data]], [[proc-item-master-detail]], [[proc-barcode]], [[proc-doc-item-pictures]], [[proc-price-engine]].
+กลุ่ม action ที่เขียน/อ่านข้อมูลหลักของ ERP (สินค้า บาร์โค้ด รูปภาพ ราคา กริดย่อย) โดยตรวจกฎที่ฝั่ง Go แล้วเขียนใน transaction เดียว. ทุก action เป็น `POST /api/v1/process/<group>/<action>` (และ `/process/...` ชื่อซ้ำ) ยกเว้น 2 route `GET .../image`. ภาพรวม prefix, envelope `{"ok":true,"data":...}`, กฎสิทธิ์ `routeRights` อยู่ที่ [[api-process-run]]; แนวคิดข้อมูลหลักที่ [[proc-master-data]], [[proc-item-master-detail]], [[proc-barcode]], [[proc-doc-item-pictures]], [[proc-price-engine]].
 
 กติการ่วม: `ProviderCode`/`DatabaseName`/`UserCode` เติมจาก claims (ฟิลด์ `json:"-"`), ไม่ใช่จากบอดี้; บอดี้เสีย = 400 "invalid request body"; ชื่อ action ที่ไม่รู้จัก = 404 "unknown <group> action"; error ธุรกิจ = 400 (ข้อความไทย) หรือ 409; ข้อผิดพลาดอื่น = 500 "internal server error" (response.Error). เพดานเวลา 60 วินาทีของ router.
 
@@ -51,7 +51,7 @@ POST /api/v1/process/master-detail/save     (Authorization: Bearer <token>)
 
 | action | หน้าที่ | input สำคัญ | ตาราง | path:line | บอดี้ |
 |---|---|---|---|---|---|
-| `itemmaster/save` | ตรวจกฎ `_icMain._saveData` ของ C# แล้วเขียนสินค้า + หน่วย + หน่วยตรงข้าม + บาร์โค้ด + คลัง/ชั้น + ต้นทุนมาตรฐาน + รูป ใน transaction เดียว พร้อมเขียน master_logs | `menuKey`, `isNew`, `item{}`, `units[]`, `oppositeUnits[]`, `barcodes[]`, `whShelves[]`, `standardCosts[]`, `images[]` | ic_inventory, ic_inventory_barcode, master_logs, erp_option, erp_user_group(+_detail), ic_trans_detail | itemdetail_handler.go:33,35 → item_master.go:559 | 4 MB |
+| `itemmaster/save` | ตรวจกฎของหน้าจอสินค้า (`ItemMasterSave` ใน `item_master.go:559`) แล้วเขียนสินค้า + หน่วย + หน่วยตรงข้าม + บาร์โค้ด + คลัง/ชั้น + ต้นทุนมาตรฐาน + รูป ใน transaction เดียว พร้อมเขียน master_logs | `menuKey`, `isNew`, `item{}`, `units[]`, `oppositeUnits[]`, `barcodes[]`, `whShelves[]`, `standardCosts[]`, `images[]` | ic_inventory, ic_inventory_barcode, master_logs, erp_option, erp_user_group(+_detail), ic_trans_detail | itemdetail_handler.go:33,35 → item_master.go:559 | 4 MB |
 | `itemmaster/delete` | ลบสินค้าที่ยังไม่ถูกใช้ + ข้อมูลลูกทั้งหมด; รหัสที่มีใน ic_trans_detail ถูกข้าม | `menuKey`, `codes[]` | ic_inventory, ic_inventory_set_detail, ic_trans_detail, master_logs, erp_user_group(+_detail) | itemdetail_handler.go:39 → item_master.go:817 | 1 MB |
 
 - สิทธิ์: save = **Add** ถ้า `isNew:true` มิฉะนั้น **Edit** (permission.go:81-86); delete = Delete (permission.go:47).
@@ -88,11 +88,11 @@ POST /api/v1/process/master-detail/save     (Authorization: Bearer <token>)
 
 | action | หน้าที่ | input สำคัญ | ตาราง | path:line | บอดี้ |
 |---|---|---|---|---|---|
-| `docpicture/formats` | ประเภทเอกสารของโมดูลหนึ่ง | `module` (ic/po/so/ap/ar/cb/gl) | erp_doc_format, erp_doc_format_gl | docpicture_handler.go:44 → doc_picture.go:74 | 1 MB |
-| `docpicture/docs` | รายการเอกสารของประเภทที่เลือก (ค้นทั้ง ic_trans, ap_ar_trans, cb_trans) แบ่งหน้า | `module`, `formatCode`, `keyword`, `page` | gl_journal, ic_trans, ap_ar_trans, cb_trans | :52 → doc_picture.go:130 | 1 MB |
-| `docpicture/get` | รูปที่ผูกกับเอกสารหนึ่งใบ | `module`, `formatCode`, `docNo`, `docDate`, `bookCode` (สองตัวหลังเฉพาะ GL) | ic_trans, ap_ar_trans, cb_trans, gl_journal, erp_option | :60 → doc_picture.go:311 | 1 MB |
-| `docpicture/save` | แทนที่ชุดรูปของเอกสารแบบ atomic (ลบทั้งหมดแล้วใส่ตามหน้าจอ) | ฟิลด์ของ get + `items[]` | เหมือน get | :68 → doc_picture.go:426 | 64 MB (`docPictureBodyLimit`, docpicture_handler.go:32; 8 รูป × 5 MB เป็น base64) |
-| `GET docpicture/image?id=<roworder>` | ส่งไบต์รูปหนึ่งรูป | query `id` (จำนวนเต็ม > 0 มิฉะนั้น 400 "invalid image id") | bc_doc_images | docpicture_handler.go:89 → doc_picture.go:333 | - |
+| `docpicture/formats` | ประเภทเอกสารของโมดูลหนึ่ง | `module` (ic/po/so/ap/ar/cb/gl) | erp_doc_format, erp_doc_format_gl | docpicture_handler.go:44 → doc_picture.go:79 | 1 MB |
+| `docpicture/docs` | รายการเอกสารของประเภทที่เลือก (ค้นทั้ง ic_trans, ap_ar_trans, cb_trans) แบ่งหน้า | `module`, `formatCode`, `keyword`, `page` | gl_journal, ic_trans, ap_ar_trans, cb_trans | :52 → doc_picture.go:135 | 1 MB |
+| `docpicture/get` | รูปที่ผูกกับเอกสารหนึ่งใบ | `module`, `formatCode`, `docNo`, `docDate`, `bookCode` (สองตัวหลังเฉพาะ GL) | ic_trans, ap_ar_trans, cb_trans, gl_journal, erp_option | :60 → doc_picture.go:327 | 1 MB |
+| `docpicture/save` | แทนที่ชุดรูปของเอกสารแบบ atomic (ลบทั้งหมดแล้วใส่ตามหน้าจอ) | ฟิลด์ของ get + `items[]` | เหมือน get | :68 → doc_picture.go:563 | 256 MB (`docPictureBodyLimit`, docpicture_handler.go:32); ไม่จำกัดจำนวนไฟล์แนบ (`docPictureMaxImages = 0` doc_picture.go:40) แต่ไฟล์ละ ≤ 25 MB (`docPictureMaxBytes` doc_picture.go:41,533-535) ส่งเป็น base64 ชนิดที่รับ: PNG, JPG, WEBP, GIF, BMP, PDF, XLS, XLSX, CSV, DOC, DOCX, PPT, PPTX, TXT, ZIP (doc_picture.go:538) |
+| `GET docpicture/image?id=<roworder>` | ส่งไบต์รูปหนึ่งรูป | query `id` (จำนวนเต็ม > 0 มิฉะนั้น 400 "invalid image id") | bc_doc_images | docpicture_handler.go:89 → doc_picture.go:349 | - |
 
 ## itempicture/* — รูปสินค้า/บาร์โค้ด/พนักงาน/สินทรัพย์
 
@@ -100,11 +100,11 @@ POST /api/v1/process/master-detail/save     (Authorization: Bearer <token>)
 |---|---|---|---|---|---|
 | `itempicture/list` | รายการสินค้า (หรือบาร์โค้ด) พร้อมจำนวนรูป | `kind` (item/barcode/staff/asset), `keyword`, `page` | ic_inventory, erp_user, as_asset, ic_inventory_barcode | stocktools_handler.go:46 → item_picture.go:87 | 1 MB |
 | `itempicture/get` | ชุดรูปของคีย์หนึ่ง | `kind`, `key` | ตารางเดียวกัน | :50 → item_picture.go:210 | 1 MB |
-| `itempicture/save` | แทนที่ชุดรูปของคีย์หนึ่ง และเขียน master_logs | `kind`, `key`, `items[]` | master_logs + ตารางเดียวกัน | :54 → item_picture.go:252 | 48 MB (`itemPictureBodyLimit`, stocktools_handler.go:40; 6 รูป × 5 MB) |
+| `itempicture/save` | แทนที่ชุดรูปของคีย์หนึ่ง และเขียน master_logs | `kind`, `key`, `items[]` | master_logs + ตารางเดียวกัน | :54 → item_picture.go:252 | 48 MB (`itemPictureBodyLimit`, stocktools_handler.go:40); ไม่จำกัดจำนวนไฟล์ (`itemPictureMaxImages = 0` item_picture.go:23) ไฟล์ละ ≤ 25 MB ผ่านตัวถอดรหัสเดียวกับ docpicture (item_picture.go:257) |
 | `GET itempicture/image?id=<roworder>` | ส่งไบต์รูป | query `id` | (ตารางรูป) | stocktools_handler.go:64 → item_picture.go:231 | - |
 
 - ทั้งสอง `GET .../image` คืนไบต์ตรงๆ: `Content-Type` จาก `DocPictureMime(data)`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, max-age=300` (docpicture_handler.go:105-107, stocktools_handler.go:80-82); สิทธิ์ Read; ผ่าน Next `src/app/api/process/{docpicture,itempicture}/image/route.ts` ซึ่งตรวจ `id` เป็นเลข ≤ 12 หลัก และ session ก่อน (401 `NO_TOKEN` ถ้าไม่มี token).
-- สิทธิ์: list/get/formats/docs = Read; save = Write (permission.go:30-31,42). ผู้เรียก: `account/master/DocumentPictureScreen.tsx:65,77,102,123`, `ItemPictureScreen.tsx:64,85,106`, `ItemDetail2Screen.tsx:373`. ความหมายของรูปสินค้าที่ [[proc-doc-item-pictures]].
+- สิทธิ์: list/get/formats/docs = Read; save = Write (permission.go:30-31,40,42). ผู้เรียก: `account/master/DocumentPictureScreen.tsx:65,77,102,123`, `ItemPictureScreen.tsx:64,85,106`, `ItemDetail2Screen.tsx:373`. ความหมายของรูปสินค้าที่ [[proc-doc-item-pictures]].
 
 ## modifyprice/* — แก้ราคาเป็นชุด (menu 2.1.25)
 

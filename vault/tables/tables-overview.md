@@ -2,7 +2,7 @@
 title: "ภาพรวมพจนานุกรมข้อมูล: ตารางฐานข้อมูล (tables overview)"
 tags: [tables, ic, gl, ap-ar, cb, as, erp, bc]
 aliases: ["tables overview", "ER overview", "แผนที่ตาราง", "data dictionary"]
-sources: ["backend/internal/application/process/trans.go:657", "backend/internal/application/process/service.go:796", "backend/internal/application/process/stock_rebuild.go:18", "backend/internal/application/process/workflow.go:100"]
+sources: ["scripts/sql/02_data_schema.sql:6571", "scripts/sql/01_main_schema.sql:49", "backend/internal/application/process/trans.go:510", "backend/internal/application/process/trans.go:593", "backend/internal/application/process/trans.go:642", "backend/internal/application/process/trans.go:657", "backend/internal/application/process/service.go:807", "backend/internal/application/process/stock_rebuild.go:18", "backend/internal/domain/query/write_policy_legacy.go:9"]
 ---
 # ภาพรวมพจนานุกรมข้อมูล: ตารางฐานข้อมูล
 
@@ -10,11 +10,11 @@ sources: ["backend/internal/application/process/trans.go:657", "backend/internal
 
 ## ข้อเท็จจริงที่ใช้ร่วมกันทุกตาราง
 
-- ไม่มี DDL ใน repo สำหรับตารางหลักเดิม (`ic_`, `gl_`, `ap_`, `ar_`, `cb_`, `as_`, `erp_`) เพราะพอร์ตมาจาก C# BCERP ฐานข้อมูลมีอยู่ก่อน มีเพียง `erpSchemaSQL` (`service.go:796-946`) ที่เพิ่มคอลัมน์/ดัชนี/ตารางบางตัว (เช่น `ic_opposite_unit`) — คอลัมน์ในโน้ตทุกใบอนุมานจาก INSERT/SELECT และ struct ในโค้ด
-- เอกสารทุกชนิดใช้คีย์ (`doc_no`, `trans_flag`) และ `doc_no` ถูกแปลงเป็นตัวพิมพ์ใหญ่ก่อนบันทึก รหัส `trans_flag` ทั้งหมดดู [[acc-trans-flag-map]]
-- บันทึกเอกสาร = ลบของเดิมแล้วสร้างใหม่ใน transaction เดียว จากนั้นคำนวณสถานะเอกสาร ซีเรียล สต๊อก/ต้นทุน และสมุดรายวัน ตามลำดับ ([[acc-transaction-save-flow]]) จึงห้ามใช้ `roworder` เป็นคีย์ถาวร
+- DDL ของตารางส่วนใหญ่อยู่ใน `scripts/sql/02_data_schema.sql` (ตารางตัวตน `bc_` ใน `scripts/sql/01_main_schema.sql`) แต่ DDL ไม่ครบทุกคอลัมน์ที่โค้ด Go ใช้: Go เพิ่มคอลัมน์/ดัชนี/ตารางเองด้วย `erpSchemaSQL` (`service.go:807-958`) และ `ALTER TABLE … ADD COLUMN IF NOT EXISTS` เฉพาะที่ — โน้ตทุกใบจึงเทียบ DDL กับ INSERT/SELECT และ struct ในโค้ด และบอกคอลัมน์ที่อยู่ฝั่งเดียว; ตารางที่ไม่มี DDL ใน repo ระบุไว้ในโน้ตนั้น (เช่น [[tbl-ic-hidden-cost-process]])
+- เอกสารทุกชนิดใช้คีย์ (`doc_no`, `trans_flag`) และ `doc_no` ถูกแปลงเป็นตัวพิมพ์ใหญ่ก่อนบันทึก (`normalizeDocNo` `trans.go:642`) รหัส `trans_flag` ทั้งหมดดู [[acc-trans-flag-map]]
+- บันทึกเอกสาร = ลบของเดิมแล้วสร้างใหม่ใน transaction เดียว (`saveTransTx` `trans.go:510`) จากนั้นสร้างซีเรียลใหม่ แล้ว `rebuildTransDerived` (`trans.go:593`) คำนวณสต๊อก/ต้นทุน → สมุดรายวัน → สถานะเช็ค ตามลำดับ ([[acc-transaction-save-flow]]) จึงห้ามใช้ `roworder` เป็นคีย์ถาวร
 - ค่าที่ derive ไม่ควรแก้ตรง: `ic_inventory.balance_qty/average_cost`, `ic_trans_detail.average_cost/sum_of_cost`, `ic_serial`, `last_status/used_status/doc_success` ของหัวเอกสาร ([[acc-inventory-stock-rebuild]], [[acc-inventory-cost-moving-average]])
-- ตารางเงิน (`ap_ar_trans` ฯลฯ) แก้ได้ผ่านงานประมวลผลเท่านั้น ส่วน master จำนวนหนึ่งแก้ผ่าน `/query/exec` ตาม legacy write allow-list (ADR-0011) ดู [[proc-master-data]], [[proc-dispatcher]]
+- ตารางเงิน (`ap_ar_trans` ฯลฯ) แก้ได้ผ่านงานประมวลผลเท่านั้น ส่วน master จำนวนหนึ่งแก้ผ่าน `/query/exec` ตาม legacy write allow-list (ADR-0011, `write_policy_legacy.go:9`) ดู [[proc-master-data]], [[proc-dispatcher]]
 - ค่าเงิน/จำนวนที่กระทบเงินเป็น decimal ส่งเป็น string (กฎเหล็กข้อ 20)
 - มาตรฐานลงบัญชี: [[acc-gl-posting-standard]]; ข้อยกเว้นสต๊อกพิเศษ: [[acc-stock-special-docs]]
 
@@ -63,7 +63,7 @@ sources: ["backend/internal/application/process/trans.go:657", "backend/internal
 
 ### เงินสด/ธนาคาร (cb)
 - [[tbl-cb-trans]] (ยอดรวมตามช่องทาง) 1:n [[tbl-cb-trans-detail]] ผ่าน (`doc_no`, `trans_flag`); เกิดจากแท็บรับ/จ่ายชำระของ [[tbl-ic-trans]] และ [[tbl-ap-ar-trans]]
-- เช็ค/บัตร: [[tbl-cb-chq-list]] (เอกสาร flag 405-418, 451-456, 461-463 อัปเดตสถานะ); บัญชีธนาคาร [[tbl-erp-pass-book]] → [[tbl-erp-bank]]; เงินสดย่อย [[tbl-cb-petty-cash]]
+- เช็ค/บัตร: [[tbl-cb-chq-list]] (เอกสาร flag 405-418, 451-456, 461-463 อัปเดตสถานะ — `chequeStatusSQL` `cheque.go:32-64`); บัญชีธนาคาร [[tbl-erp-pass-book]] → [[tbl-erp-bank]]; เงินสดย่อย [[tbl-cb-petty-cash]]
 
 ### สินทรัพย์ถาวร (as)
 - [[tbl-as-asset]] 1:1 [[tbl-as-asset-detail]] ผ่าน `as_code`; n:1 [[tbl-as-asset-type]]
@@ -95,20 +95,21 @@ sources: ["backend/internal/application/process/trans.go:657", "backend/internal
 
 ## ตารางของระบบอื่น (ไม่อธิบายในชุดนี้)
 
-ตารางขึ้นต้น `autocare_`, `wms_`, `pos_`, `tms_`, `market_`, `procure_`, `crm_` ใช้โดยระบบอื่น (WMS, POS, TMS, ตลาด, จัดซื้อ, CRM) — ถ้า backend บัญชีแตะตารางเหล่านี้ มีแค่การตรวจว่ามีตารางหรือซิงก์ข้อมูล เช่น `ic_wms_trans_detail` (`service.go:630`) และ `pos_` sync (`pos_sync.go`, `pos_bill.go`) ไม่ได้ถือเป็นส่วนหนึ่งของพจนานุกรมนี้
+ตารางขึ้นต้น `autocare_`, `wms_`, `pos_`, `tms_`, `market_`, `procure_`, `crm_` ใช้โดยระบบอื่น (WMS, POS, TMS, ตลาด, จัดซื้อ, CRM) — ถ้า backend บัญชีแตะตารางเหล่านี้ มีแค่การตรวจว่ามีตารางหรือซิงก์ข้อมูล เช่น `ic_wms_trans_detail` (`service.go:641`) และ `pos_` sync (`pos_sync.go`, `pos_bill.go`) ไม่ได้ถือเป็นส่วนหนึ่งของพจนานุกรมนี้
 
 ## ความไม่สอดคล้องที่พบ (ไว้ตรวจเมื่อใช้งานจริง)
 
-- `ic_inventory.item_type = 5`: รายงานเรียก "สูตรการผลิต" แต่ `trans_set_item.go:8-10` เรียก "สูตรสี" และแตกเป็นชุด — [[tbl-ic-inventory]]
-- `ic_shelf` ใช้คอลัมน์ `whcode` แต่ตารางอื่นใช้ `wh_code` — [[tbl-ic-shelf]]
-- `erp_doc_format_gl`: โค้ดอ่าน `account_name` แต่กริดและเทสต์ใช้ `account_name2` — [[tbl-erp-doc-format-gl]]
-- `erp_credit_approved_logs`: ไม่พบ INSERT ใน Go (อ่านที่ `doc_flow.go:70,290`) ส่วน `erp_credit_request` ถูกเขียนที่ `trans_credit.go:204-210` — [[tbl-erp-credit-approved-logs]]
-- CRM อ่าน `ap_ar_trans` flag 41/43 ขณะฝั่ง process ใช้ 235/239 — [[tbl-ap-ar-trans]]
-- ยอดตามล็อต: รายงานอ่าน `ic_trans_detail_lot` แต่บันทึกเอกสารเว็บเขียนเฉพาะ `ic_trans_detail.lot_number_1` — [[tbl-ic-trans-detail-lot]]
+- `ic_inventory.item_type = 5`: จอสินค้าเรียก "สูตรสี" (`ItemScreen.tsx:2246`) แต่รายงานประเภทสินค้าเรียก "สูตรการผลิต" (`report_menu_ic.go:913`) — [[tbl-ic-inventory]]
+- `ic_shelf` ใช้คอลัมน์ `whcode` แต่ตารางอื่นใช้ `wh_code` (`stock_tools.go:384`) — [[tbl-ic-shelf]]
+- `erp_doc_format_gl`: ตัวลงบัญชีอ่าน `account_name` (`gl_template.go:962`) แต่ค่าตั้งต้นและเทสต์ใส่ `account_name2` (`gl_template_defaults.go:43`) — [[tbl-erp-doc-format-gl]]
+- `erp_credit_approved_logs`: ไม่พบ INSERT ใน Go (อ่านที่ `doc_flow.go:70`, `:290`; ลบที่ `trans_credit.go:203`) ส่วน `erp_credit_request` ถูกเขียนที่ `trans_credit.go:204-210` — [[tbl-erp-credit-approved-logs]]
+- CRM อ่าน `ap_ar_trans` flag 41/43 (`crm/handler.go:177-178`) ขณะฝั่ง process ใช้ 235/239 (`docs.go:528`) — [[tbl-ap-ar-trans]]
+- ยอดตามล็อต: รายงานอ่าน `ic_trans_detail_lot` (`report_menu_ic.go:1206-1238`) แต่บันทึกเอกสารปกติ (`saveTransTx`) เขียนเฉพาะ `ic_trans_detail.lot_number_1` — `ic_trans_detail_lot` เขียนเฉพาะยอดยกมาและใบปรับล็อต 66/68 (`stock_lot.go:29-30`) — [[tbl-ic-trans-detail-lot]]
 
 ## ที่มาในโค้ด
 
-- `backend/internal/application/process/trans.go:657`
-- `backend/internal/application/process/service.go:796`
-- `backend/internal/application/process/stock_rebuild.go:18`
-- `backend/internal/application/process/workflow.go:100`
+- `scripts/sql/02_data_schema.sql:6571` (ตัวอย่าง DDL `ic_trans`) และ `scripts/sql/01_main_schema.sql:49` (`bc_database_list`)
+- `backend/internal/application/process/trans.go:510` (`saveTransTx`), `:593` (`rebuildTransDerived`), `:642` (`normalizeDocNo`), `:657` (`insertTransSQL`)
+- `backend/internal/application/process/service.go:807` (`erpSchemaSQL`)
+- `backend/internal/application/process/stock_rebuild.go:18` (`stockRowsSQL`)
+- `backend/internal/domain/query/write_policy_legacy.go:9` (`legacyClientWritable`)

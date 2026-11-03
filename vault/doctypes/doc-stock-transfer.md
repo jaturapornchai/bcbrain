@@ -2,36 +2,37 @@
 title: "โอนสินค้า/วัตถุดิบ ระหว่างคลัง (Stock Transfer)"
 tags: [doctypes, inventory]
 aliases: ["trans_flag 72", "trans_flag 70", "โอนสินค้า", "สินค้า_โอนออก", "สินค้า_โอนเข้า", "IM"]
-sources: ["frontend/account/tabs/transMenuMap.ts:1073", "frontend/account/transaction/transLayouts.ts:99", "backend/internal/application/process/trans.go:18", "backend/internal/application/process/stock_rebuild.go:18", "backend/internal/application/process/stock_rebuild.go:69", "backend/internal/application/process/trans.go:593", "backend/internal/application/process/gl_template.go:1096", "backend/internal/application/process/trans_save_rules.go:55", "backend/internal/application/process/doc_cancel.go:53"]
+sources: ["frontend/account/tabs/transMenuMap.ts:1073", "frontend/account/transaction/transLayouts.ts:98", "frontend/account/transaction/transLayouts.ts:99", "frontend/account/transaction/transLayouts.ts:306", "frontend/account/transaction/transLayouts.ts:474", "backend/internal/application/process/trans.go:18", "backend/internal/application/process/transcalc.go:16", "backend/internal/application/process/transcalc.go:21", "backend/internal/application/process/stock_rebuild.go:19", "backend/internal/application/process/stock_rebuild.go:69", "backend/internal/application/process/trans.go:593", "backend/internal/application/process/trans.go:615", "backend/internal/application/process/gl_template.go:1096", "backend/internal/application/process/trans_save_rules.go:55", "backend/internal/application/process/trans_ref_import.go:30", "backend/internal/application/process/doc_cancel.go:53", "backend/internal/application/process/doc_flow_graph.go:197"]
 ---
 
 # โอนสินค้า/วัตถุดิบ (trans_flag 72 โอนออก + 70 โอนเข้า)
 
 ## ใช้เมื่อไร
-ใช้ย้ายสินค้าระหว่างคลังหรือที่เก็บ อ้างใบขอโอน 124 ได้ อยู่ที่เมนู "โอนสินค้า/วัตถุดิบ" (IM, transMenuMap.ts:1073 เมนูใส่ transFlags 72/124 และมีค่า isTransfer)
+ใช้ย้ายสินค้าระหว่างคลังหรือที่เก็บ อ้างใบขอโอน 124 ได้ อยู่ที่เมนู `menu_ic_transfer_wh_out` "โอนสินค้า/วัตถุดิบ" (IM, transMenuMap.ts:1073 เมนูใส่ transFlags 72/124, `refTransFlags: [124]` และมีค่า isTransfer)
 
 ## trans_flag/ตาราง
-- สินค้าแต่ละรายการเขียน 2 บรรทัดภายใต้ doc_no เดียวกัน คือบรรทัดโอนออก 72 (calc −1) และบรรทัดโอนเข้า 70 (calc +1) (comment trans.go:18)
-- หัวเอกสาร 70 ถูกสร้างใหม่จากหัว 72 ทุกครั้ง (`syncStockTransferIn` stock_rebuild.go:69) ภายใน `rebuildTransDerived` (trans.go:593)
+- สินค้าแต่ละรายการเขียน 2 บรรทัดภายใต้ doc_no เดียวกัน คือบรรทัดโอนออก 72 (calc −1, transcalc.go:21) และบรรทัดโอนเข้า 70 (calc +1, transcalc.go:16) (comment trans.go:18)
+- หัวเอกสาร 70 ถูกลบแล้วสร้างใหม่จากหัว 72 ทุกครั้ง (`syncStockTransferIn` stock_rebuild.go:69) ซึ่งเรียกใน `rebuildTransDerived` (trans.go:593, :615)
 - เก็บใน [[tbl-ic-trans]] + [[tbl-ic-trans-detail]]
 
 ## ฟิลด์/แท็บบนหน้าจอ
-- หัวเอกสาร: refDoc, sale, wh, whTo แท็บ gl (transLayouts.ts:99)
-- ช่อง sale แสดงชื่อ "ผู้ขอโอน:" และไม่แสดงราคา (transLayouts.ts:306, :474)
+- หัวเอกสาร: refDoc, sale, wh, whTo แท็บ gl (transLayouts.ts:99 สำหรับ 72, :98 สำหรับ 70)
+- ช่อง sale แสดงชื่อ "ผู้ขอโอน:" (transLayouts.ts:306) และไม่แสดงราคา (transLayouts.ts:474)
 
 ## ผลต่อสต็อก
-- 72 ตัดออกจากคลังต้นทาง และ 70 รับเข้าคลังปลายทาง ทั้งสอง flag อยู่ใน `stockRowsSQL` (stock_rebuild.go:18)
-- อยู่ใน `stockCheckFlags` ซึ่งตรวจยอดคงเหลือตอนบันทึก (trans_save_rules.go:55)
+- 72 ตัดออกจากคลังต้นทาง และ 70 รับเข้าคลังปลายทาง ทั้งสอง flag อยู่ใน `stockRowsSQL` (stock_rebuild.go:19)
+- 72 อยู่ใน `stockCheckFlags` ซึ่งตรวจยอดคงเหลือตอนบันทึก (trans_save_rules.go:55)
 
 ## ผลต่อภาษี (VAT/WHT)
-ไม่มี
+ไม่มี (ไม่อยู่ใน `transVatTabs` / `transWhtParty` trans_tax.go:37, :48)
 
 ## การลงบัญชี
-- ไม่มี standard GL โดย 72 อยู่ใน `glTemplateOnlyFlags` ลง GL เฉพาะเมื่อรูปแบบเอกสารมี template (gl_template.go:1096) ดู [[acc-gl-template-engine]]
-- ถ้าไม่มี template จะไม่มี GL (ไม่พบ fallback ในโค้ด)
+- ไม่มี standard GL (70/72 ไม่อยู่ใน `glRebuildTransFlags` service.go:1742)
+- 72 อยู่ใน `glTemplateOnlyFlags` ซึ่ง rebuild GL ลงบัญชีให้เฉพาะเมื่อรูปแบบเอกสารมี template (gl_template.go:1094-1096) ดู [[acc-gl-template-engine]]
+- ถ้ารูปแบบเอกสารไม่มี template ใบโอนจะไม่มี GL
 
 ## เอกสารต้นทาง-ปลายทาง
-- ต้นทาง: ขอโอน 124 (คู่ {72,124} trans_ref_import.go:23)
+- ต้นทาง: ขอโอน 124 (คู่ {72,124} trans_ref_import.go:30)
 
 ## ยกเลิก/แก้ไข
 - ยกเลิกด้วย flag 73 ซึ่งใช้ได้กับทั้ง 70 และ 72 (doc_cancel.go:53)

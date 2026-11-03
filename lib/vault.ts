@@ -72,7 +72,7 @@ function load(): Map<string, Note> {
   return notes;
 }
 
-// ponytail: whole vault in memory (~470 notes); production reloads on redeploy, dev reloads every call
+// ponytail: whole vault in memory (~540 notes); production reloads on redeploy, dev reloads every call
 let cache: Map<string, Note> | null = null;
 export function vault(): Map<string, Note> {
   if (!cache || process.env.NODE_ENV !== "production") cache = load();
@@ -144,7 +144,7 @@ export function snippet(body: string, ts: string[]): string {
   return hit.replace(/\s+/g, " ").trim().slice(0, 280);
 }
 
-// ponytail: keyword scoring over ~470 notes; swap for embeddings if recall gets poor at 1000+ notes
+// ponytail: keyword scoring over ~540 notes; swap for embeddings if recall gets poor at 1000+ notes
 export function search(q: string, limit = 8) {
   const ts = terms(q);
   if (!ts.length) return [];

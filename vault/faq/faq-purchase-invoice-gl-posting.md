@@ -2,7 +2,7 @@
 title: "ซื้อสินค้า (ใบซื้อ 12) ลงบัญชี GL ยังไง ภาษีซื้อเข้าบัญชีไหน"
 tags: [faq, gl, purchase, ap, vat]
 aliases: ["ซื้อเชื่อลงบัญชียังไง", "ซื้อสดลง GL", "purchase invoice journal", "trans_flag 12", "trans_flag 315", "menu_po_purchase_billing", "Dr ซื้อ Cr เจ้าหนี้", "ภาษีซื้อ 1154"]
-sources: ["backend/internal/application/process/service.go:1965", "backend/internal/application/process/service.go:1976", "backend/internal/application/process/service.go:1785", "backend/internal/application/process/service.go:1829", "backend/internal/application/process/trans_deposit.go:48", "backend/internal/application/process/service.go:1860"]
+sources: ["backend/internal/application/process/service.go:1976", "backend/internal/application/process/service.go:1987", "backend/internal/application/process/service.go:1796", "backend/internal/application/process/service.go:1840", "backend/internal/application/process/trans_deposit.go:48", "backend/internal/application/process/service.go:1871"]
 ---
 # ซื้อสินค้า (ใบซื้อ 12) ลงบัญชี GL ยังไง ภาษีซื้อเข้าบัญชีไหน
 
@@ -32,9 +32,9 @@ sources: ["backend/internal/application/process/service.go:1965", "backend/inter
 - [[flow-procure-to-pay]]
 
 ## ที่มาในโค้ด
-- `backend/internal/application/process/service.go:1965` case ซื้อ 12/14/18/316/260/264/87/89
-- `backend/internal/application/process/service.go:1976` เงื่อนไขซื้อสด inquiry 1/3 และ hasCbPay ของ 260/264
-- `backend/internal/application/process/service.go:1785` รหัสบัญชีตั้งต้น ซื้อ/ภาษีซื้อ/เจ้าหนี้
-- `backend/internal/application/process/service.go:1829` คำนวณมัดจำที่ตัดใช้แบบก่อน VAT
+- `backend/internal/application/process/service.go:1976` case ซื้อ 12/14/18/316/260/264/87/89
+- `backend/internal/application/process/service.go:1987` เงื่อนไขซื้อสด inquiry 1/3 และ hasCbPay ของ 260/264
+- `backend/internal/application/process/service.go:1796` รหัสบัญชีตั้งต้น ซื้อ/ภาษีซื้อ/เจ้าหนี้
+- `backend/internal/application/process/service.go:1840` คำนวณมัดจำที่ตัดใช้แบบก่อน VAT
 - `backend/internal/application/process/trans_deposit.go:48` ผังบัญชีมัดจำต่อ trans_flag
-- `backend/internal/application/process/service.go:1860` `payTenders` แยกเงินสด ธนาคาร เช็ค บัตร ภาษีหัก
+- `backend/internal/application/process/service.go:1871` `payTenders` แยกเงินสด ธนาคาร เช็ค บัตร ภาษีหัก

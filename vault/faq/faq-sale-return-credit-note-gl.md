@@ -2,7 +2,7 @@
 title: "รับคืน/ลดหนี้ (48) และส่งคืน/ลดหนี้ (16) ลงบัญชี GL กลับด้านยังไง"
 tags: [faq, gl, credit-note, sale-return, purchase-return, vat]
 aliases: ["ลดหนี้ลงบัญชียังไง", "รับคืนสินค้า GL", "credit note journal", "trans_flag 48", "trans_flag 16", "trans_flag 317", "menu_so_credit_note", "menu_po_credit_note", "คืนเงินสดลดหนี้"]
-sources: ["backend/internal/application/process/service.go:2050", "backend/internal/application/process/service.go:2058", "backend/internal/application/process/service.go:1984", "backend/internal/application/process/service.go:1986", "backend/internal/application/process/pay_check.go:36", "backend/internal/application/process/trans_tax.go:37", "backend/internal/application/process/service.go:1863"]
+sources: ["backend/internal/application/process/service.go:2061", "backend/internal/application/process/service.go:2069", "backend/internal/application/process/service.go:1995", "backend/internal/application/process/service.go:1997", "backend/internal/application/process/pay_check.go:36", "backend/internal/application/process/trans_tax.go:37", "backend/internal/application/process/service.go:1874"]
 ---
 # รับคืน/ลดหนี้ (48) และส่งคืน/ลดหนี้ (16) ลงบัญชี GL กลับด้านยังไง
 
@@ -36,10 +36,10 @@ sources: ["backend/internal/application/process/service.go:2050", "backend/inter
 - [[term-inquiry-type]]
 
 ## ที่มาในโค้ด
-- `backend/internal/application/process/service.go:2050` case 48/252 Dr ขาย Dr ภาษีขาย
-- `backend/internal/application/process/service.go:2058` เงื่อนไขเงินสด `payTabEnabled` หรือ 252
-- `backend/internal/application/process/service.go:1984` case 16/317/262/91
-- `backend/internal/application/process/service.go:1986` 16/317 inquiry ≥ 2 หรือ 262 = เงินสด
+- `backend/internal/application/process/service.go:2061` case 48/252 Dr ขาย Dr ภาษีขาย
+- `backend/internal/application/process/service.go:2069` เงื่อนไขเงินสด `payTabEnabled` หรือ 252
+- `backend/internal/application/process/service.go:1995` case 16/317/262/91
+- `backend/internal/application/process/service.go:1997` 16/317 inquiry ≥ 2 หรือ 262 = เงินสด
 - `backend/internal/application/process/pay_check.go:36` `payTabEnabled` (48 = inquiry 1/3/5)
 - `backend/internal/application/process/trans_tax.go:37` `transVatTabs` ค่า vat_calc −1 ของลดหนี้
-- `backend/internal/application/process/service.go:1863` บัญชีภาษีหักเลือกตามทิศรับ/จ่าย
+- `backend/internal/application/process/service.go:1874` บัญชีภาษีหักเลือกตามทิศรับ/จ่าย

@@ -2,7 +2,7 @@
 title: "สถาปัตยกรรม Hexagonal และ composition root ของ Go backend (Hexagonal Architecture + DI)"
 tags: [backend, go, architecture, di]
 aliases: ["hexagonal", "ports and adapters", "di container", "composition root", "โครงสร้างโฟลเดอร์ backend", "internal/di"]
-sources: ["backend/go.mod:1", "backend/README.md:28", "backend/internal/di/container.go:62", "backend/internal/application/query/port.go:64", "backend/CONTEXT.md:7"]
+sources: ["backend/go.mod:1", "backend/README.md:29", "backend/internal/di/container.go:62", "backend/internal/application/query/port.go:64", "backend/CONTEXT.md:7"]
 ---
 
 # สถาปัตยกรรม Hexagonal และ composition root
@@ -53,7 +53,7 @@ backend ของ BC Ai Account เป็น Go module `github.com/bcsoft/bcaiac
 
 - `backend/go.mod:1-3` — ชื่อ module และเวอร์ชัน Go.
 - `backend/internal/di/container.go:62-182` — ลำดับการ wire ทั้งหมด; `:184` `Close`.
-- `backend/README.md:28-56` — หลักการ Hexagonal และกติกา dependency.
+- `backend/README.md:29-56` — หลักการ Hexagonal และกติกา dependency.
 - `backend/internal/application/query/port.go:64` — `AllowDDL` ที่โมดูลใช้.
 
 ## ดูเพิ่ม

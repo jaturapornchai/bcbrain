@@ -2,7 +2,7 @@
 title: "เงินมัดจำกับเงินล่วงหน้าต่างกันอย่างไร ลงบัญชีและตัดใช้ในใบกำกับอย่างไร"
 tags: [faq, deposit, advance, gl, vat, ap, ar]
 aliases: ["มัดจำ vs ล่วงหน้า", "ตัดเงินมัดจำ", "deposit advance", "advance_amount", "trans_flag 110", "trans_flag 11", "trans_flag 40", "trans_flag 10", "cb_trans_detail doc_type 6", "214220"]
-sources: ["backend/internal/application/process/trans_deposit.go:38", "backend/internal/application/process/trans_deposit.go:48", "backend/internal/application/process/trans_deposit.go:65", "backend/internal/application/process/trans_deposit.go:73", "backend/internal/application/process/service.go:1828", "backend/internal/application/process/service.go:2185", "backend/internal/application/process/trans_validate.go:258"]
+sources: ["backend/internal/application/process/trans_deposit.go:38", "backend/internal/application/process/trans_deposit.go:48", "backend/internal/application/process/trans_deposit.go:65", "backend/internal/application/process/trans_deposit.go:73", "backend/internal/application/process/service.go:1839", "backend/internal/application/process/service.go:2196", "backend/internal/application/process/trans_validate.go:258"]
 ---
 # เงินมัดจำกับเงินล่วงหน้าต่างกันอย่างไร ลงบัญชีและตัดใช้ในใบกำกับอย่างไร
 
@@ -46,7 +46,7 @@ sources: ["backend/internal/application/process/trans_deposit.go:38", "backend/i
 - ไม่พบเส้นทางในโค้ดที่ตัดเงินล่วงหน้า (doc_type 5) ผ่านแท็บใบกำกับ การใช้เงินล่วงหน้าในเอกสารอื่น ไม่ชัดจากโค้ด
 - การตรวจวงเงินเครดิตนับทั้งมัดจำขาย 110/9110 และล่วงหน้าขาย 40/9040 (`trans_save_rules.go:614-619`) ([[faq-credit-limit-approval]])
 - รหัสบัญชีตั้งต้นส่งเข้า `resolveChartAccount` ถ้าไม่มีในผัง ระบบคืนรหัสนั้นตรงๆ ไม่ได้ลงบัญชีพัก
-- ฝั่ง GL แปลงยอดเป็นก่อน VAT เมื่อ vat_type = 1 (`service.go:1836`) ส่วนตอนบันทึกถอด VAT เมื่อ vat_type = 0 จึงต้องดูคู่กัน
+- ฝั่ง GL แปลงยอดเป็นก่อน VAT เมื่อ vat_type = 1 (`service.go:1847`) ส่วนตอนบันทึกถอด VAT เมื่อ vat_type = 0 จึงต้องดูคู่กัน
 
 ## ดูเพิ่ม
 - [[acc-deposit-advance]]
@@ -60,6 +60,6 @@ sources: ["backend/internal/application/process/trans_deposit.go:38", "backend/i
 - `backend/internal/application/process/trans_deposit.go:65` `depositBalanceSQL`; `:73` `depositAdvance`
 - `backend/internal/application/process/trans_deposit.go:98` `depositStmts`; `:145` `checkDepositUse`; `:203` `OpenDeposits`; `:246` `refuseUsedDepositDelete`
 - `backend/internal/application/process/trans_validate.go:258` `checkAdvance`
-- `backend/internal/application/process/service.go:1828` `advEx` มัดจำที่ใช้ (ก่อน VAT)
-- `backend/internal/application/process/service.go:1965` ใบซื้อ Cr มัดจำ; `:2042` ใบขาย Dr มัดจำ
-- `backend/internal/application/process/service.go:2185` GL เอกสารมัดจำ/ล่วงหน้า
+- `backend/internal/application/process/service.go:1839-1850` `advEx` มัดจำที่ใช้ (ก่อน VAT)
+- `backend/internal/application/process/service.go:1993` ใบซื้อ Cr มัดจำ (ใบ 315 ที่ `:1974`); `:2053` ใบขาย Dr มัดจำ
+- `backend/internal/application/process/service.go:2196` GL เอกสารมัดจำ/ล่วงหน้า

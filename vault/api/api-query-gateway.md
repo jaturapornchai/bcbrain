@@ -35,7 +35,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:90","backend/internal
 
 - Request: `{"sql":"SELECT ...","offset":0,"limit":50,"includeTotal":true}` (handler.go:163)
 - Response 200: `{"totalRecords":123,"rows":[...]}` โดย `totalRecords` มีเมื่อ `includeTotal=true` (นับด้วย `queryTotal`, service.go:219)
-- `offset` < 0 ถูกบีบเป็น 0 และ `limit` <= 0 หรือ > 1000 ถูกบีบเป็น 1000 (`NewPagination`, query.go:454-460)
+- `offset` < 0 ถูกบีบเป็น 0 และ `limit` <= 0 หรือ > 1000 ถูกบีบเป็น 1000 (`NewPagination`, query.go:455-463)
 - ตัวอย่าง: `{"sql":"SELECT * FROM ar_customer ORDER BY code","offset":0,"limit":50,"includeTotal":true}`
 
 ## POST /query/batch
@@ -56,13 +56,13 @@ Next route ห่อผลเป็น `{ok:true,data}` (ผิดพลาด `
 - `POST /api/query/list` (`src/app/api/query/list/route.ts:12`): รับ `sql` หรือ `query`; ฟังก์ชัน `queryList` ใน `src/lib/query-client.ts:16`
 - `POST /api/query/limit` (`limit/route.ts:12`): ค่าเริ่มต้น `limit=50`, `offset=0`, `includeTotal=true`; ถ้า `source="sql_utility"` ต้อง level >= 9 (403 `FORBIDDEN`); `queryLimit` ที่ query-client.ts:25
 - `POST /api/query/batch` (`batch/route.ts:12`): ตรวจ array ไม่ว่าง และไม่เกิน 20 ก่อนส่ง; `queryBatch` ที่ query-client.ts:54
-- ทั้งหมดใช้ `requireSession` -> `getValidAccessToken` -> `fetchServiceWithAuthRetry` (api-server.ts:248, 555, 388) ซึ่งลองซ้ำเมื่อ 502/503/504 สูงสุด 3 ครั้ง และต่ออายุ token เมื่อเจอ 401; ไม่มี token = 401 `NO_TOKEN`
+- ทั้งหมดใช้ `requireSession` -> `getValidAccessToken` -> `fetchServiceWithAuthRetry` (api-server.ts:262, 569, 402) ซึ่งลองซ้ำเมื่อ 502/503/504 สูงสุด 3 ครั้ง และต่ออายุ token เมื่อเจอ 401; ไม่มี token = 401 `NO_TOKEN`
 
 ## ที่มาในโค้ด
 
 - `backend/internal/adapter/inbound/http/router.go:90-103`
 - `backend/internal/adapter/inbound/http/query/handler.go:28,103,163,347`
 - `backend/internal/application/query/service.go:16,32,58,180,219`
-- `backend/internal/domain/query/query.go:35-81,432,454`
+- `backend/internal/domain/query/query.go:35-81,428,455`
 - `frontend/src/app/api/query/list/route.ts`, `limit/route.ts`, `batch/route.ts`
-- `frontend/src/lib/query-client.ts:16,25,54`, `frontend/src/lib/api-server.ts:248,388,555`
+- `frontend/src/lib/query-client.ts:16,25,54`, `frontend/src/lib/api-server.ts:262,402,569`

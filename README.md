@@ -42,7 +42,6 @@ Tools: `ask_brain(question)` · `search_brain(query, limit?)` · `read_note(slug
 ## Limitation
 - ค้นหาแบบ keyword (ตัดคำไทย + ให้คะแนน title/alias/tag/body) ไม่ใช่ embedding — ถ้าโน้ตเกิน ~1000 ค่อยเปลี่ยน
 - โน้ตเป็นภาพถ่ายโค้ด ณ วันที่สกัด ถ้าขัดกับโค้ดปัจจุบันให้เชื่อโค้ด; อัปเดตต้องสกัดใหม่แล้ว deploy
-- ขอบเขตเฉพาะ `backend/`, `frontend/account/`, `docs/kms/`, `.agents/skills/` ระบบอื่น (pos, wms, tms, crm ฯลฯ) ยังไม่รวม
+- ขอบเขต: ทุกระบบใน `d:\bcaiaccount` (บัญชีหลัก + POS, AutoCare, CRM, LINE OA, Market, Procure, eTax, WMS, TMS, Dashboard, MonitorMap, WorkMonitor, AI, UAT, tests, scripts) แหล่งเดียว ไม่อ้างโค้ดภายนอก
 - MCP เปิดสาธารณะ ไม่มี rate limit ในแอป
 - slug ต้องไม่ซ้ำทั้ง vault (ชื่อไฟล์ซ้ำคนละโฟลเดอร์ ตัวหลังจะถูกข้าม)
-- โน้ตย้ายมาจาก SML (rebrand `SML→BC` แบบเดียวกับ `d:\bcaiaccount`): `sources` แบบ `git:<sha>` 171 จุดเป็น commit ของประวัติ SML เดิม ไม่มีใน repo BC (ประวัติเริ่มใหม่) · โน้ตเรื่องถอดจอจาก C# (`D:\bc\BCCM`) ยังเล่าตามกฎเดิม ส่วน `AGENTS.md` ของ BC เปลี่ยนเป็นไล่จาก `frontend/account/screenRegistry.tsx` แล้ว

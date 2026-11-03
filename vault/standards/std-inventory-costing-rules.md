@@ -2,12 +2,12 @@
 title: "ยอดคงเหลือและต้นทุนสินค้า (Stock Balance and Costing, rebuildStockTx)"
 tags: [standards, inventory, costing, postgres, go, accounting]
 aliases: ["rebuildStockTx", "RebuildStock", "CalculateMovingAverage", "CalculateFIFOCost", "average_cost", "sum_of_cost", "balance_qty", "stockBalancePredicate", "is_lock_cost", "ต้นทุนเฉลี่ย", "FIFO", "cost_type", "ic_trans_detail", "stock/rebuild"]
-sources: ["docs/kms/KMS_INVENTORY_COSTING_SERIAL_PARALLEL_UNIT.md", ".agents/skills/inventory-costing-and-parallel-unit/SKILL.md", "AGENTS.md", "backend/internal/application/process/service.go:1007", "backend/internal/application/process/service.go:189", "backend/internal/application/process/service.go:355", "backend/internal/application/process/stock_rebuild.go:18"]
+sources: ["docs/kms/KMS_INVENTORY_COSTING_SERIAL_PARALLEL_UNIT.md", ".agents/skills/inventory-costing-and-parallel-unit/SKILL.md", "AGENTS.md:50", "backend/internal/application/process/service.go:189", "backend/internal/application/process/service.go:220-223", "backend/internal/application/process/service.go:228", "backend/internal/application/process/service.go:233", "backend/internal/application/process/service.go:268-276", "backend/internal/application/process/service.go:355", "backend/internal/application/process/service.go:559", "backend/internal/application/process/service.go:982", "backend/internal/application/process/service.go:998-1030", "backend/internal/application/process/service.go:1018", "backend/internal/application/process/service.go:1077", "backend/internal/application/process/service.go:1135", "backend/internal/application/process/service.go:1154", "backend/internal/application/process/service.go:1255", "backend/internal/application/process/service.go:1275", "backend/internal/application/process/stock_rebuild.go:18", "backend/internal/application/process/stock_rebuild.go:26", "backend/internal/application/process/stock_rebuild.go:29", "backend/internal/application/process/trans.go:21-22", "backend/internal/application/process/trans.go:597", "backend/internal/application/process/pos_bill.go:725", "backend/internal/application/process/stock_tools.go:565", "backend/internal/application/process/trans_save_rules.go:183", "backend/internal/application/process/trans_lot_auto.go:86", "backend/internal/application/process/report_menu_ic.go:914", "backend/internal/application/process/item_master.go:39", "backend/internal/adapter/inbound/http/router.go:130"]
 ---
 
 # ยอดคงเหลือและต้นทุนสินค้า (Stock Balance and Costing)
 
-ยอดคงเหลือและต้นทุนเป็นผลลัพธ์ที่สร้างใหม่ได้ (Rebuildable Derived Results) จากรายการดิบใน `ic_trans_detail` ตามหลัก Raw Data → Process → Derived (AGENTS.md ข้อ 9) ฟังก์ชันหลักคือ `rebuildStockTx` ใน `backend/internal/application/process/service.go:1007` ส่วนหน่วยนับขนานและการดึงเอกสารอ้างอิงดู [[std-parallel-unit-and-ref-import]]
+ยอดคงเหลือและต้นทุนเป็นผลลัพธ์ที่สร้างใหม่ได้ (Rebuildable Derived Results) จากรายการดิบใน `ic_trans_detail` ตามหลัก Raw Data → Process → Derived (`AGENTS.md:50`) ฟังก์ชันหลักคือ `rebuildStockTx` (`backend/internal/application/process/service.go:1018`) ซึ่งรันใน Transaction ของผู้เรียก ผู้เรียกจริงในโค้ดตอนนี้มี 4 ที่: บันทึกเอกสาร (`trans.go:597`), บิล POS (`pos_bill.go:725`), การกวาดหลังบันทึกทะเบียนสินค้า (`stock_tools.go:565`) และปุ่ม/API ประมวลผลสต๊อก `RebuildStock` (`service.go:559`, 60 วินาทีต่อครั้ง)
 
 ## ตารางหลัก
 | ตาราง | หน้าที่ | คอลัมน์สำคัญ |
@@ -16,29 +16,29 @@ sources: ["docs/kms/KMS_INVENTORY_COSTING_SERIAL_PARALLEL_UNIT.md", ".agents/ski
 | `ic_trans_detail` | รายการสินค้าในเอกสารทุกประเภท | `trans_flag`, `calc_flag`, `qty`, `stand_value`, `divide_value`, `sum_amount`, `sum_of_cost`, `average_cost`, `is_lock_cost`, `sum_of_cost_fix`, `last_status` |
 | `ic_serial`, `ic_trans_serial_number` | Serial Number คงเหลือ / ผูกกับเอกสาร | `ic_code`, `serial_number`, `status` (0 = ว่างในคลัง, 1 = ขาย/เบิกแล้ว) |
 
-ค่า `cost_type` ตามโค้ด (`report_menu_ic.go:885`): 0 = ต้นทุนเฉลี่ย, 1 = LOT FIFO, 2 = LOT กำหนดเอง (บังคับเลือก lot ตอนบันทึก — `trans_save_rules.go:183`), 3 = FEFO (วันหมดอายุ), 4 = ต้นทุนมาตรฐาน, 5 = ต้นทุนแบบพิเศษ 1
+ค่า `cost_type` ในทะเบียนสินค้า (ชื่อที่แสดงในรายงานทะเบียนสินค้า `report_menu_ic.go:914`, ฟิลด์ `item_master.go:39`): 0 = ต้นทุนเฉลี่ย, 1 = LOT FIFO, 2 = LOT กำหนดเอง, 3 = FEFO (วันหมดอายุ), 4 = ต้นทุนมาตรฐาน, 5 = ต้นทุนแบบพิเศษ 1 โค้ดฝั่งบันทึกเอกสารอ่านเฉพาะค่า 2: บรรทัดที่ไม่มี LOT บันทึกไม่ได้ (`trans_save_rules.go:183`) และขายใหม่จะหยิบ LOT ให้อัตโนมัติ (`trans_lot_auto.go:86`)
 
 ## กฎ/วิธีทำ
-1. **คำนวณยอดคงเหลือจากรายการดิบเท่านั้น** ห้ามแก้ `ic_inventory.balance_qty` ตรง ให้เรียก `POST /process/stock/rebuild` (`{ itemCodes: [...] }`) ซึ่งทำใน Transaction เดียว
-2. **สูตรยอดคงเหลือ** (service.go ขั้นตอน "Step 2", ราว :1066)
+1. **คำนวณยอดคงเหลือจากรายการดิบเท่านั้น** ห้ามแก้ `ic_inventory.balance_qty` ตรง ให้เรียก `POST /process/stock/rebuild` (`{ itemCodes: [...] }`; เส้นทางที่ `router.go:130`) ซึ่งทำใน Transaction เดียว
+2. **สูตรยอดคงเหลือ** (`service.go:1077` "Step 2")
    - `balance_qty = SUM(qty × calc_flag × stand_value / divide_value)` (หน่วยมาตรฐานบัญชี; `stand_value`/`divide_value` เป็น 0 หรือว่างให้ถือเป็น 1)
    - `balance_qty_2 = SUM(COALESCE(qty_2, 0) × calc_flag)` (หน่วยขนานเพื่อตรวจนับจริง)
    - อัปเดตกลับ `ic_inventory` เฉพาะแถวที่ค่าเปลี่ยน (`IS DISTINCT FROM`) และไม่รวมสินค้าบริการ (`item_type = 5`)
-3. **แถวที่นับเป็นสต็อกจริง** กำหนดที่ `stock_rebuild.go:18-29`: `last_status = 0`, ไม่ใช่สำเนาเอกสาร (`is_doc_copy`), `item_type IN (0,4,6)`, `trans_flag` อยู่ในรายการที่เคลื่อนไหวสต็อก และตัดบรรทัดที่ปรับเฉพาะมูลค่า (`trans_flag IN (14,16,311)` ที่ `inquiry_type IN (1,3)`) ออกจากจำนวน — ภาคแสดงนี้ละเอียดกว่าสูตรสั้นใน KMS (ซึ่งกล่าวถึง `is_pos` และ `calc_flag IN (1,-1)`) ให้ยึดโค้ด
-4. **กันชนกัน**: ล็อกรายสินค้าด้วย `pg_advisory_xact_lock` (`lockStockItems`) เรียงตามรหัสเพื่อกัน deadlock; ถ้าไม่ระบุสินค้าจะล็อกทั้งงาน (`stockRebuildLock`)
-5. **ต้นทุน**: ดึงรายการเคลื่อนไหวของสินค้าที่เกี่ยวข้องรอบเดียว (ไม่วนคิวรีรายสินค้า) แล้วคำนวณรายสินค้าใน Go ด้วย `*big.Rat` ปัดแบบ HALF_UP (`RoundHalfUp`) ตามทศนิยมของ `erp_option.item_price_decimal` / `item_amount_decimal` (ค่าเริ่มต้น 2, ช่วงที่ยอมรับ 1-6 — `stockScales`) จากนั้นเขียนเฉพาะแถวที่ต้นทุนเปลี่ยนกลับ `ic_trans_detail` ด้วย `UPDATE ... FROM` แบบกลุ่ม
-6. **ต้นทุนเฉลี่ย** (`CalculateMovingAverage`, service.go:189) ไล่ตามลำดับเอกสาร
-   - ขาเข้า (ซื้อ 12, ยกมา 54, รับคืนจากลูกค้า 46, ปรับเข้า 58/66 ฯลฯ) รวมมูลค่าแล้วหารจำนวนได้ราคาเฉลี่ยใหม่; ขาออกใช้ราคาเฉลี่ยปัจจุบัน
-   - บรรทัดปรับสต็อก `66` ที่จำนวนติดลบถือเป็นขาออกที่ราคาเฉลี่ย (ตามคอมเมนต์ใน C# `_icInfoFlag._outFlag`)
-   - โอนระหว่างคลัง `72` (ออก) / `70` (เข้า) ไม่เปลี่ยนจำนวนและมูลค่ารวมของสินค้า: ขา 72 บันทึกจำนวน × ราคาเฉลี่ย แล้วขา 70 รับต้นทุนเดียวกันไป
-   - บรรทัดที่ล็อกต้นทุน (`is_lock_cost = 1`) ใช้ `sum_of_cost_fix` แทนต้นทุนที่คำนวณ
+3. **แถวที่นับเป็นสต็อกจริง** กำหนดที่ `stock_rebuild.go:18-29`: `last_status = 0`, ไม่ใช่สำเนาเอกสาร (`is_doc_copy`), `item_type IN (0,4,6)`, `trans_flag` อยู่ในรายการที่เคลื่อนไหวสต็อก และตัดบรรทัดที่ปรับเฉพาะมูลค่า (`trans_flag IN (14,16,311)` ที่ `inquiry_type IN (1,3)`, `stock_rebuild.go:26`) ออกจากจำนวน — ภาคแสดงนี้ละเอียดกว่าสูตรสั้นใน KMS (ซึ่งกล่าวถึง `is_pos` และ `calc_flag IN (1,-1)`) ให้ยึดโค้ด
+4. **กันชนกัน** (`service.go:998-1030`): รับล็อกร่วม `stockRebuildLock` แล้วล็อกรายสินค้าด้วย `pg_advisory_xact_lock` เรียงตามรหัสเพื่อกัน deadlock; ถ้าไม่ระบุสินค้าจะล็อกเต็ม `stockRebuildLock` ทั้งงาน
+5. **ต้นทุน**: เลือกสินค้าเป้าหมายที่ไม่ใช่สินค้าบริการ (`service.go:1135` "Step 3") ดึงรายการเคลื่อนไหวทุกสินค้ารอบเดียว (`:1154` "Step 4" ไม่วนคิวรีรายสินค้า) แล้วคำนวณรายสินค้าใน Go ด้วย `*big.Rat` ปัดแบบ HALF_UP (`RoundHalfUp`) ตามทศนิยมของ `erp_option.item_price_decimal` / `item_amount_decimal` (ค่าเริ่มต้น 2, ช่วงที่ยอมรับ 1-6 — `stockScales` `service.go:982`) จากนั้นเขียนเฉพาะแถวที่ต้นทุนเปลี่ยนกลับ `ic_trans_detail` ด้วย `UPDATE ... FROM unnest` แบบกลุ่มก้อนละ 10,000 แถว (`:1255` "Step 5") และอัปเดต `ic_inventory.average_cost` ครั้งเดียวทุกสินค้า (`:1275` "Step 6")
+6. **ต้นทุนเฉลี่ย** (`CalculateMovingAverage`, `service.go:189`) ไล่ตามลำดับเอกสาร
+   - ขาเข้า (ซื้อ 12, ยกมา 54, รับคืนจากลูกค้า 46, ปรับเข้า 58/66, โอนเข้า 62 ฯลฯ — `service.go:257`) รวมมูลค่าแล้วหารจำนวนได้ราคาเฉลี่ยใหม่; ขาออกใช้ราคาเฉลี่ยปัจจุบัน
+   - บรรทัดปรับสต็อก `66` ที่จำนวนติดลบถือเป็นขาออกที่ราคาเฉลี่ย (`service.go:228`)
+   - โอนระหว่างคลัง `72` (ออก) / `70` (เข้า) (`trans.go:21-22`) ไม่เปลี่ยนจำนวนและมูลค่ารวมของสินค้า: ขา 72 บันทึกจำนวน × ราคาเฉลี่ย แล้วขา 70 รับต้นทุนเดียวกันไป (`service.go:233`)
+   - บรรทัดที่ล็อกต้นทุน (`is_lock_cost = 1`) ใช้ `sum_of_cost_fix` แทนต้นทุนที่คำนวณ (`service.go:220-223`)
 7. ต้นทุนคิดจากหน่วยมาตรฐานบัญชี (`qty × stand_value / divide_value`) เท่านั้น ส่วน `qty_2` ผู้ใช้กรอกแยกอิสระ ห้ามผูกสูตรคูณตายตัวทับค่าที่กรอก
 8. ตัวเลขเงินทุกค่าใช้ decimal/`big.Rat` ห้าม float ตามกฎบัญชีของโปรเจกต์ ([[std-data-integrity-money-transactions]])
 
 ## ข้อควรระวัง: เอกสารกับโค้ดไม่ตรงกัน (ตรวจแล้ว)
 - KMS กล่าวถึง "Incremental Dirty-Date + Topological Wave Costing" (`min_dirty_date`, Wave 0/1+, ไฟล์ `stock_cost.go` และ `ic_cost_tier.go`) — **ไม่พบไฟล์เหล่านี้ และค้นหา `min_dirty` / `ProcessStockCost` ในโค้ด backend ไม่พบ** กลไกจริงคือ `rebuildStockTx` ที่คำนวณซ้ำทุกเอกสารของสินค้าที่ระบุ
-- `CalculateFIFOCost` (service.go:355, คิว FIFO แบบ O(N)) มีอยู่แต่ค้นไม่พบการเรียกใช้นอกไฟล์ทดสอบ (`stock_speed_bench_test.go`); `rebuildStockTx` เรียก `CalculateMovingAverage` ทุกสินค้า และ `cost_type` ถูกใช้ในทะเบียนสินค้า รายงาน และกติกาบันทึก/Lot (`item_master.go`, `trans_save_rules.go`, `trans_lot_auto.go`, `report_menu_ic.go`) แต่ไม่ได้ใช้เลือกสูตรใน rebuild — ก่อนอ้างว่า FIFO ทำงานจริงต้องถามลุงจืดหรือตรวจเพิ่ม
-- KMS อ้าง `service.go#L1065-L1122` สำหรับ `rebuildStockTx` ซึ่งปัจจุบันเริ่มที่บรรทัด 1007 และยาวกว่านั้น
+- `CalculateFIFOCost` (`service.go:355`, คิว FIFO แบบ O(N)) มีอยู่แต่ค้นไม่พบการเรียกใช้นอกไฟล์ทดสอบ (`stock_speed_bench_test.go`); `rebuildStockTx` เรียก `CalculateMovingAverage` ทุกสินค้า และ `cost_type` ถูกใช้ในทะเบียนสินค้า รายงาน และกติกาบันทึก/Lot (`item_master.go`, `trans_save_rules.go`, `trans_lot_auto.go`, `report_menu_ic.go`) แต่ไม่ได้ใช้เลือกสูตรใน rebuild — ก่อนอ้างว่า FIFO ทำงานจริงต้องถามลุงจืดหรือตรวจเพิ่ม
+- KMS และ SKILL อ้าง `service.go#L1065-L1122` สำหรับ `rebuildStockTx` ซึ่งปัจจุบันเริ่มที่ `service.go:1018` และยาวกว่านั้น (ถึง `:1303`)
 
 ## ที่มา
 - `docs/kms/KMS_INVENTORY_COSTING_SERIAL_PARALLEL_UNIT.md` §1–§2

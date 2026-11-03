@@ -58,8 +58,8 @@ sources: ["frontend/src/app/(admin)/layout.tsx:18", "frontend/src/config/adminMe
 
 **5) จอที่ยิง SQL ผ่าน `main-query` (SQL สร้างในเบราว์เซอร์)**
 - `UserGroupsInner` (`ExtraAdminScreens.tsx:45`): อ่าน/เขียนตาราง `bc_group_list` และ `bc_user_and_group` ด้วย `POST /api/admin/main-query` (บรรทัด 60,65,92,112,119,124).
-- `CheckDatabaseInner` (บรรทัด 712-735): นับคอลัมน์ต่อตารางจาก `information_schema.columns` (schema `public`) และส่ง `database: targetDb` ไปด้วย แต่ route ปฏิเสธถ้า `database` ต่างจาก `session.database` และไม่ส่ง `database` ต่อให้ backend (`main-query/route.ts:29-40`).
-- ตัว route (`main-query/route.ts:10-45`): ต้องผ่าน `requireSystemAdmin`; ถ้า body `provider` ไม่ตรง session → ปฏิเสธ "ไม่อนุญาตให้รันคำสั่งข้าม Provider ของเซสชันปัจจุบัน" (บรรทัด 24-26); ถ้า `database` ไม่ตรง session → ปฏิเสธ (บรรทัด 29-31); ส่งต่อไป backend เฉพาะ `provider` (จาก session), `sql`, `mode` (`"query"` เป็นค่าเริ่มต้น หรือ `"exec"`).
+- `CheckDatabaseInner` (บรรทัด 712-743, `verifyNow` เริ่ม 728): นับคอลัมน์ต่อตารางจาก `information_schema.columns` (schema `public`) และส่ง `database: targetDb` ไปด้วย แต่ route ปฏิเสธถ้า `database` ต่างจาก `session.database` และไม่ส่ง `database` ต่อให้ backend (`main-query/route.ts:29-40`).
+- ตัว route (`main-query/route.ts:10-42`): ต้องผ่าน `requireSystemAdmin`; ถ้า body `provider` ไม่ตรง session → ปฏิเสธ "ไม่อนุญาตให้รันคำสั่งข้าม Provider ของเซสชันปัจจุบัน" (บรรทัด 25-27); ถ้า `database` ไม่ตรง session → ปฏิเสธ (บรรทัด 29-31); ส่งต่อไป backend เฉพาะ `provider` (จาก session), `sql`, `mode` (`"query"` เป็นค่าเริ่มต้น หรือ `"exec"`).
 
 **6) เมทริกซ์สิทธิ์เมนู (`PermissionMatrixInner`, `ExtraAdminScreens.tsx:416`)**
 - `mode="group"` = `GroupPermissionScreen` (เลือกกลุ่มจาก `main-query`); `mode="user"` = `DataPermissionScreen` (เลือกผู้ใช้จาก `GET /api/admin/users`) (บรรทัด 429,440).
@@ -67,9 +67,9 @@ sources: ["frontend/src/app/(admin)/layout.tsx:18", "frontend/src/config/adminMe
 - `SystemTextScreen` ใช้ endpoint เดียวกันด้วย `kind=tooltip&code=ALL` (GET บรรทัด 279, PUT บรรทัด 293) เพื่อแก้ข้อความ tooltip ของระบบ.
 
 **7) จอพิเศษ**
-- `ChangePasswordScreen` (`ChangePasswordScreen.tsx:412-430`): ถ้าส่ง `menuCode` มา = `SelfChangePasswordScreen` (ผู้ใช้เปลี่ยนรหัสตัวเอง ใช้ `GET`+`POST /api/auth/change-password` ที่บรรทัด 182,224; ผู้ใช้ Google ไม่แสดงฟอร์ม บรรทัด 196; โหมดสาธิตห้ามเปลี่ยน บรรทัด 201-202; รหัสใหม่ต้องไม่ซ้ำรหัสเดิม บรรทัด 217). ถ้าไม่ส่ง = โหมดผู้ดูแลตั้งรหัสให้ผู้ใช้ใน Provider. จอตัวเองถูกลงทะเบียนในแอปบัญชีที่ `menu_change_password` (`account/tabs/screenRegistry.tsx:430`) และ `menu_saletools_change_password` (บรรทัด 438).
-- `McpTokenScreen` (`McpTokenScreen.tsx:91`, 1,190 บรรทัด): ดึงรายการ `GET /api/mcp/tokens` (บรรทัด 141), สร้าง token แบบ `mode:"readonly"` ระบุ `databaseCodes` + `days` (บรรทัด 238-244), เพิกถอนด้วย `POST` `action:"revoke"` (บรรทัด 270-273), สถานะ `active|expired|revoked` คำนวณจาก `revokedAt`/`expiresAt` (บรรทัด 71-73), ทดสอบเรียกเครื่องมือผ่าน JSON-RPC `tools/call` ที่ `/api/mcp` ด้วย Bearer token (บรรทัด 370-380). ถูกลงทะเบียนในแอปบัญชีที่ `menu_mcp_tokens` รหัส 1.1.21 (`screenRegistry.tsx:273-281`). (route `/api/mcp/*` อยู่นอกขอบเขตที่อ่าน)
-- `TransferDataScreen` (`ExtraAdminScreens.tsx:827-899`): เลือกฐานต้นทาง/ปลายทางจาก `GET databases` และติ๊กชุดข้อมูล 7 รายการ (`ic_inventory`, `ic_unit`, `ic_warehouse`, `ar_customer`, `ap_supplier`, `gl_chart_of_account`, `erp_doc_format`; บรรทัด 837-845) แต่ปุ่ม "เริ่มโอนข้อมูล" แค่ `setDone(...)` แสดงข้อความ "เรียบร้อย" (บรรทัด 892) **ไม่มีการเรียก API โอนข้อมูลจริงในจอนี้** และ checkbox เป็น `defaultChecked` ไม่ถูกอ่านค่า.
+- `ChangePasswordScreen` (`ChangePasswordScreen.tsx:406-421`): ถ้าส่ง `menuCode` มา = `SelfChangePasswordScreen` (ผู้ใช้เปลี่ยนรหัสตัวเอง ใช้ `GET`+`POST /api/auth/change-password` ที่บรรทัด 182,224; ผู้ใช้ Google ไม่แสดงฟอร์ม บรรทัด 196; โหมดสาธิตห้ามเปลี่ยน บรรทัด 201-202; รหัสใหม่ต้องไม่ซ้ำรหัสเดิม บรรทัด 217-218). ถ้าไม่ส่ง = โหมดผู้ดูแลตั้งรหัสให้ผู้ใช้ใน Provider. จอตัวเองถูกลงทะเบียนในแอปบัญชีที่ `menu_change_password` (`account/tabs/screenRegistry.tsx:430`) และ `menu_saletools_change_password` (บรรทัด 438).
+- `McpTokenScreen` (`McpTokenScreen.tsx:91`, 1,190 บรรทัด): ดึงรายการ `GET /api/mcp/tokens` (บรรทัด 141), สร้าง token แบบ `mode:"readonly"` ระบุ `databaseCodes` + `days` (บรรทัด 238-244), เพิกถอนด้วย `POST` `action:"revoke"` (บรรทัด 270-273), สถานะ `active|expired|revoked` คำนวณจาก `revokedAt`/`expiresAt` (บรรทัด 71-73), ทดสอบเรียกเครื่องมือผ่าน JSON-RPC `tools/call` ที่ `/api/mcp` ด้วย Bearer token (บรรทัด 370-380). ถูกลงทะเบียนในแอปบัญชีที่ `menu_mcp_tokens` (`screenRegistry.tsx:273-283`); รหัสเมนูจริงมาจาก `getMenuCodeByName("menu_mcp_tokens", ...)` (บรรทัด 279) ซึ่งอ่านจาก `bcMenu.json` ได้ `1023` ส่วน `1.1.21` ในโค้ดเป็นแค่ค่าสำรองเมื่อหาชื่อเมนูไม่เจอ. (route `/api/mcp/*` อยู่นอกขอบเขตที่อ่าน) <!-- pragma: allowlist secret -->
+- `TransferDataScreen` (`ExtraAdminScreens.tsx:815-899`): เลือกฐานต้นทาง/ปลายทางจาก `GET databases` และติ๊กชุดข้อมูล 7 รายการ (`ic_inventory`, `ic_unit`, `ic_warehouse`, `ar_customer`, `ap_supplier`, `gl_chart_of_account`, `erp_doc_format`; บรรทัด 839-847) แต่ปุ่ม "เริ่มโอนข้อมูล" แค่ `setDone(...)` แสดงข้อความ "เรียบร้อย" (บรรทัด 892) **ไม่มีการเรียก API โอนข้อมูลจริงในจอนี้** และ checkbox เป็น `defaultChecked` ไม่ถูกอ่านค่า.
 
 ## `/api/admin` routes
 
@@ -92,7 +92,7 @@ sources: ["frontend/src/app/(admin)/layout.tsx:18", "frontend/src/config/adminMe
 - `frontend/account/admin/ProviderScopedScreen.tsx:17-32`, `AdminScreenFrame.tsx:13` — โครงร่วมของจอ.
 - `frontend/account/admin/UsersTab.tsx`, `DatabasesTab.tsx`, `ProvidersTab.tsx` — CRUD (cite ในตาราง).
 - `frontend/account/admin/screens/ExtraAdminScreens.tsx:33,256,379,391,416,620,700,815` — จอที่ยิง `main-query` / `menu-permissions`.
-- `frontend/account/admin/screens/ChangePasswordScreen.tsx:162,412-430` และ `McpTokenScreen.tsx:91,141,238,270,370` — จอพิเศษ.
+- `frontend/account/admin/screens/ChangePasswordScreen.tsx:162,406-421` และ `McpTokenScreen.tsx:91,141,238,270,370` — จอพิเศษ.
 - `frontend/src/app/api/admin/*/route.ts` — proxy ฝั่ง server (cite ในตาราง route).
 
 ## ดูเพิ่ม

@@ -2,7 +2,7 @@
 title: "กำหนดเจ้าหนี้ และรายละเอียดเจ้าหนี้ (SupplierScreen, SupplierDetailScreen)"
 tags: [screens, master]
 aliases: ["SupplierScreen", "SupplierDetailScreen", "กำหนดเจ้าหนี้", "รายละเอียดเจ้าหนี้", "ทะเบียนเจ้าหนี้", "ผู้จำหน่าย", "5001", "5002", "menu_ap_detail", "menu_ap_detail_2", "ap_supplier"]
-sources: ["frontend/account/master/SupplierScreen.tsx:147", "frontend/account/master/SupplierScreen.tsx:395", "frontend/account/master/SupplierScreen.tsx:440", "frontend/account/master/SupplierScreen.tsx:660", "frontend/account/master/SupplierScreen.tsx:784", "frontend/account/master/SupplierDetailScreen.tsx:209", "frontend/account/master/SupplierDetailScreen.tsx:625", "frontend/account/master/SupplierDetailScreen.tsx:807", "frontend/account/master/SupplierDetailScreen.tsx:915", "frontend/account/master/SupplierDetailScreen.tsx:1162", "frontend/account/master/SupplierDetailScreen.tsx:1872", "frontend/account/tabs/screenRegistry.tsx:581"]
+sources: ["frontend/account/master/SupplierScreen.tsx:147", "frontend/account/master/SupplierScreen.tsx:392", "frontend/account/master/SupplierScreen.tsx:440", "frontend/account/master/SupplierScreen.tsx:661", "frontend/account/master/SupplierScreen.tsx:784", "frontend/account/master/SupplierDetailScreen.tsx:207", "frontend/account/master/SupplierDetailScreen.tsx:607", "frontend/account/master/SupplierDetailScreen.tsx:784", "frontend/account/master/SupplierDetailScreen.tsx:919", "frontend/account/master/SupplierDetailScreen.tsx:1163", "frontend/account/master/SupplierDetailScreen.tsx:1880", "frontend/account/tabs/screenRegistry.tsx:581"]
 ---
 # กำหนดเจ้าหนี้ (SupplierScreen) และรายละเอียดเจ้าหนี้ (SupplierDetailScreen)
 
@@ -11,8 +11,8 @@ sources: ["frontend/account/master/SupplierScreen.tsx:147", "frontend/account/ma
 ## วิธีเปิด
 | รหัส | เมนู | จอ | ผูกที่ |
 |---|---|---|---|
-| 5001 | กำหนดเจ้าหนี้ (`menu_ap_detail`, รหัสเก่า 5.1.1) | `SupplierScreen` | `screenRegistry.tsx:581-586` |
-| 5002 | รายละเอียดเจ้าหนี้ (`menu_ap_detail_2`, รหัสเก่า 5.1.2) | `SupplierDetailScreen` | `screenRegistry.tsx:587-592` |
+| 5001 | กำหนดเจ้าหนี้ (`menu_ap_detail`) | `SupplierScreen` | `screenRegistry.tsx:581-586` |
+| 5002 | รายละเอียดเจ้าหนี้ (`menu_ap_detail_2`) | `SupplierDetailScreen` | `screenRegistry.tsx:587-592` |
 เมนู 5003 "ข้อมูลคู่ค้า" เป็นจอมาตรฐานที่สร้างจากสคีมา ไม่ใช่จอนี้ ดู [[scr-master-detail]]
 
 ## 5001 กำหนดเจ้าหนี้
@@ -30,14 +30,14 @@ sources: ["frontend/account/master/SupplierScreen.tsx:147", "frontend/account/ma
 | เลขประจำตัวผู้เสียภาษี · เลขที่บัตรประชาชน | 50 · 50 |
 | สถานประกอบการ · เลขที่สาขา | สำนักงานใหญ่ / สาขา (25) |
 | หมายเหตุ · สถานะ | 255 · ใช้งาน/ไม่ใช้งาน |
-| ตำแหน่งผู้จำหน่าย | แผนที่ ประเภท `SUPPLIER` (`:1569`) |
-| ข้อมูลเฉพาะธุรกิจ | การ์ด `BusinessExtFieldsCard` (`:1584`) |
-- **บันทึก** (`:395-650`): สิทธิ์ → "กรุณาระบุ 'รหัสผู้จำหน่าย'" → "กรุณาระบุ 'ชื่อผู้จำหน่าย 1'" → ถ้าเลือกสาขา เลขสาขาต้องเป็นตัวเลข 5 หลักและไม่ใช่ `00000` → เลขผู้เสียภาษีที่กรอกต้องเป็น 13 หลัก ("เลขประจำตัวผู้เสียภาษีอากร ไม่ครบ 13 หลัก") และ **คู่ (เลขภาษี + ประเภทสถานประกอบการ + เลขที่สาขา) ต้องไม่ซ้ำกับเจ้าหนี้รายอื่น** (`:463-492`) → เพิ่มใหม่ตรวจรหัสซ้ำ เสนอรหัสถัดไป จากนั้นชุดคำสั่งเดียวเขียน `ap_supplier` กับ `ap_supplier_detail` (UPDATE ก่อน แล้ว INSERT ถ้ายังไม่มี) พร้อมประวัติ สำเร็จขึ้น "บันทึกข้อมูลเจ้าหนี้เสร็จเรียบร้อย"
-- **ลบ** (`:660-775`): ห้ามถ้ารหัสถูกใช้ใน `ic_trans`, `ic_trans_detail`, `ap_ar_trans`, `ap_ar_trans_detail` ("มีการใช้งานรหัสดังกล่าวในเอกสารหรือรายการซื้อแล้ว ไม่สามารถลบได้") ผ่านแล้วถามยืนยัน ลบ `ap_item_by_supplier`, `ap_contactor`, รูป (`images`), `ap_supplier_detail`, `ap_supplier` และบันทึกประวัติ
-- **Ctrl+S** บันทึก **Esc** ยกเลิกการแก้ (`:784`) กดแก้ไขขึ้นกล่องเตือนว่าโปรแกรมจะตรวจว่ามีผู้อื่นเปิดแก้อยู่หรือไม่ พร้อมช่องติ๊ก "ต้องการแสดงหน้าจอนี้อีกในครั้งต่อไป" เป็นกล่องเตือนตามจอเดิมเท่านั้น (`:335-360`)
+| ตำแหน่งผู้จำหน่าย | แผนที่ ประเภท `SUPPLIER` (`:1573-1584`) |
+| ข้อมูลเฉพาะธุรกิจ | การ์ด `BusinessExtFieldsCard` (`:1588`) |
+- **บันทึก** (`:392-655`): สิทธิ์ → "กรุณาระบุ 'รหัสผู้จำหน่าย'" → "กรุณาระบุ 'ชื่อผู้จำหน่าย 1'" → ถ้าเลือกสาขา เลขสาขาต้องเป็นตัวเลข 5 หลักและไม่ใช่ `00000` → เลขผู้เสียภาษีที่กรอกต้องเป็น 13 หลัก ("เลขประจำตัวผู้เสียภาษีอากร ไม่ครบ 13 หลัก") และ **คู่ (เลขภาษี + ประเภทสถานประกอบการ + เลขที่สาขา) ต้องไม่ซ้ำกับเจ้าหนี้รายอื่น** (`:458-496`) → เพิ่มใหม่ตรวจรหัสซ้ำ เสนอรหัสถัดไป จากนั้นชุดคำสั่งเดียวเขียน `ap_supplier` กับ `ap_supplier_detail` (UPDATE ก่อน แล้ว INSERT ถ้ายังไม่มี) พร้อมประวัติ สำเร็จขึ้น "บันทึกข้อมูลเจ้าหนี้เสร็จเรียบร้อย"
+- **ลบ** (`:661-782`): ห้ามถ้ารหัสถูกใช้ใน `ic_trans`, `ic_trans_detail`, `ap_ar_trans`, `ap_ar_trans_detail` ("มีการใช้งานรหัสดังกล่าวในเอกสารหรือรายการซื้อแล้ว ไม่สามารถลบได้") ผ่านแล้วถามยืนยัน ลบ `ap_item_by_supplier`, `ap_contactor`, รูป (`images`), `ap_supplier_detail`, `ap_supplier` และบันทึกประวัติ
+- **Ctrl+S** บันทึก **Esc** ยกเลิกการแก้ (`:784-814`) กดแก้ไขขึ้นกล่องเตือนว่าโปรแกรมจะตรวจว่ามีผู้อื่นเปิดแก้อยู่หรือไม่ พร้อมช่องติ๊ก "ต้องการแสดงหน้าจอนี้อีกในครั้งต่อไป" เป็นกล่องเตือนตามจอเดิมเท่านั้น (`:335-360`)
 
 ## 5002 รายละเอียดเจ้าหนี้
-หน้าเดียวยาว มีแถบ "ข้ามไปยังส่วน" (`:1872-1886`) ให้เลื่อนไปแต่ละส่วน หัวจอแสดงรหัส 5002:
+หน้าเดียวยาว มีแถบ "ข้ามไปยังส่วน" (`:1880-1893`) ให้เลื่อนไปแต่ละส่วน หัวจอแสดงรหัส 5002:
 | ส่วน | เนื้อหา |
 |---|---|
 | 1 ข้อมูลหลัก | ชุดเดียวกับ 5001 |
@@ -46,11 +46,12 @@ sources: ["frontend/account/master/SupplierScreen.tsx:147", "frontend/account/ma
 | 4 ผู้ติดต่อ (N) | ลำดับ · ชื่อผู้ติดต่อ · โทรศัพท์ · มือถือ · อีเมล · แผนก · ตำแหน่ง · ที่อยู่ |
 | 5 สินค้าตามเจ้าหนี้ (N) | ลำดับ · รหัสสินค้า · ชื่อสินค้า · หมายเหตุ · สถานะ |
 | 6 รูปภาพ (5) | ช่องรูป 5 ช่อง อัปโหลดแล้วเก็บ URL ที่ `images` |
-- ชื่อผู้จำหน่าย 1 ถูกประกอบจาก คำนำหน้า+ชื่อ+นามสกุล เมื่อเป็นบุคคลธรรมดา (`updateFullNameIfPersonality`, `:592`)
-- **บันทึก** (`:625-910`): ตรวจรหัส/ชื่อ → เลขภาษี 13 หลัก + **ไม่ซ้ำเฉพาะเลขภาษี** (`:660-675` ต่างจาก 5001 ที่นับสาขาด้วย) → เลขสาขา 5 หลัก → รหัสซ้ำเมื่อเพิ่มใหม่ → ชุดคำสั่ง: INSERT/UPDATE `ap_supplier`, **ลบแล้ว INSERT ใหม่** `ap_supplier_detail`, ซิงก์ลบ-ใส่ใหม่ `ap_contactor` และ `ap_item_by_supplier`, รูปภาพเฉพาะช่องที่เปลี่ยน, ประวัติ สำเร็จขึ้น "บันทึกข้อมูลรายละเอียดเจ้าหนี้เสร็จเรียบร้อย" (`:807-905`)
-- **ลบ** (`:915-1030`) เช็คเหมือน 5001 และลบข้อมูลย่อยตามไปด้วย
-- **Ctrl+S / Esc** ที่ `:1162`; ปุ่ม "ใส่รหัสถัดไปอัตโนมัติ" ที่ช่องรหัส (`:1362`)
-- อัปโหลดรูปไม่สำเร็จขึ้น "อัปโหลดรูปภาพไม่สำเร็จ: ..." (`:1145`)
+- ชื่อผู้จำหน่าย 1 ถูกประกอบจาก คำนำหน้า+ชื่อ+นามสกุล เมื่อเป็นบุคคลธรรมดา (`updateFullNameIfPersonality`, `:596`)
+- **บันทึก** (`handleSave` `:607-915`): ตรวจรหัส/ชื่อ → เลขภาษี 13 หลัก + **ไม่ซ้ำเฉพาะเลขภาษี** (`:657-681` ต่างจาก 5001 ที่นับสาขาด้วย) → เลขสาขา 5 หลัก → รหัสซ้ำเมื่อเพิ่มใหม่ → ชุดคำสั่ง: INSERT/UPDATE `ap_supplier`, **ลบแล้ว INSERT ใหม่** `ap_supplier_detail`, ซิงก์ลบ-ใส่ใหม่ `ap_contactor` และ `ap_item_by_supplier`, รูปภาพเฉพาะช่องที่เปลี่ยน, ประวัติ สำเร็จขึ้น "บันทึกข้อมูลรายละเอียดเจ้าหนี้เสร็จเรียบร้อย" (`:784-911`)
+- **ลบ** (`deleteBatch` `:919-1036`) เช็คเหมือน 5001 และลบข้อมูลย่อยตามไปด้วย
+- **เพิ่มใหม่** (`handleStartNew` `:479-555`) เปิดฟอร์มค่าเริ่มต้นแล้วโฟกัสช่องรหัสก่อน จากนั้นจึงขอรหัสถัดไปและเติมให้เฉพาะเมื่อช่องรหัสยังว่าง
+- **Ctrl+S / Esc** ที่ `:1163-1178`; ปุ่ม "ใส่รหัสถัดไปอัตโนมัติ" ที่ช่องรหัส (`:1366`)
+- อัปโหลดรูปไม่สำเร็จขึ้น "อัปโหลดรูปภาพไม่สำเร็จ: ..." (`:1149`)
 
 ## ข้อควรระวัง
 - กฎตรวจเลขภาษีไม่เหมือนกันระหว่างสองจอเจ้าหนี้: 5001 ยอมให้เลขภาษีเดียวกันซ้ำได้ถ้าเลขสาขาต่างกัน ส่วน 5002 ไม่ยอมซ้ำเลย เจ้าหนี้ที่มีหลายสาขาเลขภาษีเดียวกันจึงบันทึกที่ 5002 ไม่ผ่าน (ตามโค้ดสองไฟล์)
@@ -59,8 +60,8 @@ sources: ["frontend/account/master/SupplierScreen.tsx:147", "frontend/account/ma
 - เจ้าหนี้ถูกอ้างในเอกสารผ่านคอลัมน์ `cust_code` ของ `ic_trans` (ชื่อคอลัมน์ร่วมกับลูกหนี้) ดู [[tbl-ic-trans]]
 
 ## ที่มาในโค้ด
-- `frontend/account/master/SupplierScreen.tsx:147` รายการ; `:194-235` โหลด; `:275-290` รหัสอัตโนมัติ; `:335-360` เตือนแก้ไข; `:395-650` บันทึก; `:660-775` ลบ; `:784` คีย์ลัด
-- `frontend/account/master/SupplierDetailScreen.tsx:209` รายการ; `:262-390` โหลด; `:592` ประกอบชื่อ; `:625-910` บันทึก; `:915-1030` ลบ; `:1162` คีย์ลัด; `:1872-1886` แถบข้ามส่วน; `:2313-2323` ผู้ติดต่อ; `:2511-2518` สินค้า
+- `frontend/account/master/SupplierScreen.tsx:147` รายการ; `:183-235` โหลด; `:275-290` รหัสอัตโนมัติ; `:335-360` เตือนแก้ไข; `:392-655` บันทึก; `:661-782` ลบ; `:784-814` คีย์ลัด
+- `frontend/account/master/SupplierDetailScreen.tsx:207-214` รายการ; `:249-406` โหลด; `:479-555` เพิ่มใหม่; `:596` ประกอบชื่อ; `:607-915` บันทึก; `:919-1036` ลบ; `:1163-1178` คีย์ลัด; `:1880-1893` แถบข้ามส่วน; `:2300-2337` ผู้ติดต่อ; `:2498-2532` สินค้า
 - `frontend/src/config/schemas/apSupplier.ts:26-195`, `apSupplierDetail.ts:197-330`
 - `frontend/account/tabs/screenRegistry.tsx:581-592`
 - ดูเพิ่ม: [[fe-master-screens]] · [[screens-overview]]

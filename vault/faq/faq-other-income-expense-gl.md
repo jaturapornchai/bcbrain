@@ -2,7 +2,7 @@
 title: "รายได้อื่นๆ (250) / ค่าใช้จ่ายอื่นๆ (260) ลงบัญชีเข้าบัญชีไหน ตั้งรหัสบัญชีที่ไหน"
 tags: [faq, gl, other-income, other-expense, cash-bank]
 aliases: ["รายได้อื่นลงบัญชียังไง", "ค่าใช้จ่ายอื่นลงบัญชียังไง", "other income expense journal", "trans_flag 250", "trans_flag 260", "OI", "EPO", "erp_income_list", "erp_expenses_list", "menu_cash_income_other"]
-sources: ["backend/internal/application/process/service.go:1811", "backend/internal/application/process/service.go:1818", "backend/internal/application/process/gl_template.go:199", "backend/internal/application/process/service.go:1976", "backend/internal/application/process/service.go:2036", "backend/internal/application/process/service.go:2058", "backend/internal/application/process/service.go:1986", "backend/internal/application/process/gl_template_rules.go:43"]
+sources: ["backend/internal/application/process/service.go:1822", "backend/internal/application/process/service.go:1829", "backend/internal/application/process/gl_template.go:199", "backend/internal/application/process/service.go:1987", "backend/internal/application/process/service.go:2047", "backend/internal/application/process/service.go:2069", "backend/internal/application/process/service.go:1997", "backend/internal/application/process/gl_template_rules.go:43"]
 ---
 # รายได้อื่นๆ (250) / ค่าใช้จ่ายอื่นๆ (260) ลงบัญชีเข้าบัญชีไหน ตั้งรหัสบัญชีที่ไหน
 
@@ -23,7 +23,7 @@ sources: ["backend/internal/application/process/service.go:1811", "backend/inter
 
 ## ข้อควรระวัง
 - เส้นมาตรฐานอ่านรหัสบัญชีจาก **บรรทัดแรกที่มีรหัส** เท่านั้น เอกสารหลายบรรทัดต่างบัญชีจะลงบัญชีเดียวด้วยยอดรวม ถ้าต้องการแยก ใช้รูปแบบ GL
-- 250/254 นับเงินสดเฉพาะ inquiry_type 1 (ไม่รวม 3) ส่วน 260/264 นับ 1 และ 3 กติกา 250/254 เพิ่งถูกแก้จาก "เงินสดเสมอ" ดู [[hist-todo-open-items]]
+- 250/254 นับเป็นรับเงินเมื่อ inquiry_type = 1 (ไม่รวม 3) หรือมีแท็บชำระเงินที่ `cb_trans.total_amount_pay > 0` ส่วน 260/264 นับเป็นจ่ายเงินเมื่อ inquiry_type = 1 หรือ 3 (เว้นใบ 14/316 ที่ถือเป็นเงินเชื่อเสมอ) หรือมียอดจ่ายในแท็บชำระเงิน
 - 252 และ 262 ลงเป็นเงินสดเสมอ ไม่ขึ้นกับ inquiry_type
 - ไม่ได้ตั้งบัญชีในรายการ → รายได้อื่นเข้าบัญชีขาย ค่าใช้จ่ายอื่นเข้าบัญชีซื้อ
 
@@ -34,11 +34,11 @@ sources: ["backend/internal/application/process/service.go:1811", "backend/inter
 - [[acc-payment-tab]]
 
 ## ที่มาในโค้ด
-- `backend/internal/application/process/service.go:1811` 260/262/264 อ่านบัญชีจาก erp_expenses_list
-- `backend/internal/application/process/service.go:1818` 250/252/254 อ่านบัญชีจาก erp_income_list
+- `backend/internal/application/process/service.go:1822` 260/262/264 อ่านบัญชีจาก erp_expenses_list
+- `backend/internal/application/process/service.go:1829` 250/252/254 อ่านบัญชีจาก erp_income_list
 - `backend/internal/application/process/gl_template.go:199` SQL `gl_account_code` ของรายการ
-- `backend/internal/application/process/service.go:1976` 260/264 จ่ายสดเมื่อ inquiry 1/3 หรือมียอดจ่าย
-- `backend/internal/application/process/service.go:2036` 250/254 รับเงินเมื่อ inquiry 1 หรือมียอดรับ
-- `backend/internal/application/process/service.go:2058` 252 Cr เงินเสมอ
-- `backend/internal/application/process/service.go:1986` 262 Dr เงินเสมอ
+- `backend/internal/application/process/service.go:1987-1988` 260/264 จ่ายสดเมื่อ inquiry 1/3 หรือมียอดจ่าย
+- `backend/internal/application/process/service.go:2047` 250/254 รับเงินเมื่อ inquiry 1 หรือมียอดรับ
+- `backend/internal/application/process/service.go:2069` 252 Cr เงินเสมอ
+- `backend/internal/application/process/service.go:1997` 262 Dr เงินเสมอ
 - `backend/internal/application/process/gl_template_rules.go:43` รหัสจอ EPC/EPD/EPO/OCN/ODN/OI

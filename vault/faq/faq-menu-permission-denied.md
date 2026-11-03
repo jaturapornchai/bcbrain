@@ -25,7 +25,7 @@ sources: ["backend/internal/adapter/inbound/http/middleware/permission.go:31", "
 - คนอื่นโหลดจาก DB ตามบริษัทใน token (`claims.DatabaseName`) — ถ้าไม่มีแถวสิทธิ์เลย ได้ศูนย์ ไม่ใช่ได้ทั้งหมด
 - `Allows` (`permission.go:41`): Admin ผ่านทุกอย่าง; Write = Add หรือ Edit; ผู้ที่ไม่ใช่ Admin จะผ่านสิทธิ์ Admin ไม่ได้เลย
 
-**สิทธิ์เก็บที่ไหน** (`UserRepository.MenuRights`, `postgres_repository.go:69`): ตาราง `bc_permissions_user` (ราย user) และ `bc_permissions_group` (ราย group ผ่าน `bc_user_and_group`) ใน Main DB คอลัมน์ `image_file` เป็น blob ของรายการเมนู (JSON หรือ XML ของ C# เดิม) แถวถูกกรองด้วย `database_name` ของบริษัทที่ล็อกอิน (แถวที่ตรงบริษัทมาก่อนแถวว่าง) และผลรวมของ user + group คือ OR กัน
+**สิทธิ์เก็บที่ไหน** (`UserRepository.MenuRights`, `postgres_repository.go:69`): ตาราง `bc_permissions_user` (ราย user) และ `bc_permissions_group` (ราย group ผ่าน `bc_user_and_group`) ใน Main DB คอลัมน์ `image_file` เป็น blob ของรายการเมนู (JSON `{"menus":[...]}` หรือ XML ที่มีสิทธิ์อ่าน/เพิ่ม/แก้/ลบต่อเมนู — `DecodeMenuRights` `menu_rights.go:48`; blob ที่อ่านไม่ออกถือว่าไม่ให้สิทธิ์เลย) แถวถูกกรองด้วย `database_name` ของบริษัทที่ล็อกอิน (แถวที่ตรงบริษัทมาก่อนแถวว่าง) และผลรวมของ user + group คือ OR กัน
 
 **route ต้องการสิทธิ์อะไร:**
 - `/process`: ตาราง `routeRights` (`process/permission.go:23`) คีย์ `"กลุ่ม/action"` → read/write/del/admin และ `RequiredRight` (`:57`) ปรับตาม body เช่น `trans/save` ดู `isNew` แยก Add/Edit
@@ -55,7 +55,7 @@ sources: ["backend/internal/adapter/inbound/http/middleware/permission.go:31", "
 - `backend/internal/adapter/inbound/http/middleware/permission.go:31` `deniedMessages` ข้อความ 403 ภาษาไทยต่อชนิดสิทธิ์
 - `backend/internal/adapter/inbound/http/middleware/permission.go:41` `Allows` และ `:62` `RequireRight`
 - `backend/internal/application/identity/service.go:174` `MenuRights` (superadmin / level >= 9 / โหลดจาก DB)
-- `backend/internal/adapter/outbound/identity/postgres_repository.go:69` SQL สิทธิ์ user + group กรอง `database_name`
-- `backend/internal/adapter/outbound/identity/menu_rights.go:48` `DecodeMenuRights` (JSON หรือ XML เดิม)
+- `backend/internal/adapter/outbound/identity/postgres_repository.go:76-93` SQL สิทธิ์ user + group กรอง `database_name`
+- `backend/internal/adapter/outbound/identity/menu_rights.go:48` `DecodeMenuRights` (JSON หรือ XML)
 - `backend/internal/adapter/inbound/http/process/permission.go:23` `routeRights`, `:57` `RequiredRight` (default admin บรรทัด 132), `:138` `QueryRequiredRight`
 - `backend/internal/adapter/inbound/http/router.go:234` `GET/PUT /menu-permissions` ของ admin

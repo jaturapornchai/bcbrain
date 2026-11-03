@@ -49,7 +49,7 @@ sources: ["frontend/src/app/(admin)/layout.tsx:17", "frontend/src/app/(admin)/ad
 - ข้อควรระวัง: มีการตรวจฝั่งจอเพียงปุ่มและค่าว่าง ผลสำเร็จ/ล้มเหลวมาจากข้อความ error ของ API ที่แสดงเหนือฟอร์ม (`setError`) การกำหนดรหัสผ่านใหม่แยกอีกจอที่ [[scr-change-password]]
 
 ## 2) จัดการ Provider (ProvidersScreen -> ProvidersTab)
-หัวจอ "รายการ tenant และ auth database" ซึ่งหมายเหตุในโค้ดระบุว่า **ไม่มีใน BCERP22 เดิม** เป็นของที่ฝั่งเว็บเพิ่ม (`ProvidersScreen.tsx:17-18`)
+หัวจอ "รายการ tenant และ auth database" (`ProvidersScreen.tsx:17-18`)
 - ตาราง: รหัส, ชื่อ, ชื่อ Auth Database, สถานะ (เปิดใช้งาน/ปิด) และป้าย "ใช้งานอยู่" ที่ provider ที่ session กำลังใช้ (`ProvidersTab.tsx:104-133`)
 - modal "เพิ่ม Provider / แก้ไข <รหัส>": รหัส Provider (แก้ภายหลังไม่ได้), ชื่อ Provider, ชื่อ Auth Database, เปิดใช้งาน (`:186-229`)
 - บันทึก `POST/PATCH /api/admin/providers` (`:53-54`) ลบ `DELETE /api/admin/providers?code=..` (`:73-74`)

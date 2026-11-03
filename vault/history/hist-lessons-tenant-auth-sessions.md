@@ -1,63 +1,53 @@
 ---
 title: "บทเรียนตัวตนผู้เช่า การล็อกอิน และ session (Tenant, Auth & Sessions)"
-tags: [history, auth, tenant, session]
-aliases: ["refresh token rotation", "session expired", "Google ID token", "OAuth state", "requireSystemAdmin"]
-sources: ["git:6ba1a6d9", "git:9a2ce199", "git:6e9ae03e", "git:faa6e6d0", "git:7ab65d38", "git:a47413ec", "git:13f953cc", "frontend/src/lib/api-server.ts:89", "frontend/src/app/api/auth/google/route.ts:233"]
+tags: [history, lesson, auth, tenant, session, security]
+aliases: ["refresh token rotation", "session expired", "Google ID token", "OAuth state", "requireSystemAdmin", "ADMIN_API_KEY fail-closed", "DB_FORBIDDEN"]
+sources: ["frontend/src/lib/api-server.ts:74", "frontend/src/lib/api-server.ts:103", "frontend/src/lib/api-server.ts:277", "frontend/src/lib/api-server.ts:373", "frontend/src/app/api/auth/google/route.ts:52", "frontend/src/app/api/auth/google/route.ts:230", "frontend/src/app/api/auth/google/route.ts:252", "frontend/src/app/api/auth/google/oauth-state.ts:7", "frontend/src/app/api/auth/google/oauth-state.test.ts:12", "frontend/src/app/api/auth/databases/route.ts:289", "frontend/src/app/api/workspace/[...path]/route.ts:28", "frontend/src/app/api/workmonitor/route.ts:27", "frontend/src/app/api/auth/change-password/route.ts:36", "frontend/src/lib/api-client.ts:77", "frontend/shared/layout/PersistentWorkspaceHost.tsx:279", "backend/internal/application/identity/service.go:194", "backend/internal/application/identity/service.go:254", "backend/internal/domain/identity/identity.go:50", "backend/internal/domain/identity/identity.go:64", "backend/internal/adapter/inbound/http/admin/handler.go:283", "backend/internal/adapter/inbound/http/monitormap/handler.go:114"]
 ---
 
-## ภาพรวม
-ชั้นตัวตนผู้ใช้/ผู้เช่าถูกเจาะซ้ำ 2026-10-20 .. 2026-10-29: token หมดอายุแล้วหลุด, อีเมล Google ไม่ถูกพิสูจน์, โซนส่วนกลางเปิดกว้าง, ผู้เรียกเลือกฐานเองได้
+# ตัวตนผู้เช่า การล็อกอิน และ session
 
-## อาการ
-- **T1 (6ba1a6d9, 9a2ce199):** 401 เมื่อ token หมดอายุ ผู้ใช้เด้งออกและเสียหน้าที่ทำอยู่ (ชื่อ commit: 401 token refresh & recovery; 10-27 เพิ่ม modal ล็อกอินใหม่)
-- **T2 (6e9ae03e, faa6e6d0):** `/api/auth/google` ไม่เช็ก `aud`/`email_verified` ของ token; callback ไม่มี `state` (login CSRF)
-- **T3 (7ab65d38, faa6e6d0):** production ไม่ตั้ง `ADMIN_API_KEY` แล้วเงียบ ๆ ใช้กุญแจสำรองที่รู้กันทั่วไป; `/api/admin/*` ใช้ `requireAdmin` ผู้ดูแล workspace เข้าส่วนกลางได้; `/api/workspace/*` ฝั่ง backend ตรวจแค่กุญแจ
-- **T4 (a47413ec, 7ab65d38):** route แผนที่ไม่มี Auth ให้ผู้เรียกเลือกฐานใดก็ได้; telemetry (`fraudwarning`, `workmonitor`) ไม่มี session แล้วตกไปฐานสาธิต; สลับฐานโดยไม่ตรวจรายชื่อที่เข้าได้
-- **T5 (13f953cc, a94b0748):** รหัสผ่านเก็บตามที่ admin กรอก
-- **T6 (a3809aba):** `/login`, `/select-database`, `/admin` ยิง `/query/list` ก่อนล็อกอิน
+ระบบนี้แยกผู้เช่า (provider) และฐานข้อมูลบริษัทต่อ session ผู้ใช้ทุกคนถือ token ที่ผูกกับ provider/ฐานข้อมูลหนึ่งชุด ตัวตนต้องมาจากผลตรวจ token ฝั่ง server ไม่ใช่ข้อมูลที่ browser ส่งมาเอง บันทึกนี้เก็บด่านที่ยังเห็นในโค้ดวันนี้
 
-## สาเหตุ (root cause)
-- T1: refresh token ใช้ครั้งเดียว คำขอขนานแย่งกันหมุน (อนุมานจากโค้ดที่เพิ่ม) และ 401 ไม่จำหน้าปัจจุบัน
-- T2: ไว้ใจข้อมูลจาก client แทนผลตรวจ token
-- T3: fallback เป็นค่าคงที่ใน production; คำว่า "Admin" ปนระหว่างผู้ดูแล workspace กับส่วนกลาง
-- T4: เลือกผู้เช่าจากข้อมูลที่ผู้เรียกคุมหรือ default แทน session
-- T5: ไม่มี hash ตอนเขียน
-- T6: โหลดข้อมูลที่ต้องมี session ในหน้าสาธารณะ
+## อะไรพังได้
+- **token หมดอายุกลางงาน:** ผู้ใช้เด้งออกจากหน้าที่กำลังทำโดยไม่รู้ตัว
+- **คำขอขนานแย่งหมุน refresh token:** refresh token ใช้ได้ครั้งเดียว ถ้าสองคำขอหมุนพร้อมกัน ตัวที่สองล้มและผู้ใช้หลุด
+- **token ยังใช้ได้หลังผู้ใช้ถูกปิดหรือถอดสิทธิ์:** ถ้า refresh ต่ออายุโดยไม่ตรวจซ้ำ
+- **ล็อกอิน Google ที่เชื่อข้อมูลจาก client:** อีเมลที่ไม่ผ่านการตรวจ, token ที่ออกให้ client อื่น, callback ที่ไม่มี `state` (login CSRF)
+- **กุญแจผู้ดูแลมีค่า default ใน production:** ไม่ตั้ง `ADMIN_API_KEY` แล้วเงียบๆ ใช้ค่าสำรอง
+- **"Admin" ปนกันสองความหมาย:** ผู้ดูแล workspace กับผู้ดูแลส่วนกลาง ถ้าใช้ตัวตรวจเดียวกันจะเข้าส่วนกลางได้
+- **ผู้เรียกเลือกผู้เช่าเอง:** route ที่ไม่มี Auth หรือ endpoint สลับฐานที่รับชื่อฐานจาก body โดยไม่เทียบรายชื่อที่เข้าได้
+- **รหัสผ่านเก็บตามที่กรอก:** ไม่มี hash ตอนเขียน
 
-## วิธีแก้
-- **T1:** `rotateRefreshToken` แบบ single-flight (map คำขอที่กำลังหมุน + แคชผลสั้น ๆ); 401 เก็บ `returnTo` ใน sessionStorage, ยิงเหตุการณ์ `bc:session-expired`, banner/modal ให้ล็อกอินใหม่แล้วกลับหน้าเดิม
-- **T2:** บังคับ `idToken` (ไม่มี = 401 `NO_ID_TOKEN`), ตรวจ `aud` และ `email_verified`; `state` เป็น cookie httpOnly 10 นาที ใช้ครั้งเดียว เทียบด้วย `timingSafeEqual`
-- **T3:** `getAdminApiKey()` คืน null ใน production ถ้าไม่ตั้ง => 503 `NO_ADMIN_API_KEY`; `/api/admin/*` ใช้ `requireSystemAdmin` (`session.mode === "admin"`; สาธิตอ่านอย่างเดียว `DEMO_READ_ONLY`); `isWorkspaceAdmin` กั้น workspace route
-- **T4:** tile route ล็อกฐานสาธิต; telemetry ไม่มี `session.database` = 401; สลับฐานได้เฉพาะ `availableCompanies` หรือฐานปัจจุบัน (403 `DB_FORBIDDEN`)
-- **T5:** `HashPassword` (bcrypt) ตอน admin create/update + ขยายคอลัมน์เป็น 255; `a94b0748` เพิ่ม `/api/auth/change-password` ที่ยืนยันรหัสเดิมกับ `/auth/login` ปฏิเสธบัญชี Google/สาธิต
-- **T6:** `isPublicOrNoDbPath()` ข้ามการโหลด และตั้ง `loaded` เมื่อมีคำตอบสำเร็จเท่านั้น
+## โค้ดป้องกันไว้อย่างไร
+| ด่าน | ที่อยู่ | ทำอะไร |
+|---|---|---|
+| refresh แบบ single-flight | `frontend/src/lib/api-server.ts:103` `rotateRefreshToken` (map `inFlightRefresh` `:93`, แคชผลล่าสุด `RECENT_REFRESH_TTL_MS` 60 วินาที `:101`) | คำขอที่มี refresh token เดียวกันรอผลของคำขอแรก ไม่หมุนซ้ำ |
+| backend หมุนและตรวจซ้ำ | `backend/internal/application/identity/service.go:254` `Refresh`, `:194` `verifySession` | ผู้ใช้ต้องยัง active และยังมีสิทธิ์เข้าบริษัทนั้น; refresh token ที่ใช้แล้วถูกเพิกถอน เล่นซ้ำไม่ได้ |
+| 401 แล้วกลับหน้าเดิม | `frontend/src/lib/api-client.ts:77` `notifySessionExpired` (เรียกที่ `:115,138`); `frontend/shared/layout/PersistentWorkspaceHost.tsx:279-300,369,456` | เก็บหน้าปัจจุบันใน `sessionStorage` (`bc_return_to`), ยิงเหตุการณ์ `bc:session-expired`, แสดง modal ให้ล็อกอินใหม่แล้ว `returnTo` กลับหน้าเดิม |
+| `state` ของ Google OAuth | `frontend/src/app/api/auth/google/route.ts:24-29,111-115`, `:52-58`; `oauth-state.ts:7-24` | cookie `httpOnly` sameSite=lax อายุ 10 นาที, ลบทันทีที่ callback อ่านไม่ว่าผลเป็นอย่างไร, เทียบแบบ constant-time (`timingSafeEqual`) |
+| ตรวจ Google ID token | `google/route.ts:230` (`NO_ID_TOKEN`), `:252` (`aud` ต้องเป็น Client ID ของเว็บนี้), `:255` (`email_verified`); callback `:89` | อีเมลมาจาก token ที่ตรวจแล้วเท่านั้น ไม่รับอีเมลจาก body |
+| กุญแจผู้ดูแล fail-closed | `frontend/src/lib/api-server.ts:74-86` `getAdminApiKey`, `adminApiKeyMissing` | production ไม่ตั้ง `ADMIN_API_KEY` → คืน `null` และตอบ 503 `NO_ADMIN_API_KEY` (ใช้ที่ `google/route.ts:212`, `workspace/[...path]/route.ts:83`, `frontend/src/app/api/auth/databases/route.ts:34,120`) |
+| ผู้ดูแลส่วนกลางแยกจากผู้ดูแล workspace | `api-server.ts:373` `requireSystemAdmin` (`session.mode === "admin"`, สาธิต = `DEMO_READ_ONLY` `:380`, ไม่ใช่ = `NOT_SYSTEM_ADMIN` `:387`), `:277` `requireAdmin` (user_level ≥ 9 หรือ role ADMIN) | route ใน `frontend/src/app/api/admin/` เรียก `requireSystemAdmin`; route workspace ใช้ `isWorkspaceAdmin` (`workspace/[...path]/route.ts:28`, ใช้ที่ `:118,136,386`) เพราะ backend ตรวจแค่กุญแจ |
+| สลับฐานต้องอยู่ในรายชื่อที่เข้าได้ | `frontend/src/app/api/auth/databases/route.ts:289-297,327` | ไม่อยู่ใน `availableCompanies` และไม่ใช่ฐานปัจจุบัน → 403 `DB_FORBIDDEN` |
+| route แผนที่ไม่ให้เลือกผู้เช่า | `backend/internal/adapter/inbound/http/monitormap/handler.go:114-124` `resolveClaims` | ไม่มี claims → ใช้ฐานสาธิตร่วมเสมอ ไม่รับ `?db=`/`?provider=` |
+| telemetry ต้องมี session | `frontend/src/app/api/workmonitor/route.ts:27-31`, `fraudwarning/route.ts:24-28`, `workmonitor/stream/route.ts:21-25` | ไม่มี `session.database` → 401 |
+| รหัสผ่านเป็น bcrypt | `backend/internal/domain/identity/identity.go:50` `HashPassword`, `:64-72` `Authenticate`; `backend/internal/adapter/inbound/http/admin/handler.go:283,340` | admin สร้าง/แก้ผู้ใช้แล้ว hash ก่อนเก็บ; ล็อกอินเทียบ bcrypt (ยังรองรับรหัสเดิมแบบไม่ hash ด้วย constant-time compare) |
+| เปลี่ยนรหัสผ่านต้องยืนยันรหัสเดิม | `frontend/src/app/api/auth/change-password/route.ts:36-90` | ยืนยันรหัสเดิมผ่าน `/auth/login`; โหมดสาธิตและบัญชี Google ถูกปฏิเสธ (`DEMO_READ_ONLY`, `GOOGLE_ACCOUNT_PASSWORD`) |
+| เทสต์ | `google/oauth-state.test.ts:12,19` | จับคู่ `state` ต้องตรงเป๊ะ ขาดค่าใดค่าหนึ่งถูกปฏิเสธ |
 
-## commit ที่เกี่ยวข้อง
-- `6ba1a6d9` — refresh single-flight + กู้คืนหลัง 401 (2026-10-20); `9a2ce199` modal (10-27; ตามข้อความ commit)
-- `6e9ae03e` — Google PDPA multi-tenant auth (2026-10-24; ตรวจเฉพาะ diff google route)
-- `faa6e6d0` — ตรวจ Google ID token + `isWorkspaceAdmin` (2026-10-24)
-- `7ab65d38` — fail-closed key, OAuth state, system-admin-only, DB-switch check, telemetry (2026-10-24)
-- `a47413ec` — ล็อกฐานของ tile route (2026-10-24)
-- `a94b0748` (10-24), `13f953cc` bcrypt, `a3809aba` (10-29)
-
-## โค้ดปัจจุบันที่ป้องกัน
-- `frontend/src/lib/api-server.ts:60` `getAdminApiKey`, `:89` `rotateRefreshToken`, `:359` `requireSystemAdmin`
-- `frontend/src/app/api/auth/google/route.ts:58` (state), `:233` (idToken), `:252-260` (aud, email_verified); `oauth-state.ts:15-23`
-- `frontend/src/app/api/auth/databases/route.ts:289-296`; `frontend/src/app/(admin)/layout.tsx:21`
-- `frontend/src/lib/api-client.ts:77`; `frontend/shared/layout/PersistentWorkspaceHost.tsx:306,456`
-- `backend/internal/adapter/inbound/http/monitormap/handler.go:122`; `backend/internal/domain/identity/identity.go:50`; `admin/handler.go:283,340`
-
-## บทเรียน / กฎที่ได้
-1. ผู้เช่ามาจาก session เท่านั้น ไม่รับจาก query string, body หรือ default ที่หละหลวม
-2. ตัวตนต้องมาจากผลตรวจ token (aud, verified) ไม่ใช่ข้อมูลจาก client
+## กฎที่ต้องจำ
+1. ผู้เช่ามาจาก session เท่านั้น ห้ามรับจาก query string, body หรือ default ที่หละหลวม ถ้าจำเป็นต้องมี default (route แผนที่) ให้ล็อกเป็นฐานสาธิต
+2. ตัวตนต้องมาจากผลตรวจ token (`aud`, `email_verified`) ไม่ใช่ข้อมูลที่ client ส่ง
 3. กุญแจระบบไม่มี fallback ใน production ให้ fail-closed (503)
-4. แยกผู้ดูแล workspace จากผู้ดูแลส่วนกลางด้วย `session.mode`
-5. refresh token ใช้ครั้งเดียว ต้อง single-flight และจำหน้าที่ทำอยู่
-
-## ดูเพิ่ม
-[[adr-0003-per-tenant-identity]] · [[fe-auth-session]] · [[std-platform-google-login-pdpa-hub]] · [[hist-lessons-web-vulns-xss-redirect]] · [[history-overview]]
+4. ผู้ดูแลส่วนกลางกับผู้ดูแล workspace ใช้ตัวตรวจคนละตัว (`requireSystemAdmin` vs `isWorkspaceAdmin`)
+5. refresh token ใช้ครั้งเดียว: ฝั่ง Next ต้อง single-flight ฝั่ง backend ต้องตรวจผู้ใช้/สิทธิ์ซ้ำก่อนออก token ใหม่
+6. 401 ต้องจำหน้าที่ทำอยู่แล้วพากลับหลังล็อกอินใหม่ (ดู [[hist-lessons-web-vulns-xss-redirect]] เรื่องการตรวจ `returnTo`)
 
 ## ที่มาในโค้ด
-- git:6ba1a6d9, git:faa6e6d0, git:7ab65d38, git:13f953cc
-- frontend/src/lib/api-server.ts:60, :89, :359
-- frontend/src/app/api/auth/google/route.ts:233, :252
+- `frontend/src/lib/api-server.ts:74-86,93-101,103,277,373-390` กุญแจ, refresh, ผู้ดูแล
+- `frontend/src/app/api/auth/google/route.ts:24-29,52-58,89,111-115,212,230,252-255` และ `oauth-state.ts:7-24`
+- `frontend/src/app/api/auth/databases/route.ts:289-297,327`, `frontend/src/app/api/workspace/[...path]/route.ts:28,83,118,136,386`
+- `backend/internal/application/identity/service.go:194-231,254` ตรวจ session และหมุน token
+- `backend/internal/adapter/inbound/http/monitormap/handler.go:114-124`, `backend/internal/domain/identity/identity.go:50-72`
+- ดูเพิ่ม: [[adr-0003-per-tenant-identity]] · [[fe-auth-session]] · [[std-platform-google-login-pdpa-hub]] · [[hist-lessons-permission-rights]] · [[hist-lessons-web-vulns-xss-redirect]]

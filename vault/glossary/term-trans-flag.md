@@ -2,7 +2,7 @@
 title: "ชนิดเอกสาร / รหัสเอกสาร (document type / trans_flag)"
 tags: [glossary, document-type, ic, ap, ar, cb, gl]
 aliases: ["trans_flag", "transFlag", "ชนิดเอกสาร", "ประเภทเอกสาร", "รหัสเอกสาร", "flag", "เลข flag", "trans_type", "transType", "calc_flag", "calcFlag", "ทิศทางสต็อก", "screen code", "screenCode", "รหัสจอ", "TransKind", "kind", "doc type"]
-sources: ["backend/internal/application/process/transcalc.go:12", "backend/internal/application/process/stock_rebuild.go:18", "frontend/account/tabs/transMenuMap.ts:3", "frontend/account/tabs/transMenuMap.ts:11", "frontend/account/tabs/transMenuMap.ts:54", "frontend/account/tabs/transMenuMap.ts:541", "frontend/account/tabs/transMenuMap.ts:922", "frontend/account/tabs/transMenuMap.ts:827", "frontend/account/tabs/transMenuMap.ts:295", "frontend/account/tabs/transMenuMap.ts:1796", "backend/internal/application/process/trans.go:18", "backend/internal/application/process/service.go:1069"]
+sources: ["backend/internal/application/process/transcalc.go:14", "backend/internal/application/process/stock_rebuild.go:18", "frontend/account/tabs/transMenuMap.ts:3", "frontend/account/tabs/transMenuMap.ts:11", "frontend/account/tabs/transMenuMap.ts:54", "frontend/account/tabs/transMenuMap.ts:541", "frontend/account/tabs/transMenuMap.ts:922", "frontend/account/tabs/transMenuMap.ts:827", "frontend/account/tabs/transMenuMap.ts:295", "frontend/account/tabs/transMenuMap.ts:1798", "frontend/account/tabs/transMenuMap.ts:1813", "backend/internal/application/process/trans.go:20", "backend/internal/application/process/service.go:1080"]
 ---
 
 # ชนิดเอกสาร (trans_flag)
@@ -22,8 +22,8 @@ sources: ["backend/internal/application/process/transcalc.go:12", "backend/inter
 
 ## ค่าที่เป็นไปได้
 - `trans_type`: 1 = ซื้อ/เจ้าหนี้ (`transMenuMap.ts:54`), 2 = ขาย/ลูกหนี้ (`:541`), 3 = สินค้า/คลัง (`:922`)
-- `calc_flag`: ยอดคงเหลือคำนวณจาก `SUM(qty * calc_flag * (stand_value/divide_value))` (`service.go:1069`) ดังนั้น +1 = เข้า, −1 = ออก, 0 = ไม่กระทบสต็อก
-  - backend คำนวณ `calc_flag` เองจาก `trans_flag` ไม่เชื่อค่าที่ client ส่งมา (`calcFlagByTransFlag`, `transcalc.go:9-27`) flag ที่ไม่อยู่ในรายการได้ 0
+- `calc_flag`: ยอดคงเหลือคำนวณจาก `SUM(qty * calc_flag * (stand_value/divide_value))` (`service.go:1078-1083`) ดังนั้น +1 = เข้า, −1 = ออก, 0 = ไม่กระทบสต็อก
+  - backend คำนวณ `calc_flag` เองจาก `trans_flag` ไม่เชื่อค่าที่ client ส่งมา (`calcFlagByTransFlag`, `transcalc.go:14-27`) flag ที่ไม่อยู่ในรายการได้ 0
   - flag ที่ไม่ใช่เอกสารสต็อก เช่น 30/34/36 ก็มี `calc_flag = 1` ด้วย แต่ไม่กระทบยอด เพราะยอดคงเหลือนับเฉพาะ `trans_flag` ในรายการ `stockRowsSQL` (`stock_rebuild.go:18-22`) ดู [[term-stock-balance]]
 - ตัวอย่าง flag ที่พบบ่อย (จาก `transMenuMap.ts`):
   - ซื้อ: 2 PR ใบเสนอซื้อ (`:56`), 6 PO ใบสั่งซื้อ (`:99`), 12 PU ซื้อ/ตั้งหนี้ (`:295`), 16 PT ส่งคืน/ลดหนี้ซื้อ (`:388`), 14 PA เพิ่มหนี้ซื้อ (`:479`)
@@ -31,14 +31,14 @@ sources: ["backend/internal/application/process/transcalc.go:12", "backend/inter
   - สต็อก: 54 IB ยกมา (`:924`), 56 IO เบิก (`:996`), 58 IR รับคืนจากเบิก (`:1027`), 72 IM โอนออก (`:1073`), 66 IA ปรับปรุงเพิ่ม (`:1149`), 68 IS ปรับปรุงลด (`:1163`)
   - หนี้: 19 DE จ่ายชำระหนี้ (`:1374`), 239 EE รับชำระหนี้ (`:1573`), 213 DD ใบรับวางบิล (`:1345`), 235 ED ใบวางบิล (`:1544`)
   - เงิน: 401 DM ฝาก (`:1887`), 402 WM ถอน (`:1902`), 422 TM โอนเงิน (`:1917`), 0 JV ข้อมูลรายวัน (`:2368`)
-- ค่าคงที่ฝั่ง backend: 72 โอนออก, 70 โอนเข้า, 124 ขอโอน, 422 โอนเงิน (`trans.go:18-27`)
+- ค่าคงที่ฝั่ง backend: 72 โอนออก, 70 โอนเข้า, 124 ขอโอน, 422 โอนเงิน (`trans.go:20-27`)
 
 ## หน้าจอที่ใช้
 ทุกจอเอกสารใน `frontend/account/transaction/*` เปิดตาม `TransMenuConfig` เดียวกัน รายการเต็มดูได้ที่ [[acc-trans-flag-map]]
 
 ## ข้อควรระวัง
 - flag ของเอกสารยกเลิก/อนุมัติเป็นเอกสารแยก มีเลขของตัวเอง เช่น 45 ยกเลิกขาย (เอกสารเดิมคือ 44) และ 4 อนุมัติใบเสนอซื้อ (เอกสารเดิมคือ 2) ดู [[term-last-status-cancel-approve]]
-- flag 300/301 (เงินสดย่อย) โค้ดเรียกว่า 300 "คืน/ลด วงเงินสดย่อย" (`transMenuMap.ts:1796`) และ 301 "รับ/เพิ่ม วงเงินสดย่อย" (`:1813`) แต่โน้ต [[acc-trans-flag-map]] เขียนว่า 300 เบิก / 301 คืน ให้ยึดตามโค้ด
+- flag 300/301 (เงินสดย่อย) โค้ดเรียกว่า 300 "คืน/ลด วงเงินสดย่อย" (`transMenuMap.ts:1798`) และ 301 "รับ/เพิ่ม วงเงินสดย่อย" (`:1813`) แต่โน้ต [[acc-trans-flag-map]] เขียนว่า 300 เบิก / 301 คืน ให้ยึดตามโค้ด
 - `cb_chq_list` ใช้ `trans_flag` 1 เช็ครับ, 2 เช็คจ่าย, 3 บัตรเครดิต (`:1991`, `:2180`, `:2325`) ซ้ำเลขกับ flag ของ `ic_trans` จึงต้องดูประกอบกับตารางทุกครั้ง
 
 ## ลิงก์
@@ -46,7 +46,7 @@ sources: ["backend/internal/application/process/transcalc.go:12", "backend/inter
 
 ## ที่มาในโค้ด
 - `frontend/account/tabs/transMenuMap.ts:3` (TransKind), `:11-30` (TransMenuConfig), `:54`, `:541`, `:922` (trans_type)
-- `frontend/account/tabs/transMenuMap.ts:295`, `:827`, `:1796`, `:1813`, `:2368`
-- `backend/internal/application/process/trans.go:18-27`
-- `backend/internal/application/process/service.go:1069`
+- `frontend/account/tabs/transMenuMap.ts:295`, `:827`, `:1798`, `:1813`, `:2368`
+- `backend/internal/application/process/trans.go:20-27`
+- `backend/internal/application/process/service.go:1078-1083`
 - `backend/internal/application/process/transcalc.go:9-27`; `stock_rebuild.go:18-22`

@@ -7,7 +7,7 @@ sources: ["backend/internal/application/process/item_master.go:25", "backend/int
 
 # ข้อมูลสินค้าและข้อมูลสินค้าเพิ่มเติม (Item master & item detail)
 
-สองหน้าจอสินค้าที่พอร์ตจาก C# `BCERPIC`: (1) **ข้อมูลสินค้า** (`_icMain.cs`, เมนู 2.1.1/2.1.2/2.1.24) บันทึก `ic_inventory` พร้อมตารางหน่วยนับ บาร์โค้ด คลัง/ที่เก็บ ต้นทุนมาตรฐาน รูป ใน transaction เดียว และ (2) **ข้อมูลสินค้าเพิ่มเติม** (`_icMainDetail.cs`, เมนู 2.1.3/2.1.4) บันทึกกลุ่ม/ยี่ห้อ/มิติ/คลังตั้งต้น ฯลฯ ทั้งสองให้เซิร์ฟเวอร์ตรวจกฎเองทั้งหมด หน้าเว็บส่งแค่ฟอร์ม
+สองหน้าจอสินค้า: (1) **ข้อมูลสินค้า** (`item_master.go`, เมนู 2.1.1/2.1.2/2.1.24) บันทึก `ic_inventory` พร้อมตารางหน่วยนับ บาร์โค้ด คลัง/ที่เก็บ ต้นทุนมาตรฐาน รูป ใน transaction เดียว และ (2) **ข้อมูลสินค้าเพิ่มเติม** (`item_detail.go`, เมนู 2.1.3/2.1.4) บันทึกกลุ่ม/ยี่ห้อ/มิติ/คลังตั้งต้น ฯลฯ ทั้งสองให้เซิร์ฟเวอร์ตรวจกฎเองทั้งหมด หน้าเว็บส่งแค่ฟอร์ม
 
 ## ทำงานอย่างไร
 
@@ -35,7 +35,7 @@ sources: ["backend/internal/application/process/item_master.go:25", "backend/int
 - ผลลัพธ์: `{code, ...RebuildStockResult}`
 
 ### 2. ลบสินค้า (`ItemMasterDelete`)
-- ทำได้เฉพาะเมนูที่ screen_code `0` ("C#: only _displayMode 0 deletes") มิฉะนั้นแจ้งให้ไปลบที่หน้าข้อมูลสินค้า
+- ทำได้เฉพาะเมนูที่ `itemMasterScreen` ให้ screen_code `0` (`menu_ic_item_detail` และเมนูซิงก์สินค้า; `menu_ic_item_detail_barcode` = `1` ลบไม่ได้) มิฉะนั้นแจ้ง "หน้าจอนี้ห้ามลบข้อมูลสินค้า (กรุณาลบที่หน้าจอข้อมูลสินค้า 2.1.1)" (`item_master.go:28-32`, `:819-820`)
 - รับรหัสได้ไม่เกิน 500 รายการ (`itemDetailGridMax`) ตัดซ้ำ/ว่าง
 - สินค้าที่มีรายการใน `ic_trans_detail` ถูกข้าม (คืนใน `used`) ส่วนที่เหลือถูกลบพร้อมตารางลูกใน `itemChildTables` (เช่น `ic_unit_use`, `ic_wh_shelf`, `ic_inventory_barcode`, `ic_standard_cost`, `ic_inventory_price`, `ic_inventory_discount`), `ic_inventory_set_detail` และ `images` แล้วจึงลบ `ic_inventory` พร้อมเขียน `master_logs` (`function_code 3`)
 - ผลลัพธ์: `{deleted: [...], used: [...]}`

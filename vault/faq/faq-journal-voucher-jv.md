@@ -2,7 +2,7 @@
 title: "บันทึกรายวันทั่วไป (JV) เองยังไง แก้ GL ที่ระบบลงอัตโนมัติผ่าน JV ได้ไหม"
 tags: [faq, gl, journal, jv, manual]
 aliases: ["ข้อมูลรายวัน", "บันทึกรายวันแบบเร็ว", "journal voucher", "menu_gl_journal", "menu_gl_journal_fast", "trans_flag 0", "trans_flag 1999", "trans_direct 1", "สมุด JV"]
-sources: ["frontend/account/tabs/transMenuMap.ts:2368", "backend/internal/application/process/docs.go:251", "backend/internal/application/process/docs.go:286", "backend/internal/application/process/docs.go:294", "backend/internal/application/process/docs.go:441", "backend/internal/application/process/period.go:109", "backend/internal/application/process/journaltax.go:74", "backend/internal/application/process/service.go:1482"]
+sources: ["frontend/account/tabs/transMenuMap.ts:2368", "backend/internal/application/process/docs.go:251", "backend/internal/application/process/docs.go:286", "backend/internal/application/process/docs.go:294", "backend/internal/application/process/docs.go:441", "backend/internal/application/process/period.go:109", "backend/internal/application/process/journaltax.go:74", "backend/internal/application/process/service.go:1493", "backend/internal/application/process/gl_template.go:1109", "backend/internal/application/process/gl_template.go:1114", "backend/internal/application/process/doc_cancel.go:596"]
 ---
 # บันทึกรายวันทั่วไป (JV) เองยังไง แก้ GL ที่ระบบลงอัตโนมัติผ่าน JV ได้ไหม
 
@@ -22,7 +22,7 @@ sources: ["frontend/account/tabs/transMenuMap.ts:2368", "backend/internal/applic
 
 **JV กับ GL อัตโนมัติ**
 - ประมวลผลใหม่ลบเฉพาะ `trans_direct <> 1` JV จึงอยู่ครบ ([[faq-gl-rebuild-when]])
-- เอกสารซื้อขายที่มี GL `trans_direct = 1` เลขเดียวกัน จะไม่ถูกสร้าง GL อัตโนมัติใหม่อีก (ตาม C# `__glManual`)
+- เอกสารซื้อขายที่มี GL `trans_direct = 1` เลขเดียวกัน จะไม่ถูกสร้าง GL อัตโนมัติใหม่อีก (`gl_template.go:1109`, `:1114`, `doc_cancel.go:596-597`)
 
 ## ข้อควรระวัง
 - ใช้เลข JV ซ้ำกับเลขเอกสารซื้อขาย ทำให้เอกสารนั้นไม่ได้ GL อัตโนมัติ
@@ -44,4 +44,4 @@ sources: ["frontend/account/tabs/transMenuMap.ts:2368", "backend/internal/applic
 - `backend/internal/application/process/docs.go:441` `journalPlan` แตะเฉพาะ flag 0/1999
 - `backend/internal/application/process/period.go:109` `checkSaveDocPeriod`
 - `backend/internal/application/process/journaltax.go:74` `taxFlag` flag ของแท็บภาษี
-- `backend/internal/application/process/service.go:1482` ข้ามเอกสารที่มี GL บันทึกตรง
+- `backend/internal/application/process/service.go:1493` ข้ามเอกสารที่มี GL บันทึกตรง

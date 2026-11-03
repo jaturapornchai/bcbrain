@@ -1,51 +1,45 @@
 ---
-title: "บทเรียน ประสิทธิภาพและภาระระบบ (Performance and load)"
-tags: [history, performance, load]
-aliases: ["perf lessons", "single-flight prewarm", "help O(1) lookup", "MCP compact output", "lock wait"]
-sources: ["git:56c38867", "git:4de91436", "git:4341ae81", "git:ac839a65", "git:3e69b2b5", "git:7dc1b3a6", "adr-0008", "adr-0009"]
+title: "บทเรียนประสิทธิภาพและภาระระบบ (Performance and load)"
+tags: [history, lesson, performance, load]
+aliases: ["perf lessons", "single-flight prewarm", "help O(1) lookup", "MCP compact output", "filter before LIMIT", "lock wait"]
+sources: ["frontend/src/app/api/help/route.ts:26", "frontend/src/app/api/help/route.ts:291", "backend/internal/adapter/inbound/http/monitormap/handler.go:64", "backend/internal/adapter/inbound/http/monitormap/handler.go:509", "backend/internal/adapter/inbound/http/monitormap/handler.go:573", "backend/internal/adapter/inbound/http/monitormap/prewarm_test.go:32", "frontend/account/report/BuySaleInformationScreen.tsx:74", "backend/internal/adapter/inbound/http/mcp/compact.go:10", "backend/internal/adapter/inbound/http/mcp/gateway.go:1816", "backend/internal/domain/query/query.go:69", "backend/internal/application/process/service.go:1367"]
 ---
 
-## ภาพรวม
-ค้นประวัติ git 19-29 ต.ค. 2026 แล้ว: มี commit ติดป้าย `perf` จริงเพียง 1 ตัว (`56c38867`) ที่เหลือเป็นการกันภาระ/การแย่งล็อกที่มาจากบั๊กความถูกต้อง ไม่ใช่การจูนความเร็ว ค้นคำ N+1 / round-trip / bulk / one query ในข้อความ commit ไม่พบ commit ที่ประกาศแก้ N+1 จึงไม่แต่งเคส บันทึกนี้เก็บเฉพาะที่พิสูจน์ได้ และแยก near-miss ไว้ชัด
+# ประสิทธิภาพและภาระระบบ
 
-## อาการ
-- A) แค็ตตาล็อก Balloon Help อยู่ใน RAM ฝั่ง client ทั้งก้อน (ตามชื่อ commit)
-- B) prewarm แผนที่ (monitormap tile) รับ POST ได้โดยไม่ตรวจ session และงานเบื้องหลังซ้อนกันได้ (ตามข้อความ commit)
-- C) บันทึกเอกสารสต็อก/ต้นทุนพร้อมกัน deadlock `40P01`; บันทึกบัญชีต้องรอ rebuild GL ที่ถือล็อกนานได้ถึง 60 วินาที
-- D) หน้า BuySaleInformation "เฉพาะมียอด" กรองหลัง `LIMIT 100` รายการที่ควรโชว์หาย (M9)
+ปัญหา "ช้า/หนัก" ในระบบนี้ส่วนใหญ่ไม่ได้มาจากการจูนความเร็ว แต่มาจากงานที่ไม่มีเพดาน: ข้อมูลอ้างอิงก้อนใหญ่ฝั่ง client, งานเบื้องหลังที่ใครสั่งซ้ำก็ได้, การรอล็อก, และผลค้นหาที่ถูกตัดก่อนกรอง บันทึกนี้เก็บเฉพาะด่านที่ยังเห็นในโค้ดวันนี้ ไม่มีตัวเลขวัดก่อน-หลังให้อ้าง
 
-## สาเหตุ (root cause)
-- A) แค็ตตาล็อกเป็นไฟล์เดียวที่ bundle ไปกับ client (ตามชื่อ commit `56c38867` "zero client catalog RAM"; diff route ตรวจแล้ว)
-- B) handler รับ POST โดยไม่ตรวจ session และรันบน context ไม่มีเพดานเวลา (ข้อความ + diff `4de91436` ตรวจแล้ว)
-- C) การ update `ic_trans_detail` ของเอกสารอื่นบน item เดียวกันโดยลำดับล็อกไม่แน่นอน (comment ใน `service.go` ของ `4341ae81`); GL rebuild ถือ tx ยาวและบันทึกแบบแชร์ล็อกต้องรอ (comment ของ `ac839a65`)
-- D) ตัวกรองอยู่ฝั่ง client หลังตัดแถว (ข้อความ `7dc1b3a6`)
+## อะไรพังได้
+- **ข้อมูลอ้างอิงทั้งก้อนอยู่ใน RAM ของ client:** แค็ตตาล็อก Balloon Help หลายพันรายการถ้าแพ็กไปกับหน้าเว็บจะกินหน่วยความจำทุกเครื่อง
+- **งานเบื้องหลังที่สั่งได้ไม่จำกัด:** prewarm แผนที่ทำให้ backend ดึง tile จากต้นทางหลายร้อยรายการต่อครั้ง ถ้าไม่ตรวจ session หรือรันซ้อนกันได้ จะถูกยิงจนหนัก
+- **รอล็อกนาน:** save ทุกใบต้องรอ GL rebuild ที่ถือ transaction ยาว (ดู [[hist-lessons-concurrency-advisory-locks]])
+- **ผลหายเงียบๆ:** กรอง "เฉพาะมียอด" ฝั่ง client หลัง `LIMIT 100` ทำให้รายการที่เรียงเกิน 100 ไม่แสดงโดยไม่มี error
+- **ช่องทาง AI/MCP พ่นข้อมูลเกินจำเป็น:** ผลตารางแบบ object ซ้ำชื่อคอลัมน์ทุกแถวเปลืองโทเค็น และไม่มีเพดานแถว
 
-## วิธีแก้
-- A) `56c38867`: แยก JSON ตามโมดูล (`common/ic/ar_ap/trans/gl_tax`), ให้ server สร้าง `Map` แล้วตอบ `/api/help?keys=` ทีละ 1 entry พร้อม `Cache-Control: max-age=300` (จำกัด key <=120 ตัวอักษร, <=5 key)
-- B) `4de91436`: POST ต้องมี session, ใช้ `atomic.Bool` กัน prewarm ซ้อน (single-flight), เพดาน 10 นาที (`prewarmJobTimeout`) และมีเทสต์ `prewarm_test.go` (anonymous = 401)
-- C) `4341ae81`: ล็อก `pg_advisory_xact_lock` ต่อ item เรียงตามรหัสก่อนแก้ detail (`lockStockItems`); `ac839a65`: ล็อก `gl_journal:rebuild` แบบ exclusive (rebuild) กับ shared (บันทึก) พร้อมคอมเมนต์ระบุเพดานและทางอัปเกรดเป็นกุญแจรายงวด
-- D) `7dc1b3a6`: ย้ายตัวกรองเข้า SQL. ฟีเจอร์ใหม่ (ไม่ใช่การแก้บั๊ก) `3e69b2b5`: MCP อ่านอย่างเดียวคืนรูป `compact` เป็นค่าเริ่มต้นและตั้งเพดานแถวต่อ tool (เริ่ม 50-100, สูงสุด 200-500)
+## โค้ดป้องกันไว้อย่างไร
+| ด่าน | ที่อยู่ | ทำอะไร |
+|---|---|---|
+| Help ค้นฝั่ง server | `frontend/src/app/api/help/route.ts:26` `SERVER_HELP_INDEX` (Map), `:291` `GET` | client ขอทีละคีย์ (`keys=a\|b`, คีย์ละ ≤120 ตัวอักษร, สูงสุด 8 คีย์) ได้ entry เดียว พร้อม `Cache-Control: public, max-age=300, stale-while-revalidate=600`; `POST` (`:340`) รับ micro-batch ไม่ต้องโหลด JSON ทั้งก้อนลง client |
+| prewarm ต้องมี session | `backend/internal/adapter/inbound/http/monitormap/handler.go:509-514` | ไม่มี claims/ฐานข้อมูล → 401 ไม่ตกไปฐานเริ่มต้น |
+| prewarm single-flight | `monitormap/handler.go:64-66` `prewarmRunning atomic.Bool`, `:573` `CompareAndSwap` | งานรอบเดียวต่อครั้ง |
+| prewarm มีเพดานเวลา | `monitormap/handler.go:69-70` `prewarmJobTimeout` (10 นาที), `:577` | งานเบื้องหลังไม่รันบน context ไม่จำกัดเวลา |
+| เทสต์ prewarm | `monitormap/prewarm_test.go:32` `RequiresSession`, `:44` `SingleFlight` | |
+| กรองก่อน LIMIT | `frontend/account/report/BuySaleInformationScreen.tsx:74-82` | เงื่อนไข `onlyWithDebt` อยู่ใน SQL (`:80`) ก่อน `LIMIT 100` |
+| เพดาน batch/แถว | `backend/internal/domain/query/query.go:69-81` | `MaxListRows` 50000, `MaxBatchStatements` 20, `MaxExecBatchStatements` 1000, `MaxExecBatchBytes` 2 MiB |
+| MCP ผลแบบ compact | `backend/internal/adapter/inbound/http/mcp/compact.go:10` `FormatCompact` | ค่าเริ่มต้นเป็น columns + rows tuple ตัดคอลัมน์ว่าง/ศูนย์ |
+| MCP เพดานแถวต่อ tool | `mcp/gateway.go:1680` (≤300), `:1816` (≤500), `:1982` (≤200), `:2027` (≤500) | เกินเพดานถูกรีเซ็ตเป็นค่าเริ่มต้นของ tool นั้น (50 หรือ 100) |
+| ล็อก GL ที่รอได้ | `backend/internal/application/process/service.go:1367-1376` | comment ระบุเพดาน (rebuild ≤60 วินาที) และทางอัปเกรดเป็นคีย์รายงวด |
 
-## commit ที่เกี่ยวข้อง
-`56c38867` (perf: help), `4de91436` (prewarm), `4341ae81`, `ac839a65` (ล็อก), `7dc1b3a6` (M9, ตั้งค่ารายการต่อแท็บ), `3e69b2b5` (MCP). Near-miss: `bbf81811` ข้อความระบุ "5-min watcher interval" แต่ stat ไม่มีไฟล์ watcher จึงไม่นับเป็นงาน perf ของระบบ; ADR-0008/0009 (`/query/batch` อ่านสูงสุด 20 statement, `/query/execBatch` เขียน atomic) เน้นความถูกต้อง ไม่ใช่การจูนความเร็ว (ตามเนื้อ ADR); ตัวเลข "ประหยัด 55-75% token" เป็นคอมเมนต์ในโค้ด ไม่ได้วัดซ้ำ
-
-## โค้ดปัจจุบันที่ป้องกัน
-- `frontend/src/app/api/help/route.ts:26,291` (`SERVER_HELP_INDEX`, `GET`; ไฟล์โตขึ้นหลังเพิ่มสลับภาษา `47fce10e`), ข้อมูล `frontend/src/config/help/data/*.json`
-- `backend/internal/adapter/inbound/http/monitormap/handler.go:64-70,573` (`prewarmRunning`, `prewarmJobTimeout`, `CompareAndSwap`)
-- `backend/internal/application/process/service.go:990,992,1356,1365` (`stockRebuildLock`, `lockStockItems`, `glRebuildLock`)
-- `backend/internal/adapter/inbound/http/mcp/compact.go:10` (`FormatCompact`), `gateway.go:1190-1298` (เพดาน `limit`)
-- `backend/internal/domain/query/query.go:35-40` (เพดานจำนวน statement ของ batch)
-
-## บทเรียน / กฎที่ได้
-1. งานเบื้องหลังที่ผู้ใช้สั่งได้ต้องมี 3 อย่างเสมอ: ตรวจสิทธิ์, single-flight, เพดานเวลา
-2. ล็อกหลายตัวต้องเรียงลำดับเดียวกันทุกที่ (sorted item codes) ถ้าถือล็อกยาว ต้องเขียนเพดานและทางอัปเกรดไว้ใน comment
-3. ข้อมูลอ้างอิงขนาดใหญ่ให้ server ค้นแล้วส่งทีละ entry พร้อม cache header แทนแพ็กไปทั้งก้อน
-4. กรองก่อน `LIMIT` เสมอ มิฉะนั้นผลที่เห็นไม่ครบโดยไม่มีข้อผิดพลาด
-5. ช่องทางให้ AI/MCP ต้องแคบ (compact + เพดานแถว) ตัวเลขประหยัดเป็นค่าประมาณ
-6. ไม่มี commit ใดวัดก่อน-หลัง จึงไม่มีตัวเลขประสิทธิภาพให้อ้าง
-
-## ดูเพิ่ม
-[[hist-lessons-concurrency-advisory-locks]] · [[hist-lessons-query-gateway-write-lockdown]] · [[hist-lessons-report-engine-parity]] · [[hist-lessons-hidden-tab-hotkeys-dirty-guard]] · [[hist-lessons-atomic-transactions-swallowed-errors]] · [[history-overview]]
+## กฎที่ต้องจำ
+1. งานเบื้องหลังที่ผู้ใช้สั่งได้ต้องมี 3 อย่างเสมอ: ตรวจสิทธิ์/session, single-flight, เพดานเวลา
+2. ข้อมูลอ้างอิงก้อนใหญ่ให้ server ค้นแล้วส่งทีละ entry พร้อม cache header
+3. กรองใน SQL ก่อน `LIMIT` เสมอ — กรองหลังตัดแถวทำให้ผลไม่ครบโดยไม่มี error
+4. ช่องทางที่ AI เรียกต้องแคบ: รูปแบบ compact เป็นค่าเริ่มต้น และมีเพดานจำนวนแถว
+5. ล็อกที่ถือนานต้องเขียนเพดานและทางอัปเกรดไว้ใน comment (ดู `backend/internal/application/process/service.go:1367`)
 
 ## ที่มาในโค้ด
-repo `bcaiaccount` (อ่านอย่างเดียว): `frontend/src/app/api/help/route.ts`, `backend/internal/adapter/inbound/http/{monitormap,mcp}/`, `backend/internal/application/process/service.go`, diff ของ `56c38867`, `4de91436`, `4341ae81`, `ac839a65`
+- `frontend/src/app/api/help/route.ts:26,291,300-301,318,340` ค้น Help ฝั่ง server
+- `backend/internal/adapter/inbound/http/monitormap/handler.go:64-70,509-514,573-577` prewarm
+- `frontend/account/report/BuySaleInformationScreen.tsx:74-82` กรองก่อน LIMIT
+- `backend/internal/adapter/inbound/http/mcp/compact.go:10`, `mcp/gateway.go:1680,1816,1982,2027`
+- ดูเพิ่ม: [[adr-0008-query-batch-endpoint]] · [[adr-0009-query-exec-batch-transactional]] · [[hist-lessons-atomic-transactions-swallowed-errors]] · [[hist-lessons-query-gateway-write-lockdown]]

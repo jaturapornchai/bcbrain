@@ -2,7 +2,7 @@
 title: "API กลุ่ม /auth — ล็อกอิน เลือกบริษัท รีเฟรช ออกจากระบบ (Auth endpoints)"
 tags: [api, auth]
 aliases: ["/auth/login","/auth/select-company","/auth/me","/auth/refresh","/auth/logout","/api/auth/login","/api/auth/session","/api/auth/databases","/api/auth/logout"]
-sources: ["backend/internal/adapter/inbound/http/router.go:73","backend/internal/adapter/inbound/http/identity/handler.go:76","backend/internal/adapter/inbound/http/identity/handler.go:123","backend/internal/adapter/inbound/http/identity/handler.go:164","backend/internal/adapter/inbound/http/identity/handler.go:206","backend/internal/adapter/inbound/http/identity/handler.go:239","backend/internal/adapter/inbound/http/middleware/auth.go:39","frontend/src/app/api/auth/login/route.ts:9","frontend/src/app/api/auth/logout/route.ts:10","frontend/src/app/api/auth/databases/route.ts:28","frontend/src/lib/api-server.ts:555"]
+sources: ["backend/internal/adapter/inbound/http/router.go:73","backend/internal/adapter/inbound/http/identity/handler.go:76","backend/internal/adapter/inbound/http/identity/handler.go:123","backend/internal/adapter/inbound/http/identity/handler.go:164","backend/internal/adapter/inbound/http/identity/handler.go:206","backend/internal/adapter/inbound/http/identity/handler.go:239","backend/internal/adapter/inbound/http/middleware/auth.go:39","frontend/src/app/api/auth/login/route.ts:9","frontend/src/app/api/auth/logout/route.ts:10","frontend/src/app/api/auth/databases/route.ts:28","frontend/src/lib/api-server.ts:569"]
 ---
 
 # API กลุ่ม /auth
@@ -73,7 +73,7 @@ POST /auth/login
 - `GET|POST /api/auth/google` (route.ts:44, 214): OAuth Google แล้วเรียก `workspace/google-login` (152) ด้วย admin key
 - `POST /api/auth/change-password` (route.ts:34): ตรวจรหัสเดิมด้วย `/auth/login` (77) แล้ว `PATCH /api/v1/admin/users` (95) ด้วย admin key — ดู [[api-admin-console]]
 - `POST /api/auth/demo` (route.ts:9): ปุ่ม Demo
-- ตัวช่วย `getValidAccessToken` (`src/lib/api-server.ts:555`) ต่ออายุ token ล่วงหน้าเมื่อเหลือไม่ถึง 60 วินาที; `fetchServiceWithAuthRetry` (388) ลอง refresh แล้วเรียกซ้ำเมื่อเจอ 401
+- ตัวช่วย `getValidAccessToken` (`src/lib/api-server.ts:569`) ต่ออายุ token ล่วงหน้าเมื่อเหลือไม่ถึง 60 วินาที; `fetchServiceWithAuthRetry` (388) ลอง refresh แล้วเรียกซ้ำเมื่อเจอ 401
 
 ## ที่มาในโค้ด
 
@@ -81,4 +81,4 @@ POST /auth/login
 - `backend/internal/adapter/inbound/http/identity/handler.go:31-260` (request/response struct และ 5 handler)
 - `backend/internal/adapter/inbound/http/middleware/auth.go:39-57`
 - `frontend/src/app/api/auth/login/route.ts:9-130`, `logout/route.ts:10`, `databases/route.ts:28-250`, `google/route.ts:44-214`, `change-password/route.ts:34-111`
-- `frontend/src/lib/api-server.ts:388,555`
+- `frontend/src/lib/api-server.ts:402,569`

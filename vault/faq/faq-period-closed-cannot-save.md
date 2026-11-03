@@ -2,7 +2,7 @@
 title: "บันทึก/แก้/ลบเอกสารไม่ได้ ขึ้นว่า \"ได้ถูกปิดงวดไปแล้ว หรือยังไม่ได้กำหนดงวดบัญชี\" แก้อย่างไร"
 tags: [faq, period, validation, gl]
 aliases: ["ปิดงวดแล้วบันทึกไม่ได้", "ยังไม่ได้กำหนดงวดบัญชี", "period closed", "erp_account_period", "checkOpenPeriod", "กำหนดงวดบัญชี 1.8.1", "menu_account_period", "status 1 ปิดงวด"]
-sources: ["backend/internal/application/process/period.go:17", "backend/internal/application/process/period.go:35", "backend/internal/application/process/period.go:53", "backend/internal/application/process/period.go:109", "backend/internal/application/process/trans_validate.go:44", "backend/internal/application/process/gl_template.go:1027", "frontend/src/config/schemas/masterDetailSchemas.ts:1563"]
+sources: ["backend/internal/application/process/period.go:17", "backend/internal/application/process/period.go:35", "backend/internal/application/process/period.go:53", "backend/internal/application/process/period.go:109", "backend/internal/application/process/trans_validate.go:44", "backend/internal/application/process/gl_template.go:1027", "frontend/src/config/schemas/masterDetailSchemas.ts:1570"]
 ---
 # บันทึก/แก้/ลบเอกสารไม่ได้ ขึ้นว่า "ได้ถูกปิดงวดไปแล้ว หรือยังไม่ได้กำหนดงวดบัญชี" แก้อย่างไร
 
@@ -32,7 +32,7 @@ sources: ["backend/internal/application/process/period.go:17", "backend/internal
 ## ข้อควรระวัง
 - การปิดงวดคือแก้ `status` ด้วยมือที่หน้าจอนี้ ไม่มีงาน "ปิดงวด" แยก งานประมวลผลสิ้นงวด/สิ้นปีไม่ได้เปลี่ยน status ([[faq-year-end-close]])
 - เช็ค (`cb_chq_list`) ไม่มีการตรวจงวด (คอมเมนต์ `period.go:107-108`)
-- GL เส้นมาตรฐานหางวดโดยไม่ดู status ถ้าไม่พบงวดใส่ `period_number` = 0 (`service.go:1586-1598`)
+- GL เส้นมาตรฐานหางวดโดยไม่ดู status ถ้าไม่พบงวดใส่ `period_number` = 0 (`service.go:1598-1608`)
 - GL ตามรูปแบบ: ถ้าไม่พบงวดหรืองวดปิด จะไม่ลงบัญชีตามรูปแบบเลย (0 บรรทัด) และขึ้นคำเตือน "ไม่พบงวดบัญชีที่เปิดอยู่ของวันที่ ..." เรื่องนี้เกิดได้ตอน rebuild GL ย้อนหลัง ([[faq-gl-rebuild-when]])
 - หน้าจอเอกสารทั่วไปตรวจเฉพาะวันที่ใหม่ตอนบันทึก (`trans_validate.go:44`)
 
@@ -53,4 +53,4 @@ sources: ["backend/internal/application/process/period.go:17", "backend/internal
 - `backend/internal/application/process/fa_sale.go:422` ลบ; `:431` วันที่ใหม่; `:448` วันที่เดิม
 - `backend/internal/application/process/fa_depreciation.go:877` ลบค่าเสื่อม
 - `backend/internal/application/process/gl_template.go:1027` GL ตามรูปแบบ ข้ามงวดปิด
-- `frontend/src/config/schemas/masterDetailSchemas.ts:1563` `menu_account_period` (status `:1591-1592`)
+- `frontend/src/config/schemas/masterDetailSchemas.ts:1570` `menu_account_period` (status `:1592-1599`)

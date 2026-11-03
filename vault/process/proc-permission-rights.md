@@ -12,14 +12,14 @@ sources: ["backend/internal/adapter/inbound/http/process/permission.go:23", "bac
 ## ทำงานอย่างไร
 
 ### ชนิดสิทธิ์ (`middleware.Right`)
-| ค่า | ความหมาย (ตามคอมเมนต์ในโค้ด) | `Allows` ตรวจกับ |
+| ค่า | ความหมาย | `Allows` ตรวจกับ |
 |---|---|---|
-| `RightRead` | C# `_isRead` | `rights.Read` |
-| `RightWrite` | C# `_isAdd` หรือ `_isEdit` (save/cancel/approve) | `Add \|\| Edit` |
-| `RightDelete` | C# `_isDelete` | `rights.Delete` |
+| `RightRead` | สิทธิ์เรียกดู | `rights.Read` |
+| `RightWrite` | เพิ่ม **หรือ** แก้ไข (บันทึก/ยกเลิก/อนุมัติ) | `Add \|\| Edit` |
+| `RightDelete` | สิทธิ์ลบ | `rights.Delete` |
 | `RightAdmin` | ประมวลผลทั้งฐานข้อมูล: Admin เท่านั้น | ไม่มี case => false (ผ่านเฉพาะ `rights.Admin`) |
-| `RightAdd` | C# `_isAdd` อย่างเดียว (master data: เพิ่มใหม่) | `rights.Add` |
-| `RightEdit` | C# `_isEdit` อย่างเดียว (master data: แก้ไข) | `rights.Edit` |
+| `RightAdd` | เพิ่มอย่างเดียว (ระเบียนใหม่) | `rights.Add` |
+| `RightEdit` | แก้ไขอย่างเดียว (ระเบียนที่มีอยู่) | `rights.Edit` |
 
 - `rights.Admin == true` ผ่านทุกกรณี (`Allows` คืน true ก่อน switch)
 - ข้อความปฏิเสธเป็นภาษาไทยแยกตามชนิดสิทธิ์ใน `deniedMessages`
@@ -44,12 +44,12 @@ sources: ["backend/internal/adapter/inbound/http/process/permission.go:23", "bac
 3. **ไม่อยู่ในตาราง => `admin`** (คอมเมนต์ในโค้ด: route ใหม่ถูกล็อกไว้จนกว่าจะมีคนจัดประเภท)
 
 ### กรณีเฉพาะที่ควรรู้
-- action `workflow/ai-*` (เช่น `ai-report-sql`, `ai-audit-copilot`) ไม่ปรากฏใน `routeRights` => ตกเป็น Admin ตามกฎข้อ 2
+- action `workflow/ai-*` (เช่น `ai-report-sql`, `ai-audit-copilot`) ไม่ปรากฏใน `routeRights` => ตกเป็น Admin ตามข้อ 3
 - `QueryRequiredRight` เป็นตัวตัดสินสิทธิ์ของ `/query/exec`, `/query/execBatch`, `/blob/insert` (นอก process)
 - สิทธิ์ที่นี่เป็นสิทธิ์ระดับเมนู/route คนละเรื่องกับสิทธิ์คลัง/ที่เก็บ ดู [[proc-wh-shelf-permission]]
 
 ## ที่มาในโค้ด
-- `backend/internal/adapter/inbound/http/middleware/permission.go:14-23` - ชนิด `Right` และความหมายตาม C#
+- `backend/internal/adapter/inbound/http/middleware/permission.go:14-23` - ชนิด `Right`; `:31-38` `deniedMessages`
 - `backend/internal/adapter/inbound/http/middleware/permission.go:40-60` - `Allows`
 - `backend/internal/adapter/inbound/http/middleware/permission.go:62` - `RequireRight` (403 + ข้อความไทย)
 - `backend/internal/adapter/inbound/http/process/permission.go:23-55` - ตาราง `routeRights`

@@ -1,57 +1,43 @@
 ---
 title: "บทเรียน schema drift และคอลัมน์ที่เดาเอง (Schema Drift & Invented Columns)"
-tags: [history, schema, parity, database, migration]
-aliases: ["คอลัมน์ที่ประดิษฐ์เอง", "invented columns", "schema drift", "erp_business_ext"]
-sources: ["TODO.md:8", "git:7064535f", "git:6983d7ea", "git:e7168c84", "git:28307282", "git:a50a0122", "backend/internal/platform/db/pool.go:217"]
+tags: [history, lesson, schema, database, migration]
+aliases: ["คอลัมน์ที่ประดิษฐ์เอง", "invented columns", "schema drift", "erp_business_ext", "ensure DDL", "schema-guard test"]
+sources: ["AGENTS.md:69", "backend/internal/platform/db/pool.go:217", "backend/internal/application/process/service.go:973", "backend/internal/application/process/pos_config.go:386", "backend/internal/application/process/pos_config.go:296", "backend/internal/application/process/pos_config.go:274", "backend/internal/application/process/pos_sync_test.go:470", "backend/internal/application/process/pos_sync_test.go:431", "backend/internal/application/process/grid_calc.go:42", "backend/internal/application/process/report_options.go:123", "backend/internal/application/process/barcode_discount.go:319", "scripts/sql/02_data_schema.sql:5385", "scripts/provision-postgres.mjs:26", "scripts/sql/13_fix_image_columns_bytea.sql:1", "frontend/account/transaction/useExpireColumn.ts:22", "frontend/shared/components/BusinessExtFieldsCard.tsx:380"]
 ---
+# บทเรียน schema drift และคอลัมน์ที่เดาเอง
 
-## ภาพรวม
-ตลอด 2026-10-19..29 โค้ดอ้างคอลัมน์/ตารางที่ DB จริงไม่มีหรือชื่อไม่ตรง เพราะสร้างจอจาก markdown หรือจำชื่อเอา ผลคือ SQL 400/500 หรือเขียนลงคอลัมน์ที่ POS ไม่อ่าน แล้วต้องเติม DDL ใน backend ให้ DB เก่าตามทัน
+SQL ที่อ้างคอลัมน์ซึ่งฐานข้อมูลจริงไม่มี ไม่พังตอน build แต่พังตอนผู้ใช้เปิดจอ (400/500) หรือเงียบ (เขียนลงที่ไม่มีใครอ่าน) และฐานของลูกค้าเก่าอาจไม่มีคอลัมน์ที่โค้ดใหม่ใช้
 
-## อาการ
-- **A (TODO.md, 7064535f):** จอ 1.1.2 รอบแรกสร้างจาก markdown ฟิลด์หาย 7 ตัว เดาเอง 3 ตัว; บาร์โค้ดมีช่อง `discount_item`, `discount_item_2..5` ใน `ic_inventory_barcode`
-- **B (6983d7ea, 79c3afb6):** `CustomerScreen` select `logistic_area`, `last_update_by` จาก `ar_customer`; `SerialStockCountScreen` select `wh_code`/`shelf_code` จาก `ic_trans`; `erp_company_profile` ใช้ `tax_id`/`telephone` (จริง: `tax_number`/`telephone_number`) เมนูตอบ 400
-- **C (e7168c84, 1d86f0ad):** `master_logs` ใช้ `convert_from` กับคอลัมน์ text แล้ว 500; ตาราง `images` ไม่มี `image_file`
-- **D (28307282):** DB เก่าขาดตาราง/คอลัมน์ที่พอร์ตใหม่ต้องใช้
-- **E (เปิดอยู่):** `useExpireColumn` ถาม `use_compare_unit`, `use_quality_control_system` จาก `erp_option` ถ้า DB ไม่มีคอลัมน์จะพัง
+## อะไรพังได้
+- **ชื่อคอลัมน์ผิด:** `erp_company_profile` ของจริงใช้ `tax_number` และ `telephone_number` ไม่ใช่ `tax_id`/`telephone` ถ้า select ตามความจำ จอที่อ่านข้อมูลบริษัทจะตอบ error
+- **เก็บค่าในคอลัมน์ที่ไม่มี:** ส่วนลดบาร์โค้ดไม่ใช่คอลัมน์บน `ic_inventory_barcode` แต่เป็นแถวใน `ic_inventory_barcode_price` แยกตาม `discount_type` (1-5) การเดาคอลัมน์ส่วนลดขึ้นมาเองจะเขียนลงที่ไม่มีจริง
+- **ฐานเก่าขาดตาราง/คอลัมน์:** เช่น `images.image_file`, `erp_business_ext` ที่โค้ดใหม่ต้องใช้
+- **DDL ล้มแล้วไม่มีใครเห็น:** จุด ensure DDL ทิ้ง error จึงรู้ว่าคอลัมน์ขาดก็ต่อเมื่อ SQL ตัวถัดไปล้ม
+- **ชนิดข้อมูลผิด:** คอลัมน์ภาพที่เป็น text แทน bytea ทำให้ `convert_from(...)` ตอบ 500
+- **อ่านคอลัมน์ option ที่อาจไม่มีใน tx:** SELECT ที่ล้มกลาง transaction ทำให้คำสั่งถัดไปทั้งหมดล้ม (25P02)
 
-## สาเหตุ (root cause)
-- A: อ่านเอกสารแทน C# (TODO.md ข้อ 1: โค้ด C# -> `information_schema` -> ภาพจอ -> markdown); `bcdatabase.xml` ของ BCERPTemplate ไม่มี `discount_item` ใน `ic_inventory_barcode` ส่วนลดจริงเป็นแถว `ic_inventory_barcode_price` `discount_type` 1..5
-- B: ชื่อคอลัมน์ไม่ผ่านการเทียบ `information_schema`; C: ชนิด "image" ของ BC ถูกแม็ปเป็น text
-- E: `scripts/sql/02_data_schema.sql:3221,3254` มีสองคอลัมน์นี้ แต่ ensure DDL ใน `pool.go`/`service.go` ไม่เติมให้ (ไม่พบ commit แก้)
+## โค้ดป้องกันไว้อย่างไร
+| ด่าน | ที่อยู่ | ทำอะไร |
+|---|---|---|
+| ตรวจชื่อจริงก่อนเขียน SQL | `AGENTS.md:69-72` (กฎข้อ 25) | ใช้ `information_schema.columns` และชื่อมาตรฐาน ห้ามตั้งชื่อย่อเอง ดู [[std-pgsql-naming-convention]] |
+| schema-guard test | `pos_sync_test.go:431,470` | อ่าน `CREATE TABLE erp_company_profile` จาก `scripts/sql/02_data_schema.sql` แล้วเทียบทุก `SELECT ... FROM erp_company_profile LIMIT 1` ใน `pos_config.go` และไฟล์ frontend สามไฟล์ ล้มถ้าคอลัมน์ไม่มี หรือสคีมามี `tax_id`/`telephone`; ไฟล์ frontend ต้อง alias เป็น `telephone`/`tax_id` (`:496-499`); มีเวอร์ชันยิงบนฐานจริงที่ `:504` (ข้ามเมื่อไม่ตั้ง `GLIT_DB`) |
+| คอลัมน์ที่ DDL เติมเอง | `pos_sync_test.go:443-445` เทียบ `pool.go:71-72` | `latitude`/`longitude` ไม่อยู่ใน CREATE ของสคีมา test จึงต้องประกาศเพิ่ม |
+| ensure DDL ตอนเปิด pool | `pool.go:217` | รัน `companySchemaSQL` ทุกฐานบริษัท ยกเว้น `postgres`/`bcmain` แต่ทิ้ง error |
+| ensure DDL ต่อบริการ | `backend/internal/application/process/service.go:972-974` (`erpSchemaSQL` เริ่ม `:807`) | รันครั้งเดียวต่อฐาน และจำว่าเสร็จเมื่อสำเร็จเท่านั้น ล้มแล้วรอบหน้าลองใหม่ |
+| ensure DDL ของ POS | `pos_config.go:386-389` | รันทีละ statement ถ้าล้มข้ามไปตัวถัดไป |
+| ภาพเป็น bytea | `provision-postgres.mjs:26-27`, `13_fix_image_columns_bytea.sql:1-4`, `pos_config.go:274` | สร้างใหม่เป็น bytea และมีสคริปต์แปลงฐานเก่าที่รันซ้ำได้ผลเดิม |
+| ส่วนลดบาร์โค้ด | `barcode_discount.go:312,319`, `02_data_schema.sql:5380-5385` | ลบแล้วเขียนแถว `ic_inventory_barcode_price` ตาม `discount_type` |
+| ข้อมูลเสริมต่อประเภทธุรกิจ | `pos_config.go:296-302`, `BusinessExtFieldsCard.tsx:380-385` | ตาราง `erp_business_ext` เก็บ `ext_data` เป็น jsonb แล้ว upsert แบบรวมค่า (`||`) แทนการเพิ่มคอลัมน์ |
+| อ่าน option ที่อาจขาดอย่างปลอดภัย | `grid_calc.go:40-52` `scanOption`; `useExpireColumn.ts:22-25`; `report_options.go:123-129` | ใน tx ใช้ savepoint ล้มแล้วได้ค่าเริ่มต้น; hook ปิดคอลัมน์เมื่อ query ล้ม; รายงานซ่อนต้นทุนเมื่ออ่านค่าไม่ได้ |
 
-## วิธีแก้
-- A: 7064535f เอาคอลัมน์ที่เดาออกจาก `barcode.go` แล้วพอร์ต 2.1.8/2.1.9 เป็น `barcode_discount.go` ตาม `_icBarcodeDiscount.cs` (POS อ่านรูปแบบนี้ใน `_findPriceClass.cs`)
-- B: `logistic_area` อ่านจาก `ar_customer_detail`, ใช้ `last_update_code`, `wh_from`/`location_from`; 79c3afb6 alias ที่ frontend (`tax_number AS tax_id`) และเพิ่ม schema-guard test เทียบ `scripts/sql/02_data_schema.sql`
-- C: `provision-postgres.mjs` แม็ป image เป็น bytea; `scripts/sql/13_fix_image_columns_bytea.sql` แปลงคอลัมน์เดิม (ทำซ้ำได้); `posConfigDDL` สร้าง `images.image_file`
-- D: ensure DDL แบบ `IF NOT EXISTS` สองที่ (ด้านล่าง); หมายเหตุ: `HANDOFF_CLAUDE_CODE_100_CLONE.md` ข้อ 1.2 ระบุ `pool.go` กับ `workflow.go` แต่ `workflow.go` ไม่มี CREATE TABLE จุดที่สองคือ `service.go`
-- D ต่อ (a50a0122): ส่วนเสริมตามประเภทธุรกิจเลิก `ALTER TABLE erp_option` ที่ browser ยิงทุกครั้งที่บันทึก ไปเก็บใน `erp_business_ext(entity_type, entity_code, ext_data jsonb)`; 3ca3b07b ย้ายการสร้างตารางจาก browser ไป `pos_config.go` (commit ไม่ระบุเหตุผล; สันนิษฐานว่า DDL จาก browser ล้มเงียบหลัง lockdown 239b0997 ยังไม่ได้ทดสอบ)
-
-## commit ที่เกี่ยวข้อง
-- `7064535f` — ถอดคอลัมน์ที่เดา เพิ่ม 2.1.8/2.1.9
-- `6983d7ea` — แก้ query คอลัมน์ผิด; seed `bcdemo` ด้วยบริษัทสมมติ
-- `79c3afb6` — `erp_company_profile` + schema-guard test
-- `e7168c84` — image เป็น bytea; `1d86f0ad` — ตาราง `images`
-- `28307282` — เริ่มมี `companySchemaSQL` (pool.go) กับ `erpSchemaSQL` (service.go) 2026-10-21; `83214656`, `c0bcbb85` เติม `logo_url`, latitude/longitude
-- `a50a0122`, `3ca3b07b` — `erp_business_ext`
-
-## โค้ดปัจจุบันที่ป้องกัน
-- `backend/internal/platform/db/pool.go:16` `companySchemaSQL` รันที่ `:217` ตอนเปิด pool DB บริษัท (กลืน error) มี 42 บรรทัด `ADD COLUMN IF NOT EXISTS`
-- `backend/internal/application/process/service.go:796` `erpSchemaSQL`, รันที่ `:962` แคชต่อ pool และถือว่าเสร็จเมื่อสำเร็จเท่านั้น
-- `backend/internal/application/process/pos_config.go:274` (`images.image_file`), `:296` (`erp_business_ext`), `:399` (`tax_number`)
-- `backend/internal/application/process/pos_sync_test.go:470` (schema-guard test); `barcode_discount.go:15-19`; `scripts/provision-postgres.mjs:27`
-- `frontend/account/transaction/useExpireColumn.ts:22` ยังถามสองคอลัมน์ข้างต้น (ใช้ที่ `TransItemGrid.tsx:192`)
-
-## บทเรียน / กฎที่ได้
-1. ชื่อฟิลด์ = ชื่อคอลัมน์จริงใน PostgreSQL (TODO.md ข้อ 3) ตรวจ `information_schema` ก่อนเขียน SQL
-2. ensure DDL มีสองจุด เพิ่มคอลัมน์ต้องดูทั้ง `pool.go` และ `service.go`; error ที่ถูกกลืนทำให้ไม่เห็นว่า DDL ล้ม
-3. ชนิด "image" ใช้ bytea; test ที่ parse DDL เทียบ SELECT (79c3afb6) กันชื่อผิดได้
-4. ข้อมูลนอก C# ใช้ JSONB (`erp_business_ext`) ไม่ใช่เพิ่มคอลัมน์; ห้ามรัน DDL จาก browser
-5. เปิดอยู่ตาม handoff ข้อ 8 (`HANDOFF_BCCM_PARITY_2026-10-22.md:77`): `useExpireColumn`, "set is_serial_number" ยังไม่พบ commit ปิด; MIS 3 ฟิลด์ใน TODO.md เป็น `resource_only` ไม่ใช่คอลัมน์
-
-## ดูเพิ่ม
-[[std-csharp-screen-porting]] · [[proc-doc-item-pictures]] · [[proc-master-data]] · [[std-data-integrity-money-transactions]] · [[hist-lessons-master-save-preserve-columns]] · [[hist-lessons-query-gateway-write-lockdown]] · [[hist-todo-open-items]] · [[hist-parity-bccm]] · [[history-overview]]
+## กฎที่ต้องจำ
+1. ชื่อคอลัมน์ต้องมาจากสคีมาจริง (`scripts/sql/02_data_schema.sql` หรือ `information_schema`) ไม่ใช่ความจำหรือเอกสารสรุป
+2. ถ้าเพิ่มคอลัมน์ผ่าน ensure DDL ให้ดูทั้งสามจุด (`pool.go`, `service.go`, `pos_config.go`) และบอก schema-guard test ว่าคอลัมน์นั้นมีอยู่ เพราะ error ของ DDL ถูกกลืน
+3. ข้อมูลเสริมที่ไม่ใช่คอลัมน์มาตรฐานเก็บใน `erp_business_ext` (jsonb) ไม่ต้องเพิ่มคอลัมน์
+4. ชนิดภาพ/ไฟล์ใช้ bytea
+5. การอ่านคอลัมน์ option ที่อาจไม่มีต้องกำหนดค่าตกหล่นไว้ล่วงหน้า (ปิดฟีเจอร์ หรือซ่อนข้อมูลสำคัญ) และห้ามให้ SELECT ที่ล้มทำให้ tx ทั้งก้อนล้ม
+6. ไม่ได้ตรวจ: จออื่นนอกจาก `erp_company_profile` ที่ select คอลัมน์ตรงสคีมาหรือไม่ มี test คุมเฉพาะตารางนี้
 
 ## ที่มาในโค้ด
-- git: 7064535f, 6983d7ea, 79c3afb6, e7168c84, 1d86f0ad, 28307282, a50a0122, 3ca3b07b, 239b0997
-- `TODO.md:8` (วิธีทำงาน ข้อ 1), `docs/HANDOFF_CLAUDE_CODE_100_CLONE.md` ข้อ 1.2, `docs/HANDOFF_BCCM_PARITY_2026-10-22.md:77`
+- `backend/internal/application/process/pos_sync_test.go:431-499,504` schema-guard test
+- ดูเพิ่ม: [[std-pgsql-naming-convention]] · [[tbl-ic-inventory-barcode-price]] · [[tbl-erp-option]] · [[proc-pos-config-shift]] · [[proc-doc-item-pictures]] · [[proc-master-data]] · [[std-data-integrity-money-transactions]] · [[hist-lessons-master-save-preserve-columns]] · [[hist-lessons-query-gateway-write-lockdown]] · [[history-overview]]

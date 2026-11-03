@@ -2,7 +2,7 @@
 title: "บันทึกเอกสารแล้วขึ้น GL ไม่สมดุล (debit credit do not balance) แก้ยังไง"
 tags: [faq, gl, troubleshoot, balance, validation]
 aliases: ["เดบิตเครดิตไม่เท่ากัน", "GL ไม่บาลานซ์", "unbalanced journal", "ErrUnbalancedJournal", "debit and credit totals do not balance", "menu_gl_check_data", "ตรวจสอบความถูกต้อง GL", "gl-check"]
-sources: ["backend/internal/application/process/service.go:29", "backend/internal/application/process/service.go:508", "backend/internal/application/process/service.go:1614", "backend/internal/application/process/gl_template.go:1046", "backend/internal/application/process/docs.go:286", "backend/internal/application/process/workflow.go:554", "backend/internal/application/process/service.go:1755"]
+sources: ["backend/internal/application/process/service.go:29", "backend/internal/application/process/service.go:508", "backend/internal/application/process/service.go:1625", "backend/internal/application/process/gl_template.go:1046", "backend/internal/application/process/docs.go:286", "backend/internal/application/process/workflow.go:554", "backend/internal/application/process/service.go:1766"]
 ---
 # บันทึกเอกสารแล้วขึ้น GL ไม่สมดุล (debit credit do not balance) แก้ยังไง
 
@@ -34,8 +34,8 @@ sources: ["backend/internal/application/process/service.go:29", "backend/interna
 ## ที่มาในโค้ด
 - `backend/internal/application/process/service.go:29` `ErrUnbalancedJournal`
 - `backend/internal/application/process/service.go:508` `ValidateAndBalanceJournal`
-- `backend/internal/application/process/service.go:1614` เรียกตรวจ แล้วห่อ KindValidation
+- `backend/internal/application/process/service.go:1625` เรียกตรวจ แล้วห่อ KindValidation
 - `backend/internal/application/process/gl_template.go:1046` รูปแบบ GL ไม่สมดุล → เส้นมาตรฐาน
 - `backend/internal/application/process/docs.go:286` ตรวจ Dr = Cr ของ JV
 - `backend/internal/application/process/workflow.go:554` `GLCheck` รายการตรวจ
-- `backend/internal/application/process/service.go:1755` `resolveChartAccount`
+- `backend/internal/application/process/service.go:1766` `resolveChartAccount`

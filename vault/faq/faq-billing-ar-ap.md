@@ -2,7 +2,7 @@
 title: "ใบวางบิลลงบัญชีไหม วางบิลแล้วยอดหนี้ลดหรือเปล่า"
 tags: [faq, ar, ap, billing]
 aliases: ["ใบวางบิล", "ใบรับวางบิล", "วางบิลซ้ำ", "billing note", "trans_flag 235", "trans_flag 213", "อ้างอิงใบวางบิล", "ar_bill_inform", "filter_pay_bill", "ar_pay_from_bill_note"]
-sources: ["frontend/account/tabs/transMenuMap.ts:1544", "frontend/account/tabs/transMenuMap.ts:1345", "backend/internal/application/process/docs.go:526", "backend/internal/application/process/docs.go:645", "backend/internal/application/process/pay_check.go:168", "backend/internal/application/process/pay_check.go:221", "backend/internal/application/process/service.go:1731", "frontend/account/transaction/TransBillsGrid.tsx:382"]
+sources: ["frontend/account/tabs/transMenuMap.ts:1544", "frontend/account/tabs/transMenuMap.ts:1345", "backend/internal/application/process/docs.go:526", "backend/internal/application/process/docs.go:645", "backend/internal/application/process/pay_check.go:168", "backend/internal/application/process/pay_check.go:221", "backend/internal/application/process/service.go:1742", "backend/internal/application/process/doc_flow.go:89", "frontend/account/transaction/TransBillsGrid.tsx:382"]
 ---
 # ใบวางบิลลงบัญชีไหม วางบิลแล้วยอดหนี้ลดหรือเปล่า
 
@@ -29,7 +29,8 @@ sources: ["frontend/account/tabs/transMenuMap.ts:1544", "frontend/account/tabs/t
 
 ## ข้อควรระวัง
 - เมื่อดึงจากใบวางบิล ช่องยอดชำระจะเป็นยอดที่วางบิลไว้ ไม่ใช่ยอดคงเหลือปัจจุบัน ถ้ามีการรับชำระบางส่วนหลังจากวางบิลแล้ว ต้องแก้ยอดเอง ถ้าไม่แก้และปิด `pay_bill_over` ไว้ จะบันทึกไม่ได้เพราะ "ป้อนยอดชำระเกิน"
-- ยังไม่ได้พอร์ต flow สถานะของ 213/235 (`doc_flow.go`) บิลหนี้ต้นทางจึงไม่มีสถานะ "วางบิลแล้ว" ที่มาจากใบวางบิล
+- `flowRules` ใน `doc_flow.go:89` ไม่มีกฎสถานะของ 213/235 (คอมเมนต์ระบุว่าจะเพิ่มเมื่อมีหน้าจอเว็บอ่านสถานะ) บิลหนี้ต้นทางจึงไม่มีสถานะ "วางบิลแล้ว" ที่มาจากใบวางบิล
+- รายการบิลค้างที่ให้เลือก (`OutstandingBills`) จำกัดสูงสุด 2,000 แถว เรียงตามวันที่เอกสารแล้วเลขที่เอกสาร (`docs.go:680`)
 - ใบวางบิลที่ถูกใช้แล้ว ปิดแล้ว หรือถูกยกเลิกแล้ว จะแก้ไขหรือลบไม่ได้ (ดู [[faq-cannot-delete-document]])
 
 ## ดูเพิ่ม
@@ -42,9 +43,10 @@ sources: ["frontend/account/tabs/transMenuMap.ts:1544", "frontend/account/tabs/t
 ## ที่มาในโค้ด
 - `frontend/account/tabs/transMenuMap.ts:1544` เมนู "ใบวางบิล (ลูกหนี้)" 235 (ยกเลิก 236 ที่ `:1562`)
 - `frontend/account/tabs/transMenuMap.ts:1345` เมนู "ใบรับวางบิล (เจ้าหนี้)" 213 (ยกเลิก 214 ที่ `:1363`)
-- `backend/internal/application/process/docs.go:526` `billSides` จับคู่ใบวางบิลกับใบชำระ 235↔239, 213↔19
-- `backend/internal/application/process/docs.go:645` `OutstandingBills` ใช้ `filter_pay_bill` และหักเฉพาะยอดชำระ
+- `backend/internal/application/process/docs.go:526-528` `arBills`/`apBills`/`billSides` จับคู่ใบวางบิลกับใบชำระ 235↔239, 213↔19
+- `backend/internal/application/process/docs.go:628` `OutstandingBills` (`:645` ใช้ `filter_pay_bill`, `:680` จำกัด 2,000 แถว) หักเฉพาะยอดชำระ
 - `backend/internal/application/process/pay_check.go:168` `billSaveCheck` คำนวณยอดคงเหลือใหม่ตอนบันทึก
 - `backend/internal/application/process/pay_check.go:221` `checkBills` ตรวจวางบิลซ้ำ ชำระเกิน และบังคับอ้างอิงใบวางบิล
-- `backend/internal/application/process/service.go:1731` `glRebuildTransFlags` ไม่มี 213/235
+- `backend/internal/application/process/service.go:1742` `glRebuildTransFlags` ไม่มี 213/235
+- `backend/internal/application/process/doc_flow.go:89` `flowRules` ไม่มีแถว 213/235
 - `frontend/account/transaction/TransBillsGrid.tsx:382` ปุ่มอ้างอิงใบวางบิลในใบรับ/จ่ายชำระ

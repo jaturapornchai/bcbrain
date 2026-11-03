@@ -2,7 +2,7 @@
 title: "ตั้งประเภทต้นทุนเป็น FIFO / LOT / มาตรฐาน ได้ไหม ระบบคิดตามที่ตั้งหรือเปล่า"
 tags: [faq, ic, stock, cost, cost-type, lot]
 aliases: ["ประเภทต้นทุน", "cost_type", "FIFO", "ต้นทุน LOT FIFO", "ต้นทุน LOT กำหนดเอง", "FEFO", "ต้นทุนมาตรฐาน", "ic_standard_cost", "CalculateFIFOCost"]
-sources: ["frontend/account/master/ItemScreen.tsx:2446", "backend/internal/application/process/service.go:1187", "backend/internal/application/process/service.go:355", "backend/internal/application/process/stock_speed_bench_test.go:23", "backend/internal/application/process/trans_save_rules.go:180", "backend/internal/application/process/trans_lot_auto.go:32", "backend/internal/application/process/item_master.go:755"]
+sources: ["frontend/account/master/ItemScreen.tsx:2446", "backend/internal/application/process/service.go:1198", "backend/internal/application/process/service.go:355", "backend/internal/application/process/stock_speed_bench_test.go:23", "backend/internal/application/process/trans_save_rules.go:180", "backend/internal/application/process/trans_lot_auto.go:32", "backend/internal/application/process/item_master.go:755"]
 ---
 # ตั้งประเภทต้นทุนเป็น FIFO / LOT / มาตรฐาน ได้ไหม ระบบคิดตามที่ตั้งหรือเปล่า
 
@@ -27,7 +27,7 @@ sources: ["frontend/account/master/ItemScreen.tsx:2446", "backend/internal/appli
 
 ## ข้อควรระวัง
 - ถ้าบริษัทต้องรายงานต้นทุนแบบ FIFO หรือราคามาตรฐาน ตัวเลขในระบบนี้ยังเป็นถัวเฉลี่ย การตั้ง `cost_type` ไม่ได้เปลี่ยนตัวเลข
-- โน้ต [[std-inventory-costing-rules]] ใช้ตัวเลข `cost_type` ตามระบบ KMS เดิม ซึ่งไม่ตรงกับตัวเลือกในโค้ดปัจจุบันด้านบน ให้ยึดตามโค้ด (ดู [[term-cost-type]])
+- โน้ต [[std-inventory-costing-rules]] ใช้ตัวเลข `cost_type` ที่อาจไม่ตรงกับตัวเลือกในโค้ดปัจจุบันด้านบน ให้ยึดตามโค้ด (ดู [[term-cost-type]])
 - การเลือก LOT อัตโนมัติไม่ได้เรียงตามวันหมดอายุ (FEFO) แต่เรียงตามเลข LOT
 
 ## ดูเพิ่ม
@@ -39,7 +39,7 @@ sources: ["frontend/account/master/ItemScreen.tsx:2446", "backend/internal/appli
 
 ## ที่มาในโค้ด
 - `frontend/account/master/ItemScreen.tsx:2446` ตัวเลือก `cost_type` 0–5
-- `backend/internal/application/process/service.go:1187` ทุกสินค้าคำนวณด้วย `CalculateMovingAverage`
+- `backend/internal/application/process/service.go:1198` ทุกสินค้าคำนวณด้วย `CalculateMovingAverage`
 - `backend/internal/application/process/service.go:355` `CalculateFIFOCost` (ไม่มีที่เรียกใช้ใน production)
 - `backend/internal/application/process/stock_speed_bench_test.go:23` ที่เรียกใช้ FIFO มีแค่ในการทดสอบ
 - `backend/internal/application/process/trans_save_rules.go:180` `lotMessage` บังคับ LOT ของ `cost_type` 2

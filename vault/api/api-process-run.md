@@ -2,7 +2,7 @@
 title: "API เครื่องยนต์ process /process/* — เส้นทาง สิทธิ์ ขนาดบอดี้ (Process engine run API)"
 tags: [api, process]
 aliases: ["/process","/api/v1/process","/api/process","RequiredRight","routeRights","peekJSON","serveTrans","maxJSONBody","processhttp.Handler"]
-sources: ["backend/internal/adapter/inbound/http/router.go:126","backend/internal/adapter/inbound/http/router.go:168","backend/internal/adapter/inbound/http/process/permission.go:23","backend/internal/adapter/inbound/http/process/permission.go:231","backend/internal/adapter/inbound/http/process/handler.go:19","backend/internal/adapter/inbound/http/process/handler.go:189","backend/internal/adapter/inbound/http/process/stocktools_handler.go:23","backend/internal/adapter/inbound/http/middleware/permission.go:60","frontend/src/lib/api-server.ts:496","frontend/src/app/api/process/trans/[action]/route.ts:11"]
+sources: ["backend/internal/adapter/inbound/http/router.go:126","backend/internal/adapter/inbound/http/router.go:168","backend/internal/adapter/inbound/http/process/permission.go:23","backend/internal/adapter/inbound/http/process/permission.go:231","backend/internal/adapter/inbound/http/process/handler.go:19","backend/internal/adapter/inbound/http/process/handler.go:189","backend/internal/adapter/inbound/http/process/stocktools_handler.go:23","backend/internal/adapter/inbound/http/middleware/permission.go:62","frontend/src/lib/api-server.ts:510","frontend/src/app/api/process/trans/[action]/route.ts:11"]
 ---
 
 # API เครื่องยนต์ process `/process/*`
@@ -22,7 +22,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:126","backend/interna
 
 - มี 2 prefix ที่ชี้ handler ชุดเดียวกันทุกตัว: `/process/*` (router.go:127-166) และ `/api/v1/process/*` (router.go:168-208) — ใช้ได้เท่ากัน; Next เรียก `/api/v1/process/*`
 - ติดตั้งเมื่อ `ex.Process != nil` เท่านั้น (router.go:126); ทั้งกลุ่มผ่าน `Auth` (Bearer access token, ดู [[api-auth-login]]) แล้วตามด้วย `RequireRight(ex.Rights, processhttp.RequiredRight)` (router.go:128-129)
-- provider / database / user ถูกประทับจาก claims ใน token เสมอ (`SetScope`, stocktools_handler.go:23-35; `run(claims.ProviderCode, claims.DatabaseName)`, handler.go:189-205) — ค่าที่ใส่ใน JSON ถูกเขียนทับ ผู้เรียกข้ามบริษัทไม่ได้
+- provider / database / user ถูกประทับจาก claims ใน token เสมอ (`SetScope`, stocktools_handler.go:23-37; `run(claims.ProviderCode, claims.DatabaseName)`, handler.go:189-205) — ค่าที่ใส่ใน JSON ถูกเขียนทับ ผู้เรียกข้ามบริษัทไม่ได้
 - ทุก route เป็น `POST` ยกเว้น 2 route `GET` ส่งรูป: `/docpicture/image?id=` และ `/itempicture/image?id=` (รายละเอียดใน [[api-proc-actions-master]])
 
 | กลุ่ม path | action | handler |
@@ -55,7 +55,7 @@ action ที่ไม่รู้จักในกลุ่ม `{action}` = 40
 
 ## สิทธิ์ (RequiredRight)
 
-`RequireRight` โหลดสิทธิ์เมนูของ session แล้วเทียบกับ right ที่ `RequiredRight(r)` ตัดสิน; ไม่พอ = 403 ข้อความไทยจาก `deniedMessages` (middleware/permission.go:60-80). ชนิด right: `Read`, `Write` (= Add หรือ Edit), `Add`, `Edit`, `Delete`, `Admin` (Admin ผ่านทุกชนิด) — ดู [[proc-permission-rights]], [[be-menu-rights-permission]].
+`RequireRight` โหลดสิทธิ์เมนูของ session แล้วเทียบกับ right ที่ `RequiredRight(r)` ตัดสิน; ไม่พอ = 403 ข้อความไทยจาก `deniedMessages` (middleware/permission.go:31-38; `RequireRight` :62-82). ชนิด right: `Read`, `Write` (= Add หรือ Edit), `Add`, `Edit`, `Delete`, `Admin` (Admin ผ่านทุกชนิด) — ดู [[proc-permission-rights]], [[be-menu-rights-permission]].
 
 1. **กฎสำคัญ: route ที่ไม่อยู่ใน `routeRights` ต้องใช้ Admin** (permission.go:23-24, 130-132) — ใส่ route ใหม่แล้วลืมจัดชั้น = ล็อกอยู่เป็น Admin โดยอัตโนมัติ (action `workflow/ai-*` ทั้ง 5 ตัวไม่อยู่ในตาราง จึงต้องใช้ Admin)
 2. `routeRights` (permission.go:25-52) จัดชั้นตามกลุ่ม:
@@ -82,11 +82,11 @@ action ที่ไม่รู้จักในกลุ่ม `{action}` = 40
 | ขีด | route | ที่มา |
 |---|---|---|
 | 16 MB | `stock/rebuild`, `gl/rebuild`, `trans/{save,delete}`, `doc/{save,delete,cancel,approve}`, `report/run`, `report/pdf` | handler.go:19 (`maxJSONBody`) |
-| 64 MB | `docpicture/save` (8 รูป x 5 MB เป็น base64) | docpicture_handler.go:32 |
-| 48 MB | `itempicture/save` (6 รูป x 5 MB) | stocktools_handler.go:40 |
-| 24 MB | `stocktools/stockbeginningsave` | stocktools_handler.go:156 |
-| 8 MB | `modifyprice/*`, `stocktools/{serialcountsave,lotamountsave}` | docpicture_handler.go:112; stocktools_handler.go:108,116 |
-| 4 MB | `stocktools/*` อื่น ๆ (`small`), `itemdetail/save`, `itemmaster/save` | stocktools_handler.go:90; itemdetail_handler.go:22,35 |
+| 256 MB | `docpicture/save` (ไฟล์แนบไม่จำกัดจำนวน ไฟล์ละ ≤ 25 MB เป็น base64) | docpicture_handler.go:32; doc_picture.go:40-41 |
+| 48 MB | `itempicture/save` (ไม่จำกัดจำนวนไฟล์ ไฟล์ละ ≤ 25 MB เป็น base64) | stocktools_handler.go:40; item_picture.go:23 |
+| 24 MB | `stocktools/stockbeginningsave` | stocktools_handler.go:157 |
+| 8 MB | `modifyprice/*`, `stocktools/{serialcountsave,lotamountsave}` | docpicture_handler.go:119; stocktools_handler.go:109,117 |
+| 4 MB | `stocktools/*` อื่น ๆ (`small`), `itemdetail/save`, `itemmaster/save` | stocktools_handler.go:90; itemdetail_handler.go:23,36 |
 | 1 MB | ที่เหลือทั้งหมด: `decodeCheque` (`doc/{bills,flow}`, `cheque/*`, `tax/rebuild`, `lookup/*`, `trans/{deposits,party-defaults}`, `transgrid/*`, `barcode/*`, `master-detail/*`), `master/*`, `workflow/*`, `gl/{template-defaults,recurring}`, `docpicture/{formats,docs,get}`, `itempicture/{list,get}`, `itemdetail/get`, `itemmaster/delete` | cheque_handler.go:49; master_handler.go:18; workflow_handler.go:25 |
 
 เกินขีด = 400 `invalid request body`. ทั้ง request ยังมี timeout 60 วินาที (router.go:64).
@@ -107,7 +107,7 @@ POST /api/v1/process/gl/rebuild         Authorization: Bearer <token>
 
 ## ผู้เรียกฝั่งหน้าเว็บ
 
-- Next route ใต้ `src/app/api/process/**/route.ts` — แต่ละไฟล์ตรวจ `ACTIONS` (whitelist) ก่อน: action นอกรายการ = 404 `NOT_FOUND`; แล้ว `requireSession` -> `getValidAccessToken` (ไม่มี token = 401 `NO_TOKEN`) -> `proxyToService("/api/v1/process/<group>/<action>")` (api-server.ts:496). ถ้า Go ตอบ JSON ที่มี `ok` เป็น boolean ส่งต่อตรง ๆ; ถ้าไม่ใช่ ห่อสำเร็จเป็น `{ok:true,data}`; 401 = `SESSION_EXPIRED`; อื่น ๆ ใช้ข้อความจาก `error.message` ([[fe-api-proxy-routes]])
+- Next route ใต้ `src/app/api/process/**/route.ts` — แต่ละไฟล์ตรวจ `ACTIONS` (whitelist) ก่อน: action นอกรายการ = 404 `NOT_FOUND`; แล้ว `requireSession` -> `getValidAccessToken` (ไม่มี token = 401 `NO_TOKEN`) -> `proxyToService("/api/v1/process/<group>/<action>")` (api-server.ts:510). ถ้า Go ตอบ JSON ที่มี `ok` เป็น boolean ส่งต่อตรง ๆ; ถ้าไม่ใช่ ห่อสำเร็จเป็น `{ok:true,data}`; 401 = `SESSION_EXPIRED`; อื่น ๆ ใช้ข้อความจาก `error.message` ([[fe-api-proxy-routes]])
 - whitelist ต่อ route: `trans` {save, delete, deposits, party-defaults}, `doc` {save, delete, bills, cancel, approve, flow}, `lookup` 5 ตัว, `cheque` {rebuild, candidates}, `transgrid` 7, `barcode` 9, `master` 5, `master-detail` 2, `itemmaster` 2, `itemdetail` 2, `docpicture` 4, `itempicture` 3, `modifyprice` 2, `stocktools` 23, `workflow` 19; route เดี่ยว: `stock/rebuild`, `gl/{rebuild,recurring,template-defaults}`, `tax/rebuild`, `report/{run,pdf}`, `docpicture/image`, `itempicture/image`
 - ตัวช่วยกลางใน `src/lib/query-client.ts`: `rebuildStock` :76, `itemNextCode` :83, `saveItemMaster` :90 / ลบ :98, `rebuildGl` :111, `saveTrans` :377, `transGrid*` :444-540, `lookup*` :607-652, `deleteTrans` :683, `saveDoc` :775, `docBills` :785, `deleteDoc` :797, `runReport` :1023, `renderReportPdf` :1033 — ดู [[fe-query-client-sql-builder]]
 - หน้าจอเรียก workflow ผ่านตัวช่วย `workflow()` ใน `account/process/SystemProcessWorkbenchScreen.tsx:34-38` ([[fe-process-pos-screens]])
@@ -116,9 +116,9 @@ POST /api/v1/process/gl/rebuild         Authorization: Bearer <token>
 
 - `backend/internal/adapter/inbound/http/router.go:126-208`
 - `backend/internal/adapter/inbound/http/process/permission.go:14-132,135-161,231`
-- `backend/internal/adapter/inbound/http/middleware/permission.go:27,60-80`
+- `backend/internal/adapter/inbound/http/middleware/permission.go:27,31-38,62-82`
 - `backend/internal/adapter/inbound/http/process/handler.go:19-40,50-55,84,149-221`
-- `backend/internal/adapter/inbound/http/process/stocktools_handler.go:12-40,90,108,116,156`
+- `backend/internal/adapter/inbound/http/process/stocktools_handler.go:12-40,90,109,117,157`
 - `backend/internal/adapter/inbound/http/process/docpicture_handler.go:14-32,112`; `cheque_handler.go:49`; `master_handler.go:18`; `workflow_handler.go:25`; `itemdetail_handler.go:16-44`
 - `backend/internal/application/process/trans.go:257`; `service.go:44,60`
-- `frontend/src/app/api/process/*/route.ts`; `frontend/src/lib/api-server.ts:496-554`; `frontend/src/lib/query-client.ts:76-1033`
+- `frontend/src/app/api/process/*/route.ts`; `frontend/src/lib/api-server.ts:510-563`; `frontend/src/lib/query-client.ts:76-1033`

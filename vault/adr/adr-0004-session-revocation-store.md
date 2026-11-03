@@ -2,12 +2,12 @@
 title: "ADR-0004 การเพิกถอน session ตอน logout (RevocationStore)"
 tags: [backend, adr, identity, security]
 aliases: ["ADR 0004", "RevocationStore", "revoked_sessions.json", "logout revoke", "jti"]
-sources: ["backend/docs/adr/0004-in-memory-session-revocation.md:7", "backend/internal/adapter/outbound/identity/memory_revocation_store.go:13", "backend/internal/adapter/outbound/identity/memory_revocation_store.go:33", "backend/internal/di/container.go:79"]
+sources: ["backend/docs/adr/0004-in-memory-session-revocation.md:7", "backend/internal/adapter/outbound/identity/memory_revocation_store.go:12-14", "backend/internal/adapter/outbound/identity/memory_revocation_store.go:33", "backend/internal/di/container.go:79"]
 ---
 
 # ADR-0004 Logout เพิกถอน session ด้วย RevocationStore
 
-สถานะ: **accepted แต่ส่วน "ไม่ทนต่อ restart" ล้าสมัย** — ADR เขียนว่าเป็น map ในหน่วยความจำล้วน (`...0004...md:7`) แต่โค้ดปัจจุบันมี `NewFileBackedRevocationStore` เก็บ map เป็นไฟล์ JSON บนดิสก์ และโหลดกลับตอน start (`memory_revocation_store.go:13,33,43`). ตาม **โค้ด**: revoke ข้าม restart ได้.
+สถานะ: **accepted แต่ส่วน "ไม่ทนต่อ restart" ล้าสมัย** — ADR เขียนว่าเป็น map ในหน่วยความจำล้วน (`...0004...md:7`) แต่โค้ดปัจจุบันมี `NewFileBackedRevocationStore` เก็บ map เป็นไฟล์ JSON บนดิสก์ และโหลดกลับตอน start (`memory_revocation_store.go:12-14,33,43`). ตาม **โค้ด**: revoke ข้าม restart ได้.
 
 ## ทำงานอย่างไร
 
@@ -27,10 +27,10 @@ sources: ["backend/docs/adr/0004-in-memory-session-revocation.md:7", "backend/in
 
 ## ที่มาในโค้ด
 
-- `backend/internal/adapter/outbound/identity/memory_revocation_store.go:13` — doc comment: map ในโปรเซส + ไฟล์ JSON เสริม.
+- `backend/internal/adapter/outbound/identity/memory_revocation_store.go:12-14` — doc comment: map ในโปรเซส + ไฟล์ JSON เสริม.
 - `backend/internal/adapter/outbound/identity/memory_revocation_store.go:33` — `NewFileBackedRevocationStore`.
 - `backend/internal/di/container.go:79` — เลือกไฟล์จาก `REVOCATION_STORE_FILE`.
-- `backend/docs/adr/0004-in-memory-session-revocation.md:16` — ผลที่ตามมาตามเอกสารเดิม.
+- `backend/docs/adr/0004-in-memory-session-revocation.md:16` — ผลที่ตามมาตามข้อความใน ADR (ระบุว่า logout ไม่ข้าม restart/หลาย replica).
 
 ## ดูเพิ่ม
 

@@ -7,7 +7,7 @@ sources: ["backend/internal/application/process/workflow.go:91", "backend/intern
 
 # เปลี่ยนรหัสหลัก สินค้า/ลูกหนี้/เจ้าหนี้/ผังบัญชี (Change Code)
 
-`POST /process/workflow/change-code` เปลี่ยนรหัสของข้อมูลหลัก 4 ชนิด พร้อมแก้ทุกตารางที่อ้างรหัสนั้นใน transaction เดียว ตามรายการตาราง/คอลัมน์ที่คัดจากหน้าจอ C# `BCERPGlobal/_changeCode/*` ทีละหน้าจอ (คอมเมนต์ `workflow.go:91,130`) เป็นงานเสี่ยงสูง สิทธิ์ต้องเป็น Admin (`permission.go:50`)
+`POST /process/workflow/change-code` เปลี่ยนรหัสของข้อมูลหลัก 4 ชนิด พร้อมแก้ทุกตารางที่อ้างรหัสนั้นใน transaction เดียว ตามรายการตาราง/คอลัมน์ที่กำหนดตายตัวต่อชนิดใน `changeCodeSpecs` (`workflow.go:131`) เป็นงานเสี่ยงสูง สิทธิ์ต้องเป็น Admin (`permission.go:50`)
 
 ## ทำงานอย่างไร
 
@@ -25,7 +25,7 @@ sources: ["backend/internal/application/process/workflow.go:91", "backend/intern
 ### ลำดับใน `ChangeCode` (:230) -- ทำใน `withTx` (หมดเวลา 120 วินาที)
 1. กรองรายการอ้างอิงของ `kind` ให้เหลือเฉพาะคอลัมน์ที่มีจริง (`columnExists`) ที่ไม่มีบันทึกไว้ใน `skippedTables` (เพราะตารางที่ฐานลูกค้าไม่มีทำให้ทั้ง batch ล้ม -- คอมเมนต์ :241)
 2. `fkChildren` (:299) หา foreign key แบบคอลัมน์เดียวชนิด NO ACTION ที่ชี้ไป `master.code` (คอมเมนต์ระบุตัวอย่าง `purchase_planning_*`) เพราะ FK แบบนี้ตรวจตอนจบคำสั่ง ต้องแก้ master กับลูกใน statement เดียว; FK แบบ CASCADE ไม่ต้องทำอะไร
-3. ทีละคู่ตามลำดับ (A->B แล้ว B->C ทำงานเหมือน batch ของ C#):
+3. ทีละคู่ตามลำดับที่ส่งมา (A->B แล้ว B->C ได้ผลต่อเนื่องกันใน transaction เดียว):
    - อ่านชื่อ (`name_1`) ของรหัสเดิมจากตาราง master ไม่พบ = error "แถว N: ไม่พบ...เดิม ..."
    - รหัสใหม่มีอยู่แล้ว (`upper(code) = ใหม่`) = error แบบ conflict "แถว N: ...ใหม่ ... มีอยู่แล้ว"
    - `renameMasterWithFKChildren` (:324) แก้ `master.code` และ FK ลูกใน CTE เดียว (`WITH u0 AS (UPDATE ...), u1 AS (...) SELECT count(*) ...`)
@@ -41,7 +41,7 @@ sources: ["backend/internal/application/process/workflow.go:91", "backend/intern
 | `supplier` | `ap_supplier` | `ap_supplier_detail.ap_code`, `ap_contactor`, `ap_item_by_supplier` + กลุ่มธุรกรรมจาก `apArTransRefs` |
 | `gl_account` | `gl_chart_of_account` | `code`, `main_code`, `account_close`, `gl_journal_detail.account_code`, ตาราง `gl_journal_*_list` และ `gl_chart_of_account_*_list`, `ic_inventory.account_code_1..4`, `ar_customer_detail.account_code`, `ap_supplier_detail.account_code` |
 
-**กลุ่มธุรกรรมลูกหนี้/เจ้าหนี้ (`apArTransRefs` :110)**: แก้ `cust_code` ใน `ic_trans`, `ic_trans_detail`, `ap_ar_trans`, `ap_ar_trans_detail`, `ic_trans_serial_number`, `ic_trans_shipment`; `ap_ar_code` ใน `cb_trans`, `cb_trans_detail`; และ `ap_ar_transport_label.cust_code` ที่ `ar_ap_type` = 1 (ลูกหนี้) หรือ 0 (เจ้าหนี้) -- เฉพาะ `trans_flag` ในรายการ `arChangeCodeFlags` / `apChangeCodeFlags` (คัดจาก `_changeApArCodeUserControl` ตามคอมเมนต์ :104) ดู [[proc-doc-flow-numbering]] สำหรับความหมายของ flag
+**กลุ่มธุรกรรมลูกหนี้/เจ้าหนี้ (`apArTransRefs` :110)**: แก้ `cust_code` ใน `ic_trans`, `ic_trans_detail`, `ap_ar_trans`, `ap_ar_trans_detail`, `ic_trans_serial_number`, `ic_trans_shipment`; `ap_ar_code` ใน `cb_trans`, `cb_trans_detail`; และ `ap_ar_transport_label.cust_code` ที่ `ar_ap_type` = 1 (ลูกหนี้) หรือ 0 (เจ้าหนี้) -- เฉพาะ `trans_flag` ในรายการ `arChangeCodeFlags` / `apChangeCodeFlags` (`workflow.go:106-107`) ดู [[proc-doc-flow-numbering]] สำหรับความหมายของ flag
 
 ## ที่มาในโค้ด
 - `backend/internal/application/process/workflow.go:91-123` - `codeRef`, `refs`, รายการ flag และ `apArTransRefs`

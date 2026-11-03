@@ -2,7 +2,7 @@
 title: "รับชำระหนี้ (239) / จ่ายชำระหนี้ (19) ลงบัญชี GL ยังไง เช็ค โอน ภาษีหัก ไปไหน"
 tags: [faq, gl, ar, ap, receipt, payment, cheque, wht]
 aliases: ["รับชำระลงบัญชียังไง", "จ่ายชำระหนี้ GL", "receipt payment journal", "trans_flag 239", "trans_flag 19", "menu_ar_debt_billing", "menu_ap_debt_billing", "เช็ครับ 1122", "กำไรขาดทุนอัตราแลกเปลี่ยน"]
-sources: ["backend/internal/application/process/service.go:1486", "backend/internal/application/process/service.go:2159", "backend/internal/application/process/service.go:1860", "backend/internal/application/process/service.go:1850", "backend/internal/application/process/gl_pay_other.go:17", "backend/internal/application/process/gl_template_rules.go:20"]
+sources: ["backend/internal/application/process/service.go:1497", "backend/internal/application/process/service.go:2170", "backend/internal/application/process/service.go:1871", "backend/internal/application/process/service.go:1861", "backend/internal/application/process/gl_pay_other.go:17", "backend/internal/application/process/gl_template_rules.go:20"]
 ---
 # รับชำระหนี้ (239) / จ่ายชำระหนี้ (19) ลงบัญชี GL ยังไง เช็ค โอน ภาษีหัก ไปไหน
 
@@ -38,9 +38,9 @@ sources: ["backend/internal/application/process/service.go:1486", "backend/inter
 - [[faq-payment-tab-tenders]]
 
 ## ที่มาในโค้ด
-- `backend/internal/application/process/service.go:1486` ดึง ap_ar_trans 19/239 ด้วย total_net_value
-- `backend/internal/application/process/service.go:2159` case 19/239 และส่วนต่างอัตราแลกเปลี่ยน
-- `backend/internal/application/process/service.go:1860` `payTenders`
-- `backend/internal/application/process/service.go:1850` `money()` รวมรายได้/ค่าใช้จ่ายอื่น
+- `backend/internal/application/process/service.go:1497` ดึง ap_ar_trans 19/239 ด้วย total_net_value
+- `backend/internal/application/process/service.go:2170` case 19/239 และส่วนต่างอัตราแลกเปลี่ยน
+- `backend/internal/application/process/service.go:1871` `payTenders`
+- `backend/internal/application/process/service.go:1861` `money()` รวมรายได้/ค่าใช้จ่ายอื่น
 - `backend/internal/application/process/gl_pay_other.go:17` `payOtherGL` doc_type 11/12
 - `backend/internal/application/process/gl_template_rules.go:20` รหัสจอ → กฎรูปแบบ GL

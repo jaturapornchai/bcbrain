@@ -2,46 +2,46 @@
 title: "ขอโอนสินค้า/วัตถุดิบ (Transfer Request)"
 tags: [doctypes, inventory]
 aliases: ["trans_flag 124", "ขอโอนสินค้า", "ใบขอโอน", "RIM"]
-sources: ["frontend/account/tabs/transMenuMap.ts:1058", "frontend/account/transaction/transLayouts.ts:114", "frontend/account/transaction/transLayouts.ts:306", "frontend/account/transaction/transLayouts.ts:474", "backend/internal/application/process/trans.go:22", "backend/internal/application/process/trans_ref_import.go:23", "backend/internal/application/process/doc_flow.go:89", "backend/internal/application/process/doc_cancel.go:53"]
+sources: ["frontend/account/tabs/transMenuMap.ts:1058", "frontend/account/transaction/transLayouts.ts:114", "frontend/account/transaction/transLayouts.ts:306", "frontend/account/transaction/transLayouts.ts:474", "backend/internal/application/process/trans.go:23", "backend/internal/application/process/transcalc.go:32", "backend/internal/application/process/stock_rebuild.go:19", "backend/internal/application/process/service.go:1742", "backend/internal/application/process/trans_ref_import.go:30", "backend/internal/application/process/doc_flow.go:89", "backend/internal/application/process/doc_cancel.go:53"]
 ---
 
 # ขอโอนสินค้า/วัตถุดิบ (trans_flag 124)
 
 ## ใช้เมื่อไร
-ใช้ขอโอนสินค้าระหว่างคลังก่อนโอนจริงด้วยใบ 72 อยู่ที่เมนู "ขอโอนสินค้า/วัตถุดิบ" (RIM, transMenuMap.ts:1058 มีค่า isTransfer)
+ใช้ขอโอนสินค้าระหว่างคลังก่อนโอนจริงด้วยใบ 72 อยู่ที่เมนู `menu_ic_request_transfer` "ขอโอนสินค้า/วัตถุดิบ" (RIM, transMenuMap.ts:1058 มีค่า isTransfer)
 
 ## trans_flag/ตาราง
-- trans_flag 124 เก็บใน [[tbl-ic-trans]] + [[tbl-ic-trans-detail]]
-- grid บันทึกคอลัมน์คลัง/ที่เก็บปลายทางด้วย (comment trans.go:22)
+- trans_flag 124 เก็บใน [[tbl-ic-trans]] + [[tbl-ic-trans-detail]] (calc_flag 0 เพราะไม่อยู่ในรายการ `calcFlagByTransFlag`)
+- grid บันทึกคอลัมน์คลัง/ที่เก็บปลายทางด้วย (comment trans.go:23)
 
 ## ฟิลด์/แท็บบนหน้าจอ
 - หัวเอกสาร: refDoc, sale, wh, whTo ไม่มีแท็บ (transLayouts.ts:114)
 - ช่อง sale แสดงชื่อ "ผู้ขอโอน:" (transLayouts.ts:306) และไม่แสดงราคา (transLayouts.ts:474)
 
 ## ผลต่อสต็อก
-ไม่มี
+ไม่มี (ไม่อยู่ในชุด flag ของ `stockRowsSQL` stock_rebuild.go:19)
 
 ## ผลต่อภาษี (VAT/WHT)
-ไม่มี (`showsVatType` ไม่แสดงช่องภาษีให้ 124 transcalc.go:31)
+ไม่มี (`showsVatType` ไม่แสดงช่องภาษีให้ 124 transcalc.go:32-34)
 
 ## การลงบัญชี
-ไม่ลง GL
+ไม่ลง GL (ไม่อยู่ใน `glRebuildTransFlags` service.go:1742)
 
 ## เอกสารต้นทาง-ปลายทาง
-- ปลายทาง: โอนสินค้า 72 (คู่ {72,124} trans_ref_import.go:23)
-- flow สถานะของ 124 ยังไม่ได้พอร์ต (doc_flow.go:89)
+- ปลายทาง: โอนสินค้า 72 (คู่ {72,124} trans_ref_import.go:30)
+- 124 ไม่มีใน `flowRules` จึงไม่มีการคำนวณสถานะการใช้ (comment doc_flow.go:89)
 
 ## ยกเลิก/แก้ไข
 - ยกเลิกด้วย flag 125 (doc_cancel.go:53)
 
 ## ข้อควรระวัง
-- เมนูยกเลิกใน transMenuMap ไม่พบคู่ของ 124 แต่ backend รองรับ 125 (doc_cancel.go:53)
+- transMenuMap ไม่มีเมนูของ flag 125 แต่ backend รองรับคู่ยกเลิก 125 (doc_cancel.go:53)
 
 ## ที่มาในโค้ด
 - `frontend/account/tabs/transMenuMap.ts:1058` เมนู
 - `frontend/account/transaction/transLayouts.ts:114` FLAG_SPEC 124
-- `backend/internal/application/process/trans.go:22` คอลัมน์ปลายทาง
-- `backend/internal/application/process/trans_ref_import.go:23` refImportSpecs
+- `backend/internal/application/process/trans.go:23` คอลัมน์ปลายทาง
+- `backend/internal/application/process/trans_ref_import.go:30` refImportSpecs
 - `backend/internal/application/process/doc_cancel.go:53` ยกเลิก 125
 
 ## ดูเพิ่ม

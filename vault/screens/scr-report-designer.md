@@ -1,98 +1,103 @@
 ---
 title: "ตัวออกแบบรายงานและแบบฟอร์ม (FastReportDesignerScreen / FormDesignerScreen)"
 tags: [screens, report, admin]
-aliases: ["FastReportDesignerScreen", "FormDesignerScreen", "ออกแบบรายงาน", "สร้าง/แก้ไขแบบฟอร์ม", "ออกแบบงบการเงิน", "นำเข้ารายงาน", "นำเข้าแบบฟอร์ม", "นำเข้ารายงานสาขา", "createReportDesignerScreen", "fast_report_designer", "menu_form_edit"]
-sources: ["frontend/account/tabs/screenRegistry.tsx:101-127", "frontend/account/tabs/screenRegistry.tsx:190-262", "frontend/account/report/FastReportDesignerScreen.tsx:881-948", "frontend/account/report/FastReportDesignerScreen.tsx:1189-1215", "frontend/account/report/FastReportDesignerScreen.tsx:1280-1381", "frontend/account/report/FastReportDesignerScreen.tsx:1690-1935", "frontend/account/report/FastReportDesignerScreen.tsx:2396-2406", "frontend/account/report/FastReportDesignerScreen.tsx:3678-3880", "frontend/account/report/FastReportDesignerScreen.tsx:3885-4064", "frontend/account/report/FormDesignerScreen.tsx:809-860", "frontend/account/report/FormDesignerScreen.tsx:1737-1875", "frontend/account/report/FormDesignerScreen.tsx:1957-2260", "frontend/account/report/FormDesignerScreen.tsx:4406-5260", "backend/internal/application/process/report_template.go:395-425"]
+aliases: ["FastReportDesignerScreen", "FormDesignerScreen", "ออกแบบรายงาน", "สร้าง/แก้ไขแบบฟอร์ม", "ออกแบบงบการเงิน", "นำเข้ารายงาน", "นำเข้าแบบฟอร์ม", "นำเข้ารายงานสาขา", "fast_report_designer", "menu_gl_report_design", "menu_form_edit", "menu_import_formdesign", "menu_import_report", "menu_import_report_branch", "form_designer"]
+sources: ["frontend/account/tabs/screenRegistry.tsx:101-131", "frontend/account/tabs/screenRegistry.tsx:195-200", "frontend/account/tabs/screenRegistry.tsx:252-259", "frontend/src/config/bcMenu.ts:337-339", "frontend/shared/layout/MenuBar.tsx:819-821", "frontend/account/tabs/TabWorkspace.tsx:542-548", "frontend/account/report/FastReportDesignerScreen.tsx:859-866", "frontend/account/report/FastReportDesignerScreen.tsx:1057-1147", "frontend/account/report/FastReportDesignerScreen.tsx:1280-1352", "frontend/account/report/FastReportDesignerScreen.tsx:3897-3928", "frontend/account/report/FormDesignerScreen.tsx:809-815", "frontend/account/report/FormDesignerScreen.tsx:1737-1811", "frontend/account/report/FormDesignerScreen.tsx:4924-5100", "frontend/account/report/formDesignerPresets.ts:510", "backend/internal/application/process/report.go:246-376", "backend/internal/application/process/report_template.go:338-473", "backend/internal/application/process/report_template.go:644-679", "backend/internal/adapter/inbound/http/process/permission.go:60-67"]
 ---
+# ตัวออกแบบรายงานและแบบฟอร์ม (FastReportDesignerScreen / FormDesignerScreen)
 
-# ตัวออกแบบรายงานและแบบฟอร์ม
+เครื่องมือสร้างและแก้ไข "แบบรายงาน" (ตารางข้อมูลจาก SQL) และ "แบบฟอร์มพิมพ์" (วางวัตถุบนกระดาษ A4/ใบเสร็จ/เช็ค) ของระบบ BC Ai Account มี 2 จอจริงในโค้ด คือ `FastReportDesignerScreen` และ `FormDesignerScreen` เมนูทั้ง 6 รายการของกลุ่มนี้ใช้ 2 จอนี้ร่วมกัน จอรายงานเก็บแบบที่ออกแบบลงตาราง `erp_report_template` ผ่าน API `report/run` จอแบบฟอร์มเก็บลงตารางเดียวกันและให้หลังบ้านคัดลอกอีกชุดลงตาราง `formdesign` เลขบรรทัดที่ไม่ระบุไฟล์ในส่วนจอรายงานเป็นของ `frontend/account/report/FastReportDesignerScreen.tsx` และในส่วนจอแบบฟอร์มเป็นของ `frontend/account/report/FormDesignerScreen.tsx`
 
-เมนูสร้างรายงานเองและสร้างแบบฟอร์มกระดาษเอง ทั้ง 6 เมนูลงทะเบียนด้วยฟังก์ชัน `createReportDesignerScreen` ตัวเดียว (screenRegistry.tsx:101-127, รายการ 190-262) แล้วแตกเป็น 2 จอจริง: **FastReportDesignerScreen** (รายงาน/งบการเงิน) และ **FormDesignerScreen** (แบบฟอร์มกระดาษ) กลไก JSON schema (`bc.report.json.v1`, `bc.formdesign.json.v1`) และวิธีบันทึกผ่าน `report/run` templateAction อธิบายไว้ใน [[fe-report-print-designer]] เอกสารนี้เน้นสิ่งที่ผู้ใช้เห็นและกดได้
+## วิธีเปิด (6 เมนู)
+`screenRegistry.tsx:101-131` ห่อทั้ง 2 จอไว้ในตัวเลือกเดียว: ถ้าคีย์เป็น `form_designer`, `menu_form_edit` หรือ `menu_import_formdesign` เปิด `FormDesignerScreen` (ส่ง `initialImportMode` ตามเมนู) นอกนั้นเปิด `FastReportDesignerScreen` (`:109-129`) การลงทะเบียนอยู่ที่ `:195-200`, `:206-211`, `:217-222`, `:228-234`, `:240-247`, `:252-259`
 
-## วิธีเปิด
+| รหัสเมนู | คีย์ (`name`) | ชื่อเมนู | จอที่เปิด | พฤติกรรมตอนเปิด |
+|---|---|---|---|---|
+| 1094 | `fast_report_designer` | ออกแบบรายงาน | `FastReportDesignerScreen` | เริ่มที่แท็บ Query 1 (`:903-908`) |
+| 1092 | `menu_gl_report_design` | ออกแบบงบการเงิน | `FastReportDesignerScreen` (variant `gl_statement`) | เริ่มที่แท็บ Account (`:903-908`) |
+| 1093 | `menu_form_edit` | สร้าง/แก้ไขแบบฟอร์ม | `FormDesignerScreen` | เริ่มในโหมดดู (`isEditing` เริ่มเป็น false, `FormDesignerScreen.tsx:837`) |
+| 1113 | `menu_import_formdesign` | นำเข้าแบบฟอร์ม | `FormDesignerScreen` | เปิดหน้าต่าง "เปิดแบบฟอร์ม" ทันที (`:852`) |
+| 1114 | `menu_import_report` | นำเข้ารายงาน | `FastReportDesignerScreen` | เปิดหน้าต่างโหลดแบบทันที (`:945-947`) |
+| 1115 | `menu_import_report_branch` | นำเข้ารายงานสาขา | `FastReportDesignerScreen` | เหมือน 1114 ค่า `branchMode` เปลี่ยนแค่ชื่อหน้าต่าง (`:3683-3687`) |
 
-| รหัสเมนู | menuKey | ชื่อบนเมนู | จอที่เปิด |
-|---|---|---|---|
-| 1094 | `fast_report_designer` | ออกแบบรายงาน | FastReportDesignerScreen (แท็บเริ่มต้น `query1`) |
-| 1092 | `menu_gl_report_design` | ออกแบบงบการเงิน | FastReportDesignerScreen (แท็บเริ่มต้น `account`) |
-| 1093 | `menu_form_edit` | สร้าง/แก้ไขแบบฟอร์ม | FormDesignerScreen |
-| 1113 | `menu_import_formdesign` | นำเข้าแบบฟอร์ม | FormDesignerScreen เปิดหน้าต่างเลือกฟอร์มทันที (`initialImportMode`) |
-| 1114 | `menu_import_report` | นำเข้ารายงาน | FastReportDesignerScreen เปิดหน้าต่างโหลดรายงานทันที |
-| 1115 | `menu_import_report_branch` | นำเข้ารายงานสาขา | เหมือน 1114 ทุกอย่าง ต่างแค่หัวหน้าต่าง "นำเข้ารายงานตามสาขา (JSON Report Repository)" |
+รหัสในตารางมาจากการอ่านเมนูจริงผ่าน `frontend/src/config/bcMenu.ts` (บรรทัดเมนูใน `frontend/src/config/bcMenu.json` คือ `:1334`, `:1355`, `:1369`, `:1698`, `:1712`, `:1726`) ทั้ง 6 เมนูเป็น "เฉพาะผู้ดูแลระบบ": ตัวกรองเมนูอยู่ที่ `bcMenu.ts:337-339`, `:365-367`, `:392-397` ป้ายแสดงที่ `MenuBar.tsx:819-821` และผู้ใช้ที่ไม่ใช่แอดมินที่เปิดเมนูเหล่านี้จะถูกปฏิเสธใน `TabWorkspace.tsx:542-548` (ดู [[scr-admin-permissions]], [[fe-screen-registry-menu]]) การจำกัดนี้ทำที่ฝั่งหน้าเว็บเท่านั้น ฝั่ง API ดูหัวข้อ "ฝั่งหลังบ้าน"
 
-อ้างอิง: รหัส 4 หลักจาก `bcMenu.json`; registry ใช้รหัสเก่าแบบมีจุด ("1.13", "1.12", "1.9.7", "1.10.20/22/23") เป็น `code` (ดู [[fe-screen-registry-menu]], [[screens-overview]]) ที่มาแท็บเริ่มต้นและโมดัลเริ่มต้น: FastReportDesignerScreen.tsx:903-908, 945-947; FormDesignerScreen.tsx:852; ความต่างของ 1115 เฉพาะที่ FastReportDesignerScreen.tsx:3684-3690 (`branchMode` ใช้ตรงนี้ที่เดียว)
+ทางลัดอื่นเข้าจอแบบฟอร์ม: ปุ่ม "Form Designer" ในหน้าต่างพิมพ์เอกสาร (`GlobalDocFormPrintModal.tsx:5100-5112`) ที่เรียก `onOpenFormDesignerStudio` ของ `UniversalTransScreen` (`UniversalTransScreen.tsx:4353`, เลขบรรทัดตามฉบับ commit ล่าสุด) ดู [[scr-report-print-modal]], [[scr-universal-trans]]
 
-## 1. จอออกแบบรายงาน (FastReportDesignerScreen)
+## 1. ตัวออกแบบรายงาน (`FastReportDesignerScreen`)
+Props รับ `menuKey`, `menuCode`, `title`, `variant` และโหมดนำเข้า (`:859-866`) เริ่มในโหมดแก้ไขทันที (`isEditing` เริ่มเป็น true, `:891`) การแก้ค่าใด ๆ เพิ่มตัวนับ `dirtyCount` และแสดงป้าย "แก้ไขแล้ว N จุด" (`markModified` `:973-986`, ป้าย `:1672-1674`) การบันทึก ลบ และเพิ่มใหม่ถูกคุมด้วยสิทธิ์ของผู้ใช้ในจอ (`rights.canAdd`, `canEdit`, `canDelete`, `readOnly`)
 
-### แถบหัวและสถานะ
+### แถบปุ่มและแท็บ
+- ปุ่มหลักมี 2 ชุด (`:1694-1775`) ชุดโหมดดู: **แก้ไข** (ต้องมีสิทธิ์แก้), **เพิ่มใหม่** (สร้างแบบเปล่ารหัส `REP-` ตามด้วยเลข 4 หลักจากเวลา แล้วเข้าโหมดแก้ไข, `:1706-1723`), **ลบ**, และ **ปิดหน้าจอ** (แสดงเฉพาะเมื่อจอถูกเปิดเป็นแท็บและมี `onClose`) ชุดโหมดแก้ไข: **บันทึก** (ปิดเมื่อสิทธิ์เป็นอ่านอย่างเดียว) กับ **ปิดหน้าจอ** ที่ทำงานเป็นขั้นเดียว: ถ้ามีแก้ไขค้าง ปุ่มนี้แค่ล้างตัวนับและออกจากโหมดแก้ไข โดยไม่ย้อนค่าและไม่ถามยืนยัน (`:1761-1763`) กดอีกครั้งจึงปิดแท็บ (`:1764-1765`)
+- ToolStrip (`:1791-1930`) สั่งโหลดแบบ ส่งออก/นำเข้า JSON พิมพ์ และรันตัวอย่าง
+- แท็บ (`:2394-2404`): Condition, Query 1-7, Account (งบการเงิน), Report Options (`:3492-3600`), JSON Schema (`:3605-3669`)
+- แท็บ Condition (`:2428-2531`) กำหนดช่องเงื่อนไขของรายงาน ค่าตั้งต้น (`conditionValues`) อยู่ที่ `:915-921` ส่วนปุ่ม "Condition Preview" (`:2523-2530`) และปุ่ม "ประมวลผลงบการเงิน" ในแท็บ Account (`:3275`) คือการสั่งรันตัวอย่างซ้ำ (`handleRunPreview`) ไม่ได้คำนวณงบด้วยตรรกะแยก
 
-- ข้อความสถานะเริ่มต้น "พร้อมทำงาน (มาตรฐาน JSON-First เลิกใช้ XML 100%)" (บรรทัด 897-899)
-- แถวปุ่มหลัก: ขณะดู = "แก้ไข" / "เพิ่มใหม่" / "ลบ" / "ปิดหน้าจอ"; ขณะแก้ = "บันทึก" / "ปิดหน้าจอ" (บรรทัด 1690-1790)
-- สิทธิ์: ใช้ `useScreenRights()` ปุ่มแก้ไข/เพิ่มใหม่/ลบ/บันทึกถูกปิดตามสิทธิ์ `canEdit/canAdd/canDelete/readOnly` (บรรทัด 890, 1701-1751) ถ้ากดบันทึกโดยไม่มีสิทธิ์ ขึ้นข้อความ `ไม่มีสิทธิ์ "เพิ่ม/แก้ไขข้อมูล" ในหน้าจอนี้` และลบได้เฉพาะเมื่อมีสิทธิ์ลบ (บรรทัด 1287, 1355) ดูสิทธิ์รวมที่ [[scr-admin-permissions]]
+### แท็บ Query (`:2776-3203`)
+ตารางนิยามฟิลด์ 16 คอลัมน์ (`:2919-2936`) ผู้ใช้เขียน SQL ของแต่ละบล็อกเอง บล็อกว่างสร้างโดย `createEmptyQueryBlocks` (`:282-422`) และแบบตั้งต้นโดย `createDefaultReportDesignJSON` (`:424-573`) ชนิดรายงานที่เลือกได้อยู่ใน `BC_FASTREPORT_TYPES` (`:167-181`) ช่อง Relation, Left Margin และ Font (`:3139-3202`) เก็บค่าลงแบบเท่านั้น ไม่มีผลกับตัวอย่างหรือการพิมพ์ในหน้านี้
 
-### แถบเครื่องมือ ToolStrip (ตามต้นฉบับ BCFastReport._designer)
+### ตัวอย่าง (Preview)
+- `buildExecutableQuery` (`:1005-1024`) เตรียม SQL และ `backendColumnOverrides` (`:1034-1054`) จับคู่ชื่อคอลัมน์ `handleRunPreview` (`:1057-1147`) รันเฉพาะ SQL ของ Query 1 เท่านั้น ผ่าน `report/run` พร้อม `customSql`
+- แท็บ Account ใช้ SQL สำเร็จรูปที่ฝังในโค้ด (`:1065-1080`, `LIMIT 200`) ดึงยอดบัญชี ไม่ใช้ช่วงบรรทัดหรือสูตรที่ผู้ใช้ตั้ง
+- ตารางตัวอย่างแสดงไม่เกิน 60 แถว (`:2276`) และข้อความตัวอย่างในช่องที่ยังไม่มีข้อมูลเขียนว่า "ตามยอดบัญชีจริง" (`:2226`) ตัวอย่างรันอัตโนมัติครั้งแรกเมื่อเปิดจอ (`:1150-1153`)
+- พิมพ์ (`:3897-3928`) ส่ง SQL ของแท็บ Query ที่เปิดอยู่ (`customSql`, `:3917`) ไปพร้อมคอลัมน์ของ Query 1 (`customColumns`, `:3918`) ต่างจากตัวอย่างที่ใช้ Query 1 อย่างเดียว
 
-ปุ่ม: Preview, Query, ช่องเลือก "ประเภท :" (รายงานทั่วไป 0, สินค้าคงคลัง 1, ซื้อ 2, ขาย 3, เจ้าหนี้ 4, ลูกหนี้ 5, เงินสดและธนาคาร 6, สินทรัพย์ 7, บัญชี 8 — บรรทัด 172-180), Load, Save, Save As, Delete, "บันทึก JSON" (ส่งออกไฟล์ .json), "Load JSON" (นำเข้าไฟล์ .json), Search Name (สลับแผงค้นหา Resource), "พิมพ์ PDF" (เปิด [[scr-report-print-modal]]) และป้าย "Owner: <รหัสเจ้าของ>" (บรรทัด 1800-1930)
+### แผงตาราง (Schema dock) และ Get Field
+- แผงตาราง (`:1156-1184`) อ่านรายการคอลัมน์จาก `information_schema.columns` ของตารางที่กำหนดไว้ในโค้ด 11 ตาราง ด้วย `LIMIT 400` (`:1170`) เพื่อให้เลือกชื่อฟิลด์ไปใส่ SQL
+- "Get Field" (`:1189-1275`) รัน `queryForGetField` ของแท็บที่เปิดอยู่ ถ้าว่างใช้ `SELECT * FROM <ตารางต้นทาง หรือ ic_trans> LIMIT 1` (โหมด `report_ic` ช่วงวันที่ 2020-01-01 ถึงวันนี้) แล้วสร้างแถวฟิลด์จากคอลัมน์ที่ได้: คอลัมน์ที่ชื่อตรงกับฟิลด์เดิมคงแถวเดิมไว้ ที่เหลือเดาชนิด Number/Date/Text และรูปแบบจากชนิดคอลัมน์ ถ้า SQL ของบล็อกยังว่างจะใส่ SQL นี้ให้โดยเปลี่ยน `LIMIT 1` เป็น `LIMIT 100`
 
-### แท็บฝั่งขวา (บรรทัด 2396-2406)
+### บันทึก ลบ และโหลด
+- **บันทึก** (`:1280-1352`): ส่ง `report/run` พร้อม `templateAction = save` ใช้ `menuKey` ค่าคงที่ `fast_report_designer` ทุกเมนูของจอรายงานจึงเก็บรวมใต้คีย์เดียวกัน ชื่อแบบคือ `<menuId> : <menuName>` เก็บ JSON ของแบบทั้งก้อนใน `footerNote` เก็บ SQL ของ Query 1 ใน `customSql` และคอลัมน์ของ Query 1 ใน `customColumns` (`:1309-1329`) ถ้าจอมี `activeTemplateId` จะอัปเดตแถวเดิม ถ้าบันทึกผ่านหน้าต่าง "บันทึกเป็น" (`:3883-3892`, คอมโพเนนต์ `:3937-4062`, ตรวจข้อมูลที่ `:4048-4049`) จะสร้างแถวใหม่ เมื่อสำเร็จจอออกจากโหมดแก้ไขและล้างตัวนับ (`:1338-1343`) เมื่อไม่สำเร็จแสดงข้อความผิดพลาดใน `previewError`
+- **ลบ** (`:1354-1381`): ถ้ายังไม่เคยบันทึก (ไม่มี `activeTemplateId`) แค่รีเซ็ตแบบกลับค่าเริ่มต้นในหน้าจอ ถ้ามีแล้วและมีสิทธิ์ลบ ส่ง `templateAction = delete` ไม่มีกล่องยืนยัน เมื่อสำเร็จล้าง `activeTemplateId` และอัปเดตรายการแบบ แต่ไม่รีเซ็ตแบบที่แสดงอยู่ เมื่อไม่สำเร็จไม่แสดงข้อความใด (`:1365-1380`)
+- **ส่งออก JSON** (`:1384-1401`) ดาวน์โหลดไฟล์ `<menuId>.report.json` **นำเข้า JSON** (`:1404-1436`) ผสมไฟล์เข้ากับแบบตั้งต้น ตั้ง `schemaVersion = bc.report.json.v1` เข้าโหมดแก้ไขแล้วรันตัวอย่าง
+- **โหลดแบบ** (`:1439-1494`, หน้าต่าง `:3676-3878`): รายการแบบที่บันทึกไว้ (`savedTemplates`) มากับผลของ `report/run` ทุกครั้งที่รันตัวอย่าง บันทึก หรือลบ (`:1125-1127`, `:1335-1337`, `:1376-1378`) เลือกต้นแบบสำเร็จรูป (preset) จะไม่มี `activeTemplateId` เลือกแบบจากฐานข้อมูลจะอ่าน JSON จาก `footerNote` ถ้าอ่านไม่ได้จะสร้างแบบใหม่จาก `customTitle`, `customSubtitle` และ `customSql` แล้วรันตัวอย่างทันที ช่องติ๊กเลือก (`selectedImportIds`, `:951`, `:3759`, `:3809`) ในหน้าต่างโหลดไม่มีผลต่อการโหลด
 
-- **Condition** — ตารางเงื่อนไขรายงาน ชนิดช่อง Text / Number / Date / DropDown ฯลฯ ปุ่ม "เพิ่มเงื่อนไข" และ "Condition Preview" ลองกรอกค่าดูหน้าตาจอเงื่อนไขจริง
-- **Query 1 ถึง Query 7** — "Table Name :", Command (SQL), ปุ่ม "Get Field" ดึงรายชื่อฟิลด์จาก SQL (ถ้า SQL ว่างใช้ `SELECT * FROM <ตาราง> LIMIT 1`, ตารางเริ่มต้น `ic_trans`; รันผ่าน backend `runBackendReport`, บรรทัด 1189-1215), "Add Field", "Clear All" และตารางฟิลด์ Field Name / Column Name / Width / Align / Format / Total / Hide พร้อม Move Up / Move Down, Font, Color, Break Line, AutoNumber
-- **Account (งบการเงิน)** — "เพิ่มบรรทัดงบการเงิน" ชนิดบรรทัด HEADER (หัวข้อ) / ACCOUNT (ผังบัญชี) / FORMULA (สูตรรวม) / LINE (เส้นคั่น) ชื่อไทย/English ตัวหนา เส้นใต้ (ไม่ขีดเส้น/เส้นเดี่ยว/เส้นคู่) ย่อหน้า และปุ่ม "ประมวลผลงบการเงิน" ประเภทงบเลือกได้ งบทดลอง / งบกำไรขาดทุน / งบแสดงฐานะการเงิน / งบกระแสเงินสด (บรรทัด 2173, 3234-3277)
-- **Report Options** — กระดาษ A4 มาตรฐาน / A3 กว้างพิเศษ / A5 ครึ่งหน้า / Letter / Legal / กระดาษต่อเนื่อง, แนวตั้ง-แนวนอน, ขนาดตัวอักษร 6.5 ถึง 13 pt (ค่าเริ่ม 8.5, บรรทัด 1194-1198)
-- **JSON Schema** — ดูและแก้ JSON ตรง ๆ
+## 2. ตัวออกแบบแบบฟอร์ม (`FormDesignerScreen`)
+Props `:809-815`; ออกแบบตั้งต้นสร้างที่ `:820-822` เครื่องมือวาดมี 12 ชนิด (`formDesignerPresets.ts:7-19`) ชนิดแบบฟอร์มใน `BC_FORM_TYPES` (`:218-227`)
 
-แผงซ้าย "Search Resource และตาราง DB" ค้นด้วย "ค้นหา Code, ชื่อไทย, ตาราง..." จากรายชื่อตารางจริง (`information_schema.columns` จำกัด 400 แถว, บรรทัด 1155-1175) และแผงขวา/ล่าง "Preview (ตัวอย่างกระดาษรายงานสด)" มีปุ่มรีเฟรช
+### การวางและแก้วัตถุ
+- วางวัตถุ (`:1131-1163`) และปุ่มฟิลด์ด่วน (`:1166-1196`) ลากย้ายวัตถุ (`:1199-1245`) ไม่เข้า undo ส่วนลบ/คัดลอก/วาง/จัดชั้น (`:1248-1315`) เข้า undo
+- undo เก็บย้อนหลัง 25 ขั้น (`:955-984`)
+- วัตถุที่ล็อกตำแหน่งลบไม่ได้ ต้องปลดล็อกก่อน (`:1251`) การผูกข้อมูลของวัตถุตั้งที่แผงคุณสมบัติ (`:3542-3565`)
+- ริบบอน (`:2145-2489`) และแผงซ้าย 3 แท็บ: เครื่องมือ/ฟิลด์ ชั้นวัตถุ ต้นแบบ (`:2508-2618`) ข้อความช่วยเหลือของปุ่มลบที่ `:2191` บอกว่ากดปุ่ม Delete ได้ แต่โค้ดไม่มีตัวจับปุ่มนี้
 
-### หน้าต่างโหลด / นำเข้า (บรรทัด 3678-3880)
+### ปุ่มหลัก
+ปุ่มหลักมี 2 ชุดเหมือนจอรายงาน (`:1957-2035`) ชุดโหมดดู: **แก้ไข** (`:1957-1964`), **เพิ่มใหม่**, **ลบ**, **ปิดหน้าจอ** ชุดโหมดแก้ไข: **บันทึก** กับ **ปิดหน้าจอ**
+- **เพิ่มใหม่** (`:1965-1986`) เสนอรหัส `FORM-NNN` (จำนวนแบบที่บันทึกแล้ว + 1) เตรียมค่าในหน้าต่าง "แบบฟอร์มใหม่" ล้าง `activeTemplateId` แล้วเข้าโหมดแก้ไข แต่ไม่เปิดหน้าต่างนั้นและไม่ล้างแบบที่แสดงอยู่ การบันทึกต่อจากนี้จึงสร้างแถวใหม่ด้วยแบบเดิมที่แสดงอยู่
+- **ลบ** (`:1987-1999`) ไม่ลบอะไรในฐานข้อมูล แค่เปลี่ยนแบบที่แสดงเป็นแบบมาตรฐานแบบแรกในรายการ (`BC_STANDARD_FORM_TEMPLATES[0]`) และไม่ล้าง `activeTemplateId` ถ้ากดแก้ไขแล้วบันทึกต่อ แบบมาตรฐานจะเขียนทับแถวที่เปิดไว้
+- **ปิดหน้าจอ** ในโหมดดู เรียก `onClose` (`:2003-2008`) ในโหมดแก้ไข (`:2021-2032`) ปุ่มชื่อเดียวกันแค่ออกจากโหมดแก้ไขและล้างตัวนับ โดยไม่ย้อนค่า ไม่ถามยืนยัน และไม่ปิดแท็บ ต้องกดอีกครั้งในโหมดดู
+- แถบไอคอน (`:2038-2130`): ฟอร์มใหม่ (`:2044-2055`), เปิด (`:2057-2062`), บันทึกเป็น (`:2064-`)
+- แบบฟอร์มใหม่ผ่านหน้าต่างเฉพาะ (`:1320-1395`, หน้าต่าง `:5160`)
 
-หัวหน้าต่าง "เลือกรายงานที่ต้องการโหลด" (หรือ "นำเข้ารายงานมาตรฐาน (JSON Report Repository)" ในโหมดนำเข้า) มีตัวกรอง "หมวดรายงาน" (-- ทุกประเภทรายงาน --), ช่องค้นหา "ค้นหารหัสรายงาน หรือ ชื่อรายงาน...", ตาราง เลือก / รหัสรายงาน (menuid) / ชื่อรายงาน (menuname) / ประเภทรายงาน / การดำเนินการ แถวสำเร็จรูปในโค้ดมี 3 รายงาน (FAST-IC-001 ยอดคงเหลือและต้นทุนสินค้า, FAST-SO-001 วิเคราะห์ยอดขายและภาษีขาย, FAST-GL-001 สมุดรายวันและผังบัญชี) ปุ่ม "เปิดใช้งาน" และแถวจากฐานข้อมูลปุ่ม "โหลดจาก DB" รวมถึง "นำเข้าจากไฟล์ .json ในเครื่อง" ปุ่ม "นำเข้ารายงานที่เลือก" (โหมดนำเข้าเท่านั้น) **ทำเพียงปิดหน้าต่างและขึ้นข้อความ "นำเข้ารายงานมาตรฐาน (JSON) เข้าสู่ระบบเรียบร้อย" — การโหลดจริงเกิดตอนกด "เปิดใช้งาน/โหลดจาก DB" แล้ว** (บรรทัด 3855-3872, 1436-1492)
+### เปิด บันทึก และตัวอย่างข้อมูล
+- หน้าต่างเปิด (`:4653-4745`) แสดงแบบมาตรฐานจากโค้ด (`BC_STANDARD_FORM_TEMPLATES`, `formDesignerPresets.ts:510` เช่น `TAX-INV-A4` `:518`, `CHEQUE-TH` `:1309`, `WHT-50TAWI` `:1538`) และแบบที่บันทึกไว้ใน `erp_report_template` การโหลดแบบมาตรฐาน (`FormDesignerScreen.tsx:4678-4688`) ไม่ล้าง `activeTemplateId` จึงทำให้การบันทึกครั้งถัดไปเขียนทับแบบที่เปิดไว้ก่อนหน้า
+- **บันทึก** (`:1737-1811`) ทำได้ด้วยปุ่ม (`:2013-2020`) หรือ `Ctrl+S` ขณะอยู่ในโหมดแก้ไข (`:1863-1875`) ส่ง `report/run` ด้วย `menuKey = menu_form_edit` ชื่อแบบ `<formCode> : <formName>` เก็บ JSON ของแบบทั้งก้อนใน `footerNote` และส่ง SQL ของคิวรีลำดับ 1 (`queries[1]` ที่หน้าจอเรียก Query 1 เพราะนับจาก 0) หรือ `SELECT ... FROM ic_trans LIMIT 10` ถ้าว่าง เป็น `customSql` หน้าต่าง "บันทึกเป็น" (`:4768-4847`) ส่งโดยไม่มี `templateId` จึงสร้างแถว `erp_report_template` ใหม่ทุกครั้ง
+- ส่งออก/นำเข้าไฟล์ JSON (`:1814-1860`)
+- ข้อมูลตัวอย่างบนกระดาษ (`loadSavedFormsAndSampleData` `:987-1038`) โหลดผ่านตัวช่วยคิวรีของหน้าเว็บ: รายการแบบจาก `report/run` ของ `menu_form_edit`, 100 แถวแรกของตาราง `formdesign` (เก็บใน `dbFormDesignRows` `:890`, `:1024` ซึ่งยังไม่มีส่วนใดนำไปใช้), ข้อมูลบริษัท 1 แถวจาก `erp_company_profile`, หัวเอกสารล่าสุด 15 แถวจาก `ic_trans` และรายการสินค้า 15 แถวจาก `ic_trans_detail`
+- แบบตั้งต้นมี 5 คิวรี (`createDefaultFormQueries`, `formDesignerPresets.ts:457-505`) หน้าต่าง Query (`FormDesignerScreen.tsx:4856-4919`) แก้ SQL ผูกข้อมูลของแบบที่แสดงอยู่ และค่าจะถูกเก็บลงฐานเมื่อบันทึกแบบ
+- ฟังก์ชันแปลงจำนวนเงินเป็นคำอ่านบาทไทยและอังกฤษ (`formDesignerPresets.ts:1771`, `:1815`) ใช้แสดงวัตถุคำอ่านจำนวนเงินในจอนี้ (`FormDesignerScreen.tsx:741-742`) และหน้าต่างพิมพ์เอกสารของ ERP ยืมไปใช้ต่อ (`GlobalDocFormPrintModal.tsx:4513-4516`, [[scr-report-print-modal]])
+- "สแกนด้วย AI" (`:1400-`, ชนิดข้อมูลที่ `formDesignerPresets.ts:2040-`) ทำบนแคนวาสในเครื่อง ไม่เรียกเครือข่าย
+- ตัวอย่างก่อนพิมพ์ (`:4924-5100`): ปุ่มพิมพ์ที่ `:4989` ใช้ `window.print` ค่าชดเชยหัวพิมพ์ (`:5045-5046`) มีผลกับภาพตัวอย่างเท่านั้น ไม่ส่งไปเครื่องพิมพ์
 
-### หน้าต่าง Save As และการตรวจสอบ (บรรทัด 3885-4064)
-
-หัว "บันทึกรายงาน (Save Report — JSON Database)" ช่อง "รหัสเมนูรายงาน (Menu Id) *", "ชื่อรายงาน (Menu Name) *", "ประเภทรายงาน (Report Type)", "รหัสเจ้าของรายงาน (Owner Code)" ถ้า Menu Id หรือ Menu Name ว่างขึ้น "กรุณากรอกข้อมูล Menu Id และ Menu Name ให้ครบถ้วน" (บรรทัด 4051) ปุ่ม "ยกเลิก (Cancel)" / "บันทึก (Save)"
-
-### ลบ
-
-ถ้าไม่ได้เปิดรายงานที่บันทึกไว้ (ไม่มี template ที่ active) กด "ลบ" จะแค่รีเซ็ตเป็นค่าเริ่มต้น "รีเซ็ตรายงานกลับเป็นค่าเริ่มต้นแล้ว" โดยไม่แตะฐานข้อมูล (บรรทัด 1355-1365)
-
-## 2. จอออกแบบแบบฟอร์ม (FormDesignerScreen)
-
-### โครงจอ
-
-- ใช้ JSON ฟอร์มหลายหน้า (ต้นฉบับ/สำเนา) วางวัตถุบนกระดาษด้วยเครื่องมือ Pointer, Label, TextField, SpecialLabel, Table, Line, Rectangle, RoundedRectangle, Ellipse, Picture, ImageField, Barcode (รายการเครื่องมือใน [[fe-report-print-designer]])
-- ชนิดฟอร์ม 4 แบบ: 0 ฟอร์มทั้งหมด, 1 ฟอร์มพิมพ์เอกสาร, 2 ฟอร์มบาร์โค้ดสินค้า, 3 ฟอร์มป้ายชื่อขนส่ง (`BC_FORM_TYPES`, formDesignerPresets.ts:218)
-- ปุ่มหลัก ขณะดู: "แก้ไข" / "เพิ่มใหม่" / "ลบ" / "ปิดหน้าจอ" ขณะแก้: "บันทึก" / "ปิดหน้าจอ" ต้องกด "แก้ไข" ก่อนจึงวางวัตถุบนกระดาษได้ (ข้อความ "กรุณากดปุ่ม [แก้ไข] ก่อนวาง…" บรรทัด 1141) การตรวจสิทธิ์ใช้ `useScreenRights()` เช่นเดียวกัน (บรรทัด 817, 1743, 1990)
-- แถบไอคอน (เลื่อนเมาส์จะมีคำอธิบาย, บรรทัด 2043-2123): สร้างใหม่ (New Form), "เปิดแบบฟอร์ม / ฟอร์มมาตรฐาน (n)", "บันทึกเป็นรหัสใหม่ (Save As)", "ตั้งค่ารูปพื้นหลังแบบฟอร์ม (Background Form)", "อัปโหลดรูปฟอร์มมาทาบ" (PNG/JPG/WebP), "AI อ่านฟอร์มวางตำแหน่งอัตโนมัติ (Clean & Rebuild)", "คำสั่งดึงข้อมูล SQL (Query 0..n)", "ทดสอบพิมพ์ฟอร์ม / ดูตัวอย่างจริง (Print Preview)", "ส่งออกไฟล์แบบฟอร์ม (Save JSON)"
-- แถบจัดตัวอักษร: แบบอักษร Tahoma / Sarabun / Cordia New / Angsana New / Courier New, ขนาด, ตัวหนา/เอียง/ขีดเส้นใต้; ซูมกระดาษ "85% = พอดีหน้าจอ"; สลับหน้ากระดาษ ต้นฉบับ/สำเนา; ล้างวัตถุทั้งหมดบนหน้า; ล็อก/ปลดล็อกตำแหน่ง; ทำซ้ำวัตถุ; จัดชิดซ้าย/กึ่งกลาง/ชิดขวา/เต็มความกว้าง (บรรทัด 2200-3520)
-- คีย์ลัดมีเพียง **Ctrl+S** (บันทึกเมื่ออยู่ในโหมดแก้ไขและแท็บนี้กำลังแสดง) ไม่มี Delete/ลูกศร แม้คอมเมนต์ในโค้ดเขียนว่า "F12" (บรรทัด 1862-1875)
-
-### หน้าต่างย่อย
-
-- **สร้างแบบฟอร์มใหม่ (New Form Design)** (บรรทัด 5160-5260): รหัส (Form Code) *, ชื่อ (Form Name) *, ประเภทฟอร์ม, ขนาดกระดาษ, แนวกระดาษ แล้วเลือกวิธีเริ่ม 3 แบบ — 1) กระดาษเปล่า 100% 2) กระดาษเปล่า + เลือกรูปสแกนฟอร์มจากเครื่อง 3) เริ่มจากโครงสร้างมาตรฐาน (หัวเอกสาร ตารางสินค้า ท้ายบิลวางไว้ให้) มีคำเตือนว่าการสร้างใหม่จะล้างวัตถุบนกระดาษปัจจุบัน
-- **เปิดแบบฟอร์มมาตรฐาน และแบบฟอร์มในฐานข้อมูล** (บรรทัด 4626-4760): ส่วน 1 ฟอร์มมาตรฐานพร้อมรูปพื้นหลัง 3 แบบ (TAX-INV-A4 ใบกำกับภาษี/ใบส่งของ/ใบแจ้งหนี้, CHEQUE-TH ฟอร์มพิมพ์เช็คธนาคารมาตรฐานไทย, WHT-50TAWI) ปุ่ม "โหลดแบบฟอร์มนี้" ส่วน 2 ฟอร์มที่บันทึกในฐานข้อมูล (formDesignerPresets.ts:510, 800, 1029)
-- **Background Form** (4406), **Save As** (4768), **Query SQL** (4856), **ตัวอย่างก่อนพิมพ์แบบฟอร์มจริง (Form Print Preview)** (4924) — แสดงข้อมูลตัวอย่างจากเอกสารจริงใน `ic_trans`/`ic_trans_detail`/`erp_company_profile` (ดึงด้วย `queryList` บรรทัด 986-1020)
-- **"AI อ่านฟอร์ม"**: ทำ 3 ขั้น (ล้างวัตถุเดิม, สแกนเส้นตารางและกรอบข้อมูล, วางฟิลด์ใหม่) ด้วยฟังก์ชัน `analyzeBackgroundFormAndBuildObjects` ซึ่งวิเคราะห์ภาพด้วย `canvas` ในเบราว์เซอร์ ค้นทั้งฟังก์ชัน (formDesignerPresets.ts:2150-3320) ไม่พบการเรียก `fetch`/`/api` จึงไม่ส่งรูปออกนอกเครื่อง แม้ปุ่มจะชื่อ "AI" (FormDesignerScreen.tsx:1398-1520)
-
-### บันทึก
-
-`handleSaveFormToDatabase` (บรรทัด 1737-1810): รหัสแบบฟอร์มแปลงเป็นตัวพิมพ์ใหญ่และตัดช่องว่าง บันทึกผ่าน `report/run` ด้วย `menuKey: "menu_form_edit"`, `templateAction: "save"` ข้อความสำเร็จบอกว่า `บันทึกแบบฟอร์ม "<รหัส> - <ชื่อ>" (JSON) ลงตาราง form…` ฝั่ง backend เขียนแถวลงตาราง `formdesign` (ลบแถวเดิมที่รหัสเดียวกันแล้ว INSERT ใหม่) โดย **ตัดรหัสแบบฟอร์มเหลือ 25 ตัวอักษร** (report_template.go:401-425)
+## ฝั่งหลังบ้าน
+- เส้นทาง `report/run` ใน `backend/internal/application/process/report.go:246-376` ตั้งเวลาสูงสุด 45 วินาที (`:253`) จัดการแบบ (`TemplateAction`, `report.go:67`) ที่ `:258-265` แล้วรัน SQL กำหนดเอง (`:327-343`) คีย์ของตัวออกแบบอยู่ที่ `:393-403`
+- `report_template.go`: สร้างตารางด้วย DDL (`:195-232`), รายการแบบกรองด้วย `menu_key = $1 OR '*'` (`:243-305`), บันทึก/ลบ/ตั้งค่าเริ่มต้น (`:338-473`) JSON ของการออกแบบ (ทั้งรายงานและแบบฟอร์ม) ไปอยู่ในฟิลด์ `footerNote` ของ `page_setup_json` (`:475-493`) ถ้า `menuKey` เป็น `menu_form_edit` หรือ `menu_import_formdesign` หลังบ้านลบแถวในตาราง `formdesign` ที่ `formcode` ตรงกัน (ไม่สนตัวพิมพ์) หรือ `guid_code` ตรงกัน แล้วเพิ่มแถวใหม่ที่เก็บ JSON เดียวกันใน `formdesigntext` (`:401-427`) ค่า `form_type` ที่เขียนเป็น 0 เสมอ (`:418`) ไม่ใช่ชนิดแบบที่ผู้ใช้เลือก และ `formcode` ถูกตัดที่ 25 ตัวอักษร (`:406-408`) ถ้า `templateId` ที่ส่งมาเป็นของรายงานอื่น การบันทึกตอบ "ไม่พบ" (`:398-400`) ข้อความผิดพลาดของขั้นตอน `formdesign` ที่ `:414`, `:425` ในโค้ดเป็นตัวอักษร "?" ทั้งหมด
+- รัน SQL กำหนดเอง (`:644-679`) ตรวจว่าเป็นคำสั่งอ่านอย่างเดียว (`validateReadOnlyReportSQL`, `:499-529`) รันในธุรกรรมแบบอ่านอย่างเดียว (`:664-667`) และครอบด้วย `LIMIT 50000` (`:657-662`) ไม่มีรายการตารางที่อนุญาต ตัวแปร `#...#` ที่นักออกแบบเก็บไว้ไม่ถูกขยายโดยฟังก์ชันขยายพารามิเตอร์ของหลังบ้าน (`:604-640`)
+- เทมเพลตถูก commit (`report.go:258-265`, `report_template.go:428`) ก่อนรัน SQL กำหนดเอง (`report.go:327-343`) ถ้า SQL ผิดหลังบันทึก API ตอบล้มเหลว แต่แบบถูกบันทึกแล้ว
+- สิทธิ์: ที่ชั้นเส้นทาง `report/run` และ `report/pdf` ที่มี `customSql` ไม่ว่าง ต้องมีสิทธิ์ผู้ดูแลระบบ ถ้าไม่มี `customSql` จัดเป็นสิทธิ์อ่าน (`permission.go:60-67`) เมนูทั้ง 6 จึงจำกัดแอดมินที่ฝั่งหน้าเว็บ ส่วนการลบหรือตั้งค่าเริ่มต้นของแบบผ่าน `report/run` โดยไม่มี `customSql` ไม่มีตัวตรวจสิทธิ์เฉพาะที่พบในชั้นเส้นทาง (ยังไม่ได้ทดสอบจริง)
 
 ## ข้อควรระวัง
-
-- **ฟอร์มที่ออกแบบแล้วไม่ถูกนำไปใช้พิมพ์เอกสารในโค้ดที่ค้น**: ตาราง `formdesign` ถูกเขียน/ลบโดย `report_template.go` และอ่านโดยจอออกแบบเท่านั้น ส่วนหน้าต่างพิมพ์เอกสารจริง ([[scr-report-print-modal]]) ใช้แม่แบบ 18 แบบในโค้ด (`READY_DOC_FORM_TEMPLATES`) กับค่า `erp_doc_format.form_code` ([[scr-doc-format]]) ค้น `formdesign` ใน `frontend/account`, `frontend/shared`, `frontend/src`, `backend` ไม่พบตัวพิมพ์ที่อ่านตารางนี้ ผู้ใช้ที่ออกแบบฟอร์มจึงอาจคาดหวังว่าจะเห็นผลตอนพิมพ์ใบกำกับภาษี แต่ในโค้ดที่ตรวจไม่มีทางเชื่อมนั้น (ควรยืนยันกับเจ้าของระบบว่ายังอยู่ระหว่างพัฒนาหรือมีตัวพิมพ์ภายนอกอ่านตารางนี้)
-- รหัสแบบฟอร์มยาวเกิน 25 ตัวอักษรจะถูกตัดตอนบันทึก (ฝั่ง backend) ทำให้รหัสที่เห็นหลังเปิดซ้ำต่างจากที่พิมพ์
-- เมนู 1115 "นำเข้ารายงานสาขา" ไม่มีตรรกะเฉพาะสาขา เปลี่ยนแค่ข้อความหัวหน้าต่าง ผู้ใช้ที่หวังให้กรองตามสาขาจะไม่พบ
-- **ปุ่ม "ปิดหน้าจอ" ในโหมดแก้ไขไม่ได้ปิดจอ**: ในจอฟอร์มแค่ออกจากโหมดแก้ไข ขึ้น "ออกจากโหมดแก้ไขแบบฟอร์ม" และรีเซ็ตตัวนับการแก้ไขเป็น 0 โดยไม่ถามและไม่ย้อนค่า ส่วนจอรายงานถ้ามีการแก้ไขค้างจะออกจากโหมดแก้ไข (ถ้าไม่มีจึงปิดจอ) (FormDesignerScreen.tsx:2023-2030, FastReportDesignerScreen.tsx:1760-1771) งานที่ยังไม่บันทึกยังค้างในหน้าจอแต่ถูกนับเป็นไม่มีการแก้ไข
-- ปุ่ม "นำเข้ารายงานที่เลือก" ไม่ได้นำเข้าเพิ่ม (ดูหัวข้อหน้าต่างโหลด) การเลือกจริงเกิดที่ปุ่มของแต่ละแถว
-- ชนิดฟอร์ม 2 (บาร์โค้ด) และ 3 (ป้ายขนส่ง) ถูกกำหนดในรายการประเภท แต่จอพิมพ์บาร์โค้ด/ป้ายขนส่งที่ตรวจ ([[scr-barcode-print]], [[scr-transport-label-print]]) ไม่ได้ระบุว่าอ่านแบบฟอร์มจากจอนี้
-- ตัวอย่างภาพพื้นหลัง/โลโก้ที่อัปโหลดจัดเก็บภายในไฟล์ JSON ของแบบฟอร์ม ไฟล์ใหญ่ได้ถ้าใช้ภาพความละเอียดสูง (ไม่ได้ตรวจขนาดจำกัดในส่วนที่อ่าน)
+- แบบที่ออกแบบในจอฟอร์มไม่มีโค้ดส่วนใดของหน้าพิมพ์เอกสาร ERP อ่านไปใช้ หน้าต่างพิมพ์เอกสารใช้แบบจาก [[scr-doc-format]] และตัวพิมพ์ของตัวเอง ([[scr-report-print-modal]]) จอนี้เป็นแหล่งเก็บและดูตัวอย่างแบบเท่านั้น
+- ตัวอย่างของจอรายงานรันเฉพาะ Query 1 พิมพ์รันแท็บที่เปิดอยู่ ผลที่เห็นในสองที่อาจต่างกัน
+- ตัวออกแบบสร้างแถว `erp_report_template` ใหม่ทุกครั้งที่ "บันทึกเป็น" ไม่มีขั้นตอนรวมหรือลบซ้ำ
+- งานพิมพ์บาร์โค้ดและป้ายขนส่งเป็นจอแยก ดู [[scr-barcode-print]], [[scr-transport-label-print]]
 
 ## ที่มาในโค้ด
-
-- ลงทะเบียน 6 เมนู: `frontend/account/tabs/screenRegistry.tsx:101-127, 190-262`
-- จอรายงาน: `frontend/account/report/FastReportDesignerScreen.tsx` (props `:864-890`, สิทธิ์ `:890, 1287, 1355`, Get Field `:1189`, บันทึก `:1280-1351`, ลบ `:1352-1381`, ToolStrip `:1800-1930`, แท็บ `:2396-2406`, หน้าต่างโหลด `:3678-3880`, Save As `:3885-4064`, preset ในโค้ด `:578`)
-- จอฟอร์ม: `frontend/account/report/FormDesignerScreen.tsx` (props `:809-817`, AI สแกน `:1398-1520`, บันทึก `:1737-1810`, ส่งออก/นำเข้า `:1814-1870`, Ctrl+S `:1863-1875`, ปุ่ม `:1957-2260`, หน้าต่างย่อย `:4406-5260`)
-- ชนิดฟอร์ม/ฟอร์มมาตรฐาน/สแกนภาพ: `frontend/account/report/formDesignerPresets.ts:218, 510, 2150`
-- บันทึกฝั่ง backend: `backend/internal/application/process/report_template.go:395-425`
-- กลไก JSON และบันทึกผ่าน `report/run`: [[fe-report-print-designer]]
+- `frontend/account/tabs/screenRegistry.tsx:101-131` ตัวห่อเลือกจอ; `:195-259` การลงทะเบียน 6 เมนู
+- `frontend/src/config/bcMenu.ts:337-339`, `:365-367`, `:392-397`; `frontend/shared/layout/MenuBar.tsx:819-821`; `frontend/account/tabs/TabWorkspace.tsx:519-548`, `:630` การจำกัดแอดมิน
+- `frontend/account/report/FastReportDesignerScreen.tsx:859-1494` สถานะ ตัวอย่าง บันทึก ลบ โหลด; `:2394-3669` แท็บ; `:3676-4062` หน้าต่างโหลด/บันทึกเป็น/พิมพ์
+- `frontend/account/report/FormDesignerScreen.tsx:809-1875` สถานะ วางวัตถุ บันทึก; `:1957-2618` ปุ่มและริบบอน; `:4653-5100` หน้าต่างเปิด บันทึกเป็น Query ตัวอย่างก่อนพิมพ์
+- `frontend/account/report/formDesignerPresets.ts:7-19`, `:218-227`, `:457-505`, `:510`
+- `backend/internal/application/process/report.go:246-403`; `backend/internal/application/process/report_template.go:195-679`
+- `backend/internal/adapter/inbound/http/process/permission.go:60-67`
+- ดูเพิ่ม: [[fe-report-print-designer]] · [[fe-report-screens]] · [[scr-universal-report]] · [[scr-report-print-modal]] · [[scr-doc-format]] · [[screens-overview]]

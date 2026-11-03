@@ -2,7 +2,7 @@
 title: "ขายสินค้า (ใบกำกับ 44) แล้วลงบัญชี GL อะไรบ้าง"
 tags: [faq, gl, sale, ar, vat]
 aliases: ["ขายเชื่อลงบัญชียังไง", "ขายสด GL", "sale invoice journal", "trans_flag 44", "trans_flag 144", "menu_so_invoice", "Dr ลูกหนี้ Cr ขาย", "ภาษีขาย 2134"]
-sources: ["backend/internal/application/process/service.go:1574", "backend/internal/application/process/service.go:1785", "backend/internal/application/process/service.go:1998", "backend/internal/application/process/service.go:2001", "backend/internal/application/process/service.go:1755", "backend/internal/application/process/gl_template_defaults.go:86"]
+sources: ["backend/internal/application/process/service.go:1585", "backend/internal/application/process/service.go:1796", "backend/internal/application/process/service.go:2009", "backend/internal/application/process/service.go:2012", "backend/internal/application/process/service.go:1766", "backend/internal/application/process/gl_template_defaults.go:86"]
 ---
 # ขายสินค้า (ใบกำกับ 44) แล้วลงบัญชี GL อะไรบ้าง
 
@@ -33,9 +33,9 @@ sources: ["backend/internal/application/process/service.go:1574", "backend/inter
 - [[flow-order-to-cash]]
 
 ## ที่มาในโค้ด
-- `backend/internal/application/process/service.go:1574` ลองรูปแบบ GL (`tpl.post`) ก่อน
-- `backend/internal/application/process/service.go:1785` รหัสบัญชีตั้งต้น
-- `backend/internal/application/process/service.go:1998` case ขาย 44/46/50/144/250/254
-- `backend/internal/application/process/service.go:2001` ขายสด inquiry 1/3 และแยก cb_trans
-- `backend/internal/application/process/service.go:1755` `resolveChartAccount`
+- `backend/internal/application/process/service.go:1585` ลองรูปแบบ GL (`tpl.post`) ก่อน
+- `backend/internal/application/process/service.go:1796` รหัสบัญชีตั้งต้น
+- `backend/internal/application/process/service.go:2009` case ขาย 44/46/50/144/250/254
+- `backend/internal/application/process/service.go:2012` ขายสด inquiry 1/3 และแยก cb_trans
+- `backend/internal/application/process/service.go:1766` `resolveChartAccount`
 - `backend/internal/application/process/gl_template_defaults.go:86` ตัด action 101/103

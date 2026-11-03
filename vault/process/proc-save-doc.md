@@ -26,7 +26,7 @@ sources: ["backend/internal/application/process/docs.go:17", "backend/internal/a
 ### โครงแผน `docPlan` (:108) และ `runDocPlan` (:179)
 `buildSaveDocPlan` / `buildDeleteDocPlan` ตรวจ input แล้วสร้าง "แผน" (คำสั่ง SQL แบบพารามิเตอร์เรียงลำดับ + ตัวตรวจหลังเขียน) จากนั้น `runDocPlan` รันใน transaction เดียวตามลำดับ:
 1. ล็อกเอกสารด้วย `pg_advisory_xact_lock(hashtext(lockKey))` (`gl_journal:<เลขที่>` หรือ `ap_ar_trans:<เลขที่>`) และล็อกร่วมระดับบัญชีแยกประเภท (`lockGLShared`)
-2. `isNew` = ตรวจซ้ำด้วย `existsSQL`; ถ้าไม่ใช่และเป็น `ap_ar_trans` ล็อกคีย์เดียวกับการยกเลิกเอกสาร (`ic_trans:<เลขที่>:<flag>`) แล้วตรวจ `checkStoredApArEditable` -- เอกสารที่ถูกใช้ (`used`), เสร็จสมบูรณ์ (`success`) หรือยกเลิกแล้ว (`last_status`) แก้/ลบไม่ได้ (`apArEditLocked` :457 อ้างอิง C# `_ar_ap_trans._myManageData1__checkEditData`); เอกสารที่ไม่มีอยู่ผ่าน
+2. `isNew` = ตรวจซ้ำด้วย `existsSQL`; ถ้าไม่ใช่และเป็น `ap_ar_trans` ล็อกคีย์เดียวกับการยกเลิกเอกสาร (`ic_trans:<เลขที่>:<flag>`) แล้วตรวจ `checkStoredApArEditable` -- เอกสารที่ถูกใช้ (`used`), เสร็จสมบูรณ์ (`success`) หรือยกเลิกแล้ว (`last_status`) แก้/ลบไม่ได้ (`apArEditLocked` :457); เอกสารที่ไม่มีอยู่ผ่าน
 3. ถ้าเป็นเอกสารที่ผูกการอ้างอิง (`docFlow`) อ่านเอกสารต้นทางเดิมไว้ก่อน
 4. รันคำสั่งทีละตัว (ลบของเดิมแล้วแทรกใหม่); ข้อผิดพลาดฐานข้อมูลแปลงด้วย `execError`
 5. รันตัวตรวจหลังเขียน (`checks`, ไฟล์ `pay_check.go` -- เช่นยอดแท็บชำระครบ)
@@ -40,17 +40,17 @@ sources: ["backend/internal/application/process/docs.go:17", "backend/internal/a
 ### สมุดรายวัน `gl_journal` (:227-)
 - เลขที่เอกสาร 1-25 ตัวอักษร, วันที่เอกสารบังคับ; ข้ามแถวที่ไม่มีรหัสบัญชี; ยอดเดบิตรวมต้องเท่ากับเครดิตรวม ไม่งั้น error "ยอดเดบิต (...) และเครดิต (...) ไม่เท่ากัน"
 - เขียน `gl_journal_detail` + `gl_journal` พร้อมงวด/ปีบัญชีหาจาก `erp_account_period` (ไม่พบ ใช้เดือน/ปีของวันที่)
-- `journalPlan` (:441) แตะเฉพาะ JV มือ (`trans_flag` 0 หรือ 1999 ตามคอมเมนต์อ้าง C# `JournalDataProcess.cs:20`) -- GL ที่ `rebuildGLTx` สร้างจากเอกสารอื่นเลขเดียวกันไม่ถูกลบ; ลบสมุดรายวันลบแท็บภาษีด้วย (`journalTaxDeleteStmts`)
+- `journalPlan` (:441) แตะเฉพาะ JV มือ (`trans_flag` 0 หรือ 1999) -- GL ที่ `rebuildGLTx` สร้างจากเอกสารอื่นเลขเดียวกันไม่ถูกลบ; ลบสมุดรายวันลบแท็บภาษีด้วย (`journalTaxDeleteStmts`)
 
 ### เอกสาร `ap_ar_trans` (:300-)
 - `apArPlan` (:483) ลบแถวเดิมใน `ap_ar_trans_detail`, `ap_ar_trans`, `cb_trans_detail`, `cb_trans`, `cb_chq_list` (เช็คจากแท็บชำระ) ของเลขที่+flag นั้น แล้วแทรกหัว `ap_ar_trans`, กริดบิล, แท็บชำระ และแท็บภาษี (19: ภาษีซื้อ + หัก ณ ที่จ่ายรับ, 239: ภาษีขาย + หัก ณ ที่จ่ายจ่าย)
-- flag ที่มีกริดบิล: 213/235/19/239; ถ้าไม่มี ยอดรวมมาจาก `lines`; กรณีมีกริดบิล `total_net_value` = ผลรวม `sum_pay_money` ตาม C# `_reCalc`
+- flag ที่มีกริดบิล: 213/235/19/239; ถ้าไม่มี ยอดรวมมาจาก `lines`; กรณีมีกริดบิล `total_net_value` = ผลรวม `sum_pay_money`
 - `ap_ar_trans` เป็นคีย์เดียวด้วย `doc_no` (ชื่อ constraint ในคอมเมนต์ :482) จึงตรวจแก้ไขด้วย `doc_no` อย่างเดียว กันแก้ผิด flag แล้วหลุดจากตัวป้องกัน
-- ลบ (`buildDeleteDocPlan` :402): นอกจากแผนข้างต้น ลบ `gl_journal_detail`/`gl_journal` ตาม `doc_no` และแท็บภาษีตาม `doc_no` + flag (อ้างอิง C# `_ar_ap_trans.cs:3068, 2972-2986`) ต้องระบุ `transFlag` > 0
+- ลบ (`buildDeleteDocPlan` :402): นอกจากแผนข้างต้น ลบ `gl_journal_detail`/`gl_journal` ตาม `doc_no` และแท็บภาษีตาม `doc_no` + flag ต้องระบุ `transFlag` > 0
 
 ### รายการเอกสารหนี้ค้างชำระ `doc/bills` (`OutstandingBills` :628)
 - Input `{transFlag (213/235/19/239), custCode, docDate, docNo}`: `docNo` คือเอกสารที่กำลังแก้ ยอดชำระของมันเองไม่หักยอดคงค้าง; ไม่รู้จัก flag = "ประเภทเอกสารนี้ไม่มีรายการเอกสารหนี้"; ไม่ระบุรหัสลูกหนี้/เจ้าหนี้ = error
-- คัดเอกสารหนี้/ใบลดหนี้จาก `ic_trans` รวมการขายสินทรัพย์เชื่อ (`as_trans` flag 1802) ด้วยชุดเงื่อนไข flag ใน `arDebtWhere/arCreditWhere/apDebtWhere/apCreditWhere` (:599-609, อ้างอิง C# `_process.cs _createQuery` 588-956) ใบลดหนี้คิดเป็นยอดติดลบ; กรองใบวางบิลซ้ำเมื่อ `erp_option.filter_pay_bill = 1`
+- คัดเอกสารหนี้/ใบลดหนี้จาก `ic_trans` รวมการขายสินทรัพย์เชื่อ (`as_trans` flag 1802) ด้วยชุดเงื่อนไข flag ใน `arDebtWhere/arCreditWhere/apDebtWhere/apCreditWhere` (:599-609) ใบลดหนี้คิดเป็นยอดติดลบ; กรองใบวางบิลซ้ำเมื่อ `erp_option.filter_pay_bill = 1`
 - ผลลัพธ์คือ `BillLine[]` (ใช้เติมกริดบิล) รองรับหลายสกุลเงินผ่าน `billFx`
 
 ## ที่มาในโค้ด

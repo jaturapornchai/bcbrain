@@ -1,60 +1,45 @@
 ---
 title: "บทเรียนยกเลิก ลบ และยกเลิกรายบรรทัด (Cancel, Delete & Partial Cancel)"
-tags: [history, cancel, delete]
-aliases: ["ยกเลิกเอกสาร", "partial cancel", "per-item cancel", "refuseIfReferenced", "set item delete", "cancel undo"]
-sources: ["git:e7168c84", "git:6983d7ea", "git:bd834b16", "git:86519142", "git:bc8d27d4", "git:678fc5fc", "backend/internal/application/process/doc_cancel.go:497", "docs/HANDOFF_BCCM_PARITY_2026-10-22.md:68"]
+tags: [history, lesson, cancel, delete]
+aliases: ["ยกเลิกเอกสาร", "partial cancel", "per-item cancel", "refuseIfReferenced", "set item delete", "undo cancel", "checkStoredApArEditable"]
+sources: ["backend/internal/application/process/doc_cancel.go:164", "backend/internal/application/process/doc_cancel.go:399", "backend/internal/application/process/doc_cancel.go:497", "backend/internal/application/process/doc_cancel.go:585", "backend/internal/application/process/trans_deposit.go:246", "backend/internal/application/process/trans.go:403", "backend/internal/application/process/docs.go:457", "backend/internal/application/process/docs.go:463", "backend/internal/application/process/docs_test.go:47", "backend/internal/application/process/doc_cancel_item.go:74", "backend/internal/application/process/doc_cancel_item.go:135", "backend/internal/application/process/doc_cancel_item.go:205", "backend/internal/application/process/doc_cancel_item.go:223", "backend/internal/application/process/doc_approve_item.go:96", "frontend/account/transaction/UniversalTransScreen.tsx:3647"]
 ---
+# บทเรียนยกเลิก ลบ และยกเลิกรายบรรทัด
 
-## ภาพรวม
-การยกเลิก/ลบเอกสารต้องรักษาความสัมพันธ์ระหว่างเอกสารเดิม เอกสารยกเลิก GL กลับรายการ และสถานะ flow ไว้ครบ ช่วง 2026-10-19..24 พบบั๊กลบ/ยกเลิกแล้วมีเศษค้าง (GL กลับรายการ, แถวลูกสินค้าชุด, เอกสารยกเลิก) หรือยอดหัวบิลไม่ตรง C#
+การยกเลิกหรือลบเอกสารต้องรักษาความสัมพันธ์ระหว่างเอกสารเดิม เอกสารยกเลิก รายการ GL กลับรายการ และสถานะ flow ไว้ครบ ถ้าด่านไม่ครบจะเหลือเศษค้างหรือยอดเพี้ยนโดยไม่มีข้อความเตือน
 
-## อาการ
-- **A (e7168c84):** ลบเอกสารยกเลิกแล้ว GL กลับรายการค้าง; ลบเอกสารที่ถูกใบอื่นอ้างอิงหรือมัดจำที่ใช้/คืนแล้วได้ (แถวอ้างอิงชี้ที่ไม่มี); เลขเอกสารยกเลิกไม่แยก flag
-- **B (6983d7ea, bc8d27d4):** ยกเลิกรายบรรทัด (flag 7/39/37) ไม่ตรวจเพดานจำนวน และสถานะ PO (`doc_success`/`used_status`) ไม่ตามการยกเลิก; PR อนุมัติ (flag 4) ทับค่าที่ขอเดิม; หน้ายกเลิก/อนุมัติมี grid เตี้ยจน help bar ทับแถวเครดิต
-- **C (bd834b16):** commit ไม่มีเนื้อความ แต่คอมเมนต์ใน `docs.go` ระบุอาการปัจจุบัน: ลบ ap_ar_trans 239/19 ต้นฉบับที่ถูกยกเลิกแล้ว จะทิ้งเอกสารยกเลิกและ GL กลับรายการไว้
-- **D (86519142):** ยกเลิกรายชิ้น (37) เขียนเพียง `total_amount` ไม่ใช่ชุดยอดหัวบิลเต็มแบบ C#
-- **E (678fc5fc, T3):** ลบแถวสินค้าชุดแล้วแถวลูกค้าง ยอดแถวลูกยังถูกรวม
+## อะไรพังได้
+- **ลบ/ยกเลิกเอกสารที่ถูกอ้างอิงอยู่:** เอกสารที่ใบอื่นอ้างถึง หรือมัดจำที่ถูกใช้แล้ว ถ้าลบได้ แถวที่อ้างจะชี้ไปหาเอกสารที่ไม่มีอยู่
+- **GL กลับรายการค้าง:** ลบเอกสารยกเลิกแล้ว รายการ GL ที่กลับรายการไว้ยังอยู่ ถ้าไม่มีขั้นเก็บกวาด
+- **เลขเอกสารยกเลิกชนกัน:** ถ้าทุกเมนูยกเลิกใช้ prefix เดียวกัน เลขรันจะถูกแจกซ้ำข้าม `trans_flag`
+- **ยกเลิกรายบรรทัดเกินยอดคงเหลือ:** ถ้าไม่ตรวจเพดานจำนวน ผู้ใช้ยกเลิกได้มากกว่าที่เหลือ และสถานะ `used_status`/`doc_success` ของใบสั่งไม่ตามการยกเลิก
+- **ยอดหัวบิลคนละสูตร:** ถ้าเอกสารยกเลิกรายชิ้นเขียนยอดย่อยเอง แทนที่จะใช้ชุดคำนวณเดียวกับหน้าจอ ยอดจะไม่ตรงกัน
+- **แก้/ลบเอกสารลูกหนี้-เจ้าหนี้ที่ใช้แล้ว/ปิดแล้ว/ยกเลิกแล้ว:** ถ้าด่านอยู่แค่ปุ่มบนจอ เรียก API ตรงก็ลบได้ และทิ้งเอกสารยกเลิกกับ GL กลับรายการไว้
+- **ลบแถวสินค้าชุดแล้วแถวลูกค้าง:** ยอดแถวลูกยังถูกรวมเข้าเอกสาร
 
-## สาเหตุ (root cause)
-- A: C# `_transProcess.cs:1009-1200` จัดเลข `DOC<flag>` และลบ GL กำพร้า แต่ Go ยังไม่พอร์ต และ delete ไม่เช็กการอ้างอิง 
-- B: ยอดคงเหลือต่อบรรทัดและสถานะ PO ใน C# คำนวณใน `_docFlowThread` ซึ่ง Go ยังไม่มีตอนนั้น
-- C: `SaveDoc`/`DeleteDoc` ของ ap_ar_trans ไม่มีด่านเช็กสถานะเอกสารที่เก็บไว้ (ตรงกับ `_myManageData1__checkEditData`)
-- D: ไม่ได้ใช้ฟังก์ชันรวมยอดเดียวกับหน้าจอ/บันทึกปกติ
-- E: แถวชุดกับแถวลูกผูกกันด้วย `ref_guid` / `set_ref_line` แต่ handler ลบแถวเดียว
+## โค้ดป้องกันไว้อย่างไร
+| ด่าน | ที่อยู่ | ทำอะไร |
+|---|---|---|
+| เลขเอกสารยกเลิกแยกตาม flag | `doc_cancel.go:399` | ใช้ prefix `DOC<flag>` แทน `DOC` กลาง |
+| ห้ามยกเลิกเอกสารที่ถูกอ้างอิง | `doc_cancel.go:497` `refuseIfReferenced`, `:547` `referencingDoc`; เรียกที่ `:167` | ตรวจรวมทุกทางที่เอกสารอื่นอ้างถึง (บรรทัดอ้างอิง เช็ค ใบวางบิล มัดจำ) ก่อนสร้างเอกสารยกเลิก |
+| ห้ามลบมัดจำที่ถูกใช้ | `trans_deposit.go:246` `refuseUsedDepositDelete`; เรียกที่ `trans.go:403` | ตรวจ `cb_trans_detail` และใบคืนที่อ้างมัดจำ |
+| เก็บกวาด GL กลับรายการกำพร้า | `doc_cancel.go:585` `reverseCancelledGL` (ลบ `:625-637`) | เมื่อเอกสารยกเลิกหายไปแล้ว ลบรายการกลับรายการของมันออกจาก `gl_journal_detail`/`gl_journal` |
+| ยกเลิกรายบรรทัดตรวจเพดาน | `doc_cancel_item.go:74` `checkCancelQty`, `:135` `checkItemCancel`; เรียกที่ `doc_cancel.go:164` | ปฏิเสธบรรทัดที่ไม่มีอยู่หรือจำนวนเกินที่เหลือ (คิดจากยอดคงเหลือปัจจุบัน) |
+| สถานะใบสั่งตามการยกเลิก | `doc_cancel_item.go:223` `orderDerivedStatus` | คำนวณ `used_status`/`doc_success` จากจำนวนที่ใช้/ลด |
+| ยอดหัวบิลสูตรเดียว | `doc_cancel_item.go:205`, `doc_approve_item.go:96`, `trans.go:792` เรียก `companyHeaderTotals` (`transcalc.go:79`) | ทุกเส้นทางคำนวณยอดหัวบิลจากฟังก์ชันเดียว |
+| ด่านแก้/ลบเอกสารลูกหนี้-เจ้าหนี้ | `backend/internal/application/process/docs.go:457` `apArEditLocked`, `:463` `checkStoredApArEditable`; เรียกที่ `:195` | ปฏิเสธเมื่อ `used_status`, `doc_success` หรือ `last_status` เป็น 1 หรือชนิดเอกสารไม่ตรงกับที่บันทึกไว้ (undo-cancel ผ่าน `CancelDoc` ไม่โดนด่านนี้) |
+| เทสต์ | `docs_test.go:47` `TestApArCancelUndoIntegration` (ต้องตั้ง `DOCFLOW_IT_DB`, rollback) | ตรวจว่าเอกสารที่ยกเลิกแล้วแก้/ลบไม่ได้ (รวมกรณีส่ง flag ผิด) และหลัง undo จึงลบได้ |
+| ลบแถวสินค้าชุดทั้งกลุ่ม | `UniversalTransScreen.tsx:3647-3649` | ลบแถวชุดพร้อมแถวที่ `set_ref_line` ตรงกับ `ref_guid` ของแถวชุด |
 
-## วิธีแก้
-- A: `DOC%d` ต่อ flag, ลบ GL กำพร้าตอนลบเอกสารยกเลิก, `refuseIfReferenced` ใช้ `referencingDoc` ร่วม cancel/delete, `refuseUsedDepositDelete` สำหรับมัดจำ
-- B: `parseCancelLines` / `checkCancelQty` ตรวจเพดานจาก `lineBalances`; `orderDerivedStatus` คำนวณ `used_status`/`doc_success`; PR flag 4 เก็บค่าที่ขอใน `temp_float_1/2` + `temp_string_1` แล้วรวมยอดหัวบิลใหม่
-- C: `checkStoredApArEditable` ปฏิเสธเอกสารที่ used/finished/cancelled; undo-cancel ผ่าน `CancelDoc` ไม่โดนด่านนี้ + เทสต์ `TestApArCancelUndoIntegration`
-- D: ให้ `companyHeaderTotals` คำนวณยอดตาม `_calc` ล่างของ C# (ข้ามแถวชุด) ทั้งหน้าจอและตอนบันทึก **ตัดสินใจ:** เอกสารเก่าคงยอดเดิม ไม่ย้อนแก้ (handoff:68)
-- E: ลบแถวชุดพร้อมแถวที่ `set_ref_line` ตรงกับ `ref_guid`
-
-## commit ที่เกี่ยวข้อง
-- `e7168c84` — เลข DOC<flag>, ลบ GL กำพร้า, ลบต้องเช็กการอ้างอิง, ตรวจมัดจำ
-- `6983d7ea` — ยกเลิกรายบรรทัด 7/39/37, อนุมัติ PR flag 4, สถานะ PO
-- `bd834b16` — ด่าน ap_ar_trans + undo-cancel (ไม่มีเนื้อความ)
-- `86519142` — ยอดยกเลิกรายชิ้น 37 ตาม `_calc`
-- `bc8d27d4` — จอยกเลิก/AR issue #36-#48 (ไม่มีเนื้อความ; ยังไม่ได้ตรวจ diff ละเอียด)
-- `678fc5fc` — ลบสินค้าชุดพร้อมแถวลูก
-
-## โค้ดปัจจุบันที่ป้องกัน
-- `process/doc_cancel.go:399` เลข `DOC%d`, `:497` refuseIfReferenced, `:547` referencingDoc, `:637` ลบ GL กำพร้า
-- `process/trans_deposit.go:246` refuseUsedDepositDelete
-- `process/docs.go:457` apArEditLocked, `:463` checkStoredApArEditable; เทสต์ `docs_test.go:47`
-- `process/doc_cancel_item.go:74` checkCancelQty, `:135` checkItemCancel, `:205` companyHeaderTotals, `:223` orderDerivedStatus; `doc_approve_item.go:96`
-- `frontend/account/transaction/UniversalTransScreen.tsx:3606-3608` ลบแถวชุดพร้อมลูก
-
-## บทเรียน / กฎที่ได้
-1. ลบ/ยกเลิกทุกชนิดต้องเช็ก "ใครอ้างถึงฉัน" ก่อน และลบตารางลูก/GL ที่เป็นของเอกสารนั้นให้หมดใน tx เดียว
+## กฎที่ต้องจำ
+1. ลบหรือยกเลิกทุกชนิดต้องเช็ก "ใครอ้างถึงฉัน" ก่อน และลบตารางลูก/GL ที่เป็นของเอกสารนั้นให้หมดใน tx เดียว
 2. ยอดหัวบิลต้องผ่าน `companyHeaderTotals` ตัวเดียวทุกเส้นทาง ห้ามเขียนยอดย่อยเอง
-3. ด่าน "แก้ไม่ได้ถ้าใช้แล้ว/ปิดแล้ว/ยกเลิกแล้ว" ต้องอยู่ที่ save และ delete ด้วย ไม่ใช่เฉพาะปุ่มบนจอ
-4. ลบแถวพ่วง (สินค้าชุด) ต้องลบทั้งกลุ่ม ไม่งั้นยอดรวมผิดเงียบๆ
-5. รายการเปิด: จอยกเลิก 3/7/31/37/39 ยังไม่เทียบ C# ref flow (handoff บรรทัด 77)
-
-## ดูเพิ่ม
-[[proc-doc-cancel-approve]] · [[acc-transaction-delete-edit]] · [[std-menu-workflow-cancel-lookup]] · [[hist-lessons-doc-ref-docflow]] · [[hist-lessons-trans-save-rules]]
+3. ด่าน "แก้ไม่ได้ถ้าใช้แล้ว/ปิดแล้ว/ยกเลิกแล้ว" ต้องอยู่ที่ save และ delete ฝั่ง backend ไม่ใช่เฉพาะปุ่มบนจอ
+4. ลบแถวพ่วง (สินค้าชุด) ต้องลบทั้งกลุ่ม
 
 ## ที่มาในโค้ด
-- `backend/internal/application/process/doc_cancel.go:399,497,547,637`
-- `docs/HANDOFF_BCCM_PARITY_2026-10-22.md:68,77`
-- git:e7168c84, git:6983d7ea, git:86519142, git:678fc5fc
+- `backend/internal/application/process/doc_cancel.go:164-167,399,497,547,585-637` ด่านยกเลิกและเก็บกวาด GL
+- `backend/internal/application/process/doc_cancel_item.go:74,135,205,223` ยกเลิกรายบรรทัด
+- `backend/internal/application/process/docs.go:457-480` ด่านเอกสารลูกหนี้-เจ้าหนี้
+- `frontend/account/transaction/UniversalTransScreen.tsx:3647-3649` ลบแถวสินค้าชุด
+- ดูเพิ่ม: [[proc-doc-cancel-approve]] · [[acc-transaction-delete-edit]] · [[std-menu-workflow-cancel-lookup]] · [[hist-lessons-doc-ref-docflow]] · [[hist-lessons-trans-save-rules]]

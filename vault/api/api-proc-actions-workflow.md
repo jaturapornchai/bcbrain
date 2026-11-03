@@ -47,7 +47,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:164","backend/interna
 
 | action | หน้าที่ | input สำคัญ | ตาราง | path:line |
 |---|---|---|---|---|
-| `workflow/change-code` | เปลี่ยนรหัสหลัก 1-500 คู่ในหนึ่ง transaction (A→B แล้ว B→C ทำตามลำดับเหมือนชุดคำสั่ง C#) และแก้ทุกตารางที่อ้างอิงรหัสนั้น | `kind` (item/customer/supplier/gl_account), `menuName`, `pairs[]:{oldCode,newCode}` | ตารางหลักตามชนิด + ตารางอ้างอิงที่ค้นจาก pg_constraint/pg_attribute; เขียน master_logs | workflow_handler.go:38 → workflow.go:230 |
+| `workflow/change-code` | เปลี่ยนรหัสหลัก 1-500 คู่ในหนึ่ง transaction (A→B แล้ว B→C ทำตามลำดับคู่ที่ส่งมา) และแก้ทุกตารางที่อ้างอิงรหัสนั้น | `kind` (item/customer/supplier/gl_account), `menuName`, `pairs[]:{oldCode,newCode}` | ตารางหลักตามชนิด + ตารางอ้างอิงที่ค้นจาก pg_constraint/pg_attribute; เขียน master_logs | workflow_handler.go:38 → workflow.go:230 |
 | `workflow/audit-list` | ประวัติการใช้งาน 1 หน้าจอ อ่านอย่างเดียว ใหม่สุดก่อน ไม่เกิน 5000 แถว | `kind` (login/menu/trans/master/full), `dateFrom`, `dateTo`, `search` | logs, master_logs, erp_logs | :87 → workflow.go:976 |
 | `workflow/import-transport-label` | คัดลอกผู้ขาย (`ap`) หรือลูกค้า (`ar`) ที่ยังไม่มีแถวป้ายขนส่งเข้าตาราง | `kind` (ap/ar) | ap_ar_transport_label | :108 → sysproc_tools.go:219 |
 | `workflow/province-list` | รายการจังหวัดมาตรฐานสำหรับตารางติ๊ก (อ่านจากข้อมูลที่ฝังในไบนารี ไม่ใช้ DB) | `{}` | (ไม่มี) | :115 → province_load.go:68 |
@@ -66,7 +66,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:164","backend/interna
 ### audit-list
 
 - **Request**: `{"kind":"login","dateFrom":"2026-01-01","dateTo":"2026-01-31","search":"<text>"}`; `search` ใช้ `ILIKE` กับผู้ใช้/เครื่อง/เลขเอกสารตามชนิด (workflow.go:951-972)
-- **Response 200**: `{"ok":true,"data":{"columns":[...],"rows":[{"<column>":"<text>"}],"note":"..."}}` — คอลัมน์เรียงตาม C#; ทุกค่าเป็นสตริง
+- **Response 200**: `{"ok":true,"data":{"columns":[...],"rows":[{"<column>":"<text>"}],"note":"..."}}` — คอลัมน์เรียงตามลำดับที่ `AuditList` (`workflow.go:976`) กำหนดต่อ `kind`; ทุกค่าเป็นสตริง
 - **ผู้เรียก**: `SystemProcessWorkbenchScreen.tsx:454` (`mode === "audit_log"`)
 
 ### import-transport-label และ province-*

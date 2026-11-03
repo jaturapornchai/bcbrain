@@ -1,59 +1,48 @@
 ---
 title: "บทเรียนธุรกรรมอะตอมมิกและ error ที่ถูกกลืน (Atomic Transactions & Swallowed Errors)"
-tags: [history, transaction, atomic, error-handling]
-aliases: ["ExecBatch atomic", "swallowed error", "docno.Stamp", "credit_used double charge", "WmsBinRebuildSQL", "fmt.Sprintf missing verb"]
-sources: ["git:a47413ec", "git:4de91436", "git:239b0997", "git:5e3dbd36", "git:2ab00c67", "git:dc975db9", "backend/internal/adapter/inbound/http/wms/handler.go:505", "backend/internal/platform/docno/docno.go:23", "AGENTS.md rules 9, 20"]
+tags: [history, lesson, transaction, atomic, error-handling]
+aliases: ["ExecBatch atomic", "swallowed error", "docno.Stamp", "credit_used double charge", "WmsBinRebuildSQL", "fmt.Sprintf missing verb", "ทิ้ง error"]
+sources: ["AGENTS.md:50", "AGENTS.md:51", "AGENTS.md:61", "backend/internal/application/query/service.go:130", "backend/internal/adapter/inbound/http/wms/handler.go:505", "backend/internal/adapter/inbound/http/wms/handler.go:1997", "backend/internal/adapter/inbound/http/wms/handler.go:2039", "backend/internal/adapter/inbound/http/market/handler.go:669", "backend/internal/adapter/inbound/http/market/handler.go:1874", "backend/internal/adapter/inbound/http/market/handler.go:365", "backend/internal/adapter/inbound/http/etax/handler.go:461", "backend/internal/adapter/inbound/http/etax/handler.go:1016", "backend/internal/adapter/inbound/http/crm/handler.go:653", "backend/internal/platform/docno/docno.go:23", ".agents/skills/secure-api-data-integrity-checklist/SKILL.md:27"]
 ---
 
-## ภาพรวม
-งานหลายขั้นที่เคยเขียนทีละ `Exec` และทิ้งค่า `error` ทำให้ได้ข้อมูลครึ่งๆ กลางๆ แต่ตอบสำเร็จ ช่วง 2026-10-21..24 แก้ให้เขียนใน tx เดียว (`ExecBatch` / `pgx.Tx`) คืน error ทุกจุด และให้ค่าที่ derive ได้ (ยอด bin, เครดิต) คำนวณซ้ำได้ผลเดิม
+# ธุรกรรมอะตอมมิกและ error ที่ถูกกลืน
 
-## อาการ
-- **A (a47413ec, 5e3dbd36):** WMS ส่งของ (SHIPPED) และบันทึก movement เขียน log ดิบกับยอด bin/order/stop แยกคำสั่ง ถ้าขั้นกลางพังก็ตอบสำเร็จ ยอด bin ลดแบบเพิ่มทีละก้อนและหยุดที่ 0 (`GREATEST(0, ...)`) ตามที่เห็นใน diff
-- **B (4de91436):** สั่งซื้อ B2B ซ้ำ (retry) ตัดเครดิตผู้แทนจำหน่ายสองครั้ง เพราะบวก `credit_used + x`; ตามข้อความ commit
-- **C (4de91436):** เลขเอกสาร WMS/TMS/RFQ รูปแบบ HHMMSS ชนกันภายในวินาที/นาที
-- **D (a47413ec):** บันทึกเอกสาร e-Tax ล้มเหลวแต่ตอบ 200; ปัดภาษีผิด (WHT 1% ของ 14.50 ได้ 0.14 แทน 0.15); สั่งซื้อ/ทริปที่ insert หลักพังแล้วยังตัดเครดิตต่อ; ข้อความ `fmt.Sprintf` ขาด verb เก็บ `...ERP%!(EXTRA string=PCS)` ใน `pack_size_desc` (B9)
-- **E (239b0997, 2ab00c67, dc975db9):** frontend เขียน SQL ตรงเข้าตารางนอก transaction ของ backend (THIN-SQL-xx ตามข้อความ commit 239b0997; ยังไม่ได้ตรวจ diff ละเอียด); serial/shipment เคยไม่ถูกเขียนพร้อมเอกสาร
+งานที่ต้องเขียนหลายตารางต่อหนึ่งคำสั่งผู้ใช้ ถ้าเขียนทีละ `Exec` แล้วทิ้งค่า `error` จะได้ข้อมูลครึ่งๆ กลางๆ แต่ตอบผู้ใช้ว่า "สำเร็จ" ส่วนค่าที่คำนวณได้ (ยอดช่องเก็บ, เครดิตตัวแทน) ถ้าสะสมแบบ "ยอดเดิม + ค่าใหม่" จะนับซ้ำเมื่อ retry
 
-## สาเหตุ (root cause)
-- A/D: `_, _ = Exec(...)` แล้วตอบ OK ก่อนรู้ผล ผิด AGENTS.md ข้อ 20
-- B: ค่า `credit_used` เป็น state สะสมที่อัปเดตแบบ `+x` จึงไม่ idempotent เมื่อ request ซ้ำ
-- C: เลขเอกสารใช้เวลาแค่ HHMMSS ไม่มีส่วนสุ่ม
-- E: ขัดกฎ thin-client (AGENTS.md ข้อ 10): เขียนข้อมูลผ่าน `query/exec` จาก browser ทำให้ไม่อยู่ใน tx ของเอกสาร
+## อะไรพังได้
+- **ตอบสำเร็จทั้งที่เขียนไม่ครบ:** สถานะส่งของเปลี่ยนแล้วแต่ยอดสต็อก/ออเดอร์ไม่ตาม, เอกสารภาษีบันทึกไม่ได้แต่ตอบ 200, insert ออเดอร์/ทริปล้มแต่ยังตัดเครดิตและสร้างเอกสารต่อ
+- **ยอดสะสมนับซ้ำ:** `credit_used + x` ไม่ idempotent ผู้แทนจำหน่ายที่ retry ถูกตัดเครดิตสองครั้ง
+- **ยอดช่องเก็บถูกบีบที่ 0:** `GREATEST(0, ...)` ซ่อนยอดติดลบที่ควรเตือน
+- **เลขเอกสารชนกัน:** เลขที่ใช้เวลาระดับวินาทีซ้ำเมื่อสองคำขอเข้าวินาทีเดียวกัน
+- **ปัดภาษีด้วย float:** 1% ของ 14.50 ได้ 0.14 แทน 0.15
+- **เขียนทับหลักฐานจริง:** ดึงรูปจาก MinIO ไม่ได้ (timeout/5xx) แล้วบันทึก placeholder ทับรูปเดิม
+- **ข้อความเสียใน DB:** `fmt.Sprintf` ที่มี `%s` ไม่ครบจะบันทึก `%!(EXTRA ...)` ลงข้อมูล
 
-## วิธีแก้
-- A: `AdvanceFulfillment` และ `CreateMovement` รวม movement log + `WmsBinOpeningSQL` + `WmsBinRebuildSQL` + อัปเดต order/stop ไว้ใน `ExecBatch` เดียว คืน error; ยอด bin = OPENING + SUM(movement ที่มีเครื่องหมาย) ไม่ clamp ที่ 0 และเตือนเมื่อติดลบ
-- B: ล็อกแถว profile ของผู้แทนแล้วคำนวณ `credit_used`/`credit_available`/`rebate` ใหม่จาก opening + SUM ของ `market_b2b_order` (ไม่รวมสถานะ CANCEL) ทุกครั้ง; คอลัมน์ `credit_used_opening` / `rebate_opening` เก็บยอดตั้งต้นที่ไม่มีแถวออเดอร์อธิบาย
-- C: `docno.Stamp(layout)` = เวลา + มิลลิวินาที + แท็ก hex สุ่ม 4 ตัว
-- D: etax คำนวณด้วย `big.Rat` ปัดครึ่งออกจากศูนย์ (`etaxAmounts`) และตอบ error ถ้าบันทึกพัง; market/tms หยุดเมื่อ insert หลักพัง; แก้ `%s` ที่หาย
-- E: งาน serial/shipment อยู่ใน `saveTransTx`/`deleteTransTx` แล้ว rebuild ใน tx เดียวกัน (ดู [[hist-lessons-serial-lot-shipment]]); งานเขียนจาก frontend ย้ายเข้า backend (เช่น `StockBeginningBalanceScreen.tsx` ลด 361 บรรทัด)
+## โค้ดป้องกันไว้อย่างไร
+| ด่าน | ที่อยู่ | ทำอะไร |
+|---|---|---|
+| ExecBatch = 1 transaction | `backend/internal/application/query/service.go:130-169` | ตรวจทุก statement แล้วรันใน transaction เดียว statement ไหนพังก็ rollback ทั้งชุด |
+| ส่งของ WMS | `backend/internal/adapter/inbound/http/wms/handler.go:505-523` | ยอดตั้งต้น + log + rebuild ยอดช่อง + อัปเดตออเดอร์/จุดส่ง อยู่ใน `ExecBatch` เดียว และ `return` error |
+| ยอดช่องเก็บ derive ได้ | `wms/handler.go:1997` `WmsBinOpeningSQL`, `:2039` `WmsBinRebuildSQL` | แถว `OPENING` ครั้งเดียวต่อช่อง (`WHERE NOT EXISTS`) แล้ว `physical_qty = OPENING + SUM(movement มีเครื่องหมาย)` ไม่ครอบ `GREATEST(0,...)` ให้ยอดติดลบเห็นได้ |
+| ใช้ซ้ำใน TMS/Procure | `tms/handler.go:554,569`, `procure/handler.go:1382,1398` | เรียกชุดเดียวกันใน batch ของตัวเอง |
+| เครดิตตัวแทนคำนวณใหม่ | `market/handler.go:669-673` ล็อกแถวตัวแทนก่อน, `:1874` `marketDealerOpeningSQL`, `:1885` `marketDealerBalanceSQL` | `credit_used = credit_used_opening + SUM(ออเดอร์)` จากข้อมูลดิบทุกครั้ง ไม่สะสม |
+| เลขเอกสารกันชน | `backend/internal/platform/docno/docno.go:23` `Stamp` | เวลา + มิลลิวินาที + แท็ก hex สุ่ม 4 ตัว เช่น `153045123-9F2C` |
+| ภาษีไม่ปัดผิด | `etax/handler.go:1016` `etaxAmounts` | `math/big.Rat` ปัดครึ่งออกจากศูนย์ที่สตางค์ |
+| บันทึกพังต้องตอบ error | `etax/handler.go:461` | `response.Error(w, err)` ไม่ตอบ overview ราวกับสำเร็จ |
+| ไม่เขียนทับรูปจริง | `crm/handler.go:653-654` | อ่านรูปไม่ได้ → ส่ง placeholder แต่ไม่บันทึกกลับ |
+| `Sprintf` ครบ verb | `market/handler.go:365,387` | ข้อความ `(หน่วย %s)` ครบตาม argument; `go vet` อยู่ในกฎ AGENTS.md ข้อ 20 |
 
-## commit ที่เกี่ยวข้อง
-- `a47413ec` — WMS atomic, e-tax big.Rat + คืน error, หยุดเมื่อ insert หลักพัง, แก้ Sprintf
-- `4de91436` — เช็กเอาต์ตลาดแบบ atomic + เครดิตแบบ derive, TMS/procure atomic, `docno.Stamp`
-- `239b0997` — ย้าย SQL เขียนจาก frontend ไป backend + lockdown `query/exec`
-- `5e3dbd36` — rebuild ยอด bin จาก OPENING + movement
-- `2ab00c67`, `dc975db9` — serial/shipment บันทึกใน tx เดียวกับเอกสาร
-
-## โค้ดปัจจุบันที่ป้องกัน
-- `adapter/inbound/http/wms/handler.go:505-514` ExecBatch ใน AdvanceFulfillment, `:534` CreateMovement, `:1995` WmsBinOpeningSQL, `:2037` WmsBinRebuildSQL
-- `tms/handler.go:554,569` และ `procure/handler.go:1382,1398` ใช้ opening + movement log ใน batch
-- `market/handler.go:1874` marketDealerOpeningSQL, `:1885` marketDealerBalanceSQL; `:365,387` ข้อความ `(หน่วย %s)`
-- `etax/handler.go:461` ตอบ error เมื่อบันทึกพัง, `:1016` etaxAmounts; `platform/docno/docno.go:23` Stamp
-- ยังเหลือ `_, _ = ExecBatch` ที่ `wms/handler.go:840,1737` (buildOverview; ดูเป็นข้อมูลสาธิต ยังไม่ได้ตรวจเต็ม)
-
-## บทเรียน / กฎที่ได้
-1. ห้ามทิ้ง error ของคำสั่งเขียน; งานหลายขั้นที่ต้องไปด้วยกันรวมเป็น batch เดียวแล้วคืน error
-2. ค่าที่ derive ได้ (ยอดคงเหลือ, เครดิต) ให้คำนวณจากแหล่งเดิม ไม่สะสม `+x` เพื่อให้ retry ปลอดภัย (ข้อ 9)
-3. เลขเอกสารต้องมีส่วนสุ่ม/มิลลิวินาที ไม่ใช่เวลาระดับวินาที
-4. การเขียนที่กระทบเอกสารต้องอยู่ฝั่ง backend ใน tx เดียว
-5. รัน `go vet` ทุกครั้ง จับ `Sprintf` ที่ขาด verb ได้
-
-## ดูเพิ่ม
-[[adr-0009-query-exec-batch-transactional]] · [[adr-0011-query-exec-write-lockdown]] · [[be-query-write-policy]] · [[std-data-integrity-money-transactions]] · [[hist-lessons-rounding-decimal]] · [[hist-lessons-serial-lot-shipment]]
+## กฎที่ต้องจำ
+1. ห้ามทิ้ง error ของคำสั่งเขียน (`_, _ = Exec(...)`) ในเส้นทางที่ตอบผู้ใช้ — insert หลักล้มต้อง `response.Error` แล้ว `return` (`.agents/skills/secure-api-data-integrity-checklist/SKILL.md:27`)
+2. เขียนหลายตารางต่อหนึ่งคำสั่งผู้ใช้ต้องอยู่ใน `ExecBatch` เดียว บันทึก raw log ก่อนตาราง derived (กฎข้อ 9-10, 20 ใน `AGENTS.md:50,51,61`)
+3. ค่า derive ได้ให้คำนวณจากข้อมูลดิบทุกครั้ง ไม่สะสม `+x` เพื่อให้ retry ปลอดภัย
+4. เลขเอกสารอิงเวลาต้องผ่าน `docno.Stamp` ไม่ใช้ `time.Now().Format("150405")` ตรงๆ
+5. เงิน/ภาษีฝั่ง Go ใช้ `big.Rat` ปัดสตางค์
+6. ข้อสังเกตที่ยังเหลือ: `buildOverview` ใน `wms/handler.go:840,1737` ยังเรียก `_, _ = ...ExecBatch` สำหรับการ rebuild ยอดช่องก่อนอ่านภาพรวม (ไม่ได้ตอบผู้ใช้ว่าสำเร็จ) ไม่ได้ตรวจเกินกว่านี้
 
 ## ที่มาในโค้ด
-- `backend/internal/adapter/inbound/http/wms/handler.go:505,534,1995,2037`
-- `backend/internal/adapter/inbound/http/market/handler.go:1874,1885`
-- `backend/internal/platform/docno/docno.go:23`
-- git:a47413ec, git:4de91436, git:5e3dbd36, git:239b0997
+- `backend/internal/application/query/service.go:130-169` ExecBatch เป็น transaction เดียว
+- `backend/internal/adapter/inbound/http/wms/handler.go:505-523,1997,2039` batch ส่งของ + SQL ยอดช่อง
+- `backend/internal/adapter/inbound/http/market/handler.go:669-673,1874-1890` ล็อกตัวแทน + คำนวณเครดิตใหม่
+- `backend/internal/platform/docno/docno.go:23` + `docno_test.go` เทสต์เลขกันชน
+- ดูเพิ่ม: [[adr-0009-query-exec-batch-transactional]] · [[adr-0011-query-exec-write-lockdown]] · [[be-query-write-policy]] · [[std-data-integrity-money-transactions]] · [[hist-lessons-concurrency-advisory-locks]] · [[hist-lessons-query-gateway-write-lockdown]]

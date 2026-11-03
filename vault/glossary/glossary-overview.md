@@ -2,7 +2,7 @@
 title: "อภิธานศัพท์ BC Ai Account (glossary overview)"
 tags: [glossary, hub]
 aliases: ["อภิธานศัพท์", "glossary", "คำศัพท์", "พจนานุกรมคำไทย-โค้ด", "glossary-overview"]
-sources: ["frontend/account/tabs/transMenuMap.ts:3", "frontend/src/config/bcMenu.json:42", "frontend/account/transaction/TransTopForm.tsx:564", "frontend/account/transaction/TransBottomPanel.tsx:330", "frontend/account/transaction/TransItemGrid.tsx:332", "frontend/account/transaction/JournalTaxTabs.tsx:225", "frontend/account/transaction/transLayouts.ts:35", "frontend/account/master/ItemScreen.tsx:2237", "frontend/src/config/schemas/masterDetailSchemas.ts:250", "frontend/src/config/schemas/erpOption/index.ts:46", "backend/internal/application/process/trans.go:18", "backend/internal/application/process/transcalc.go:9", "backend/internal/application/process/stock_rebuild.go:18", "backend/internal/application/process/service.go:1066", "backend/internal/application/process/cheque.go:8", "backend/internal/application/process/doc_cancel.go:17", "backend/internal/application/process/period.go:13", "backend/internal/application/process/fx.go:16"]
+sources: ["frontend/account/tabs/transMenuMap.ts:3", "frontend/src/config/bcMenu.json:42", "frontend/account/transaction/TransTopForm.tsx:261", "frontend/account/transaction/TransBottomPanel.tsx:106", "frontend/account/transaction/TransItemGrid.tsx:356", "frontend/account/transaction/JournalTaxTabs.tsx:225", "frontend/account/transaction/transLayouts.ts:35", "frontend/account/master/ItemScreen.tsx:2228", "frontend/src/config/schemas/masterDetailSchemas.ts:248", "frontend/src/config/schemas/erpOption/index.ts:46", "backend/internal/application/process/trans.go:20", "backend/internal/application/process/transcalc.go:14", "backend/internal/application/process/stock_rebuild.go:18", "backend/internal/application/process/cheque.go:32", "backend/internal/application/process/doc_cancel.go:120", "backend/internal/application/process/period.go:17", "backend/internal/application/process/fx.go:18"]
 ---
 
 # อภิธานศัพท์ BC Ai Account
@@ -28,7 +28,7 @@ sources: ["frontend/account/tabs/transMenuMap.ts:3", "frontend/src/config/bcMenu
 | ข้อมูลรายวัน | JV | `gl_journal` · `menu_gl_journal` | ข้อมูลรายวัน (`transMenuMap.ts:2368`) | [[term-gl-journal]] |
 | ข้อมูลสินค้า | item master | `ic_inventory` | จอสินค้า (`ItemScreen.tsx`) | [[term-module-prefix]] |
 | ข้อเลือกพิเศษ | system options | `erp_option` · `erpOptionSchema` | กำหนดข้อเลือกพิเศษต่างๆ `menu_option` | [[term-erp-option]] |
-| ขอโอน | — | `trans_flag` 124 | ค่าคงที่ `trans.go:18-27` | [[term-wh-shelf]] |
+| ขอโอน | — | `trans_flag` 124 | ค่าคงที่ `trans.go:25` | [[term-wh-shelf]] |
 | ขายเชื่อ / ขายสด | credit / cash sale | `inquiry_type` 0 / 1 (ขาย) | หัวเอกสารขาย | [[term-inquiry-type]] |
 | ขายสินค้า | SI | `trans_flag` 44 | จอ SI (`transMenuMap.ts:827`) | [[term-trans-flag]] |
 | ขึ้นเงินบัตรเครดิต | credit card | `trans_flag` 461 · `chq_type` 3 | จอบัตรเครดิต (`transMenuMap.ts:2338`) | [[term-cheque-status]] |
@@ -135,11 +135,11 @@ sources: ["frontend/account/tabs/transMenuMap.ts:3", "frontend/src/config/bcMenu
 | ประเภทบัญชี | account type | `account_type` 0-4 | ผังบัญชี | [[term-chart-of-account]] |
 | ประเภทปี | year type | `erp_option.year_type` | ข้อเลือกพิเศษ แท็บตั้งค่าระบบ | [[term-buddhist-year]] |
 | ประเภทภาษี (เอกสาร) | VAT type | `ic_trans.vat_type` 0-3 | หัวเอกสาร | [[term-vat-type]] |
-| ประเภทรายการ (เงินสด/เงินเชื่อ) | inquiry type | `inquiry_type` · `InquiryType` | หัวเอกสาร (`transLayouts.ts:35-51`) | [[term-inquiry-type]] |
+| ประเภทรายการ (เงินสด/เงินเชื่อ) | inquiry type | `inquiry_type` · `InquiryType` | หัวเอกสาร (`transLayouts.ts:35-50`) | [[term-inquiry-type]] |
 | ประเภทรายการบัญชี | journal type | `journal_type` 0 รายวัน · 1 ยกมางวด · 2 ปิดงวด · 3 ปรับปรุง · 4 ยอดยกมา | — | [[term-gl-journal]] |
 | ประเภทลูกหนี้ | AR type | `ar_type` | กำหนดลูกหนี้ | [[term-party-ap-ar]] |
-| ประเภทสินค้า | item type | `ic_inventory.item_type` 0-6 | จอสินค้า (`ItemScreen.tsx:2237`) | [[term-item-type]] |
-| ประเภทหน่วยนับ | unit type | `unit_type` 0-3 | จอสินค้า (`ItemScreen.tsx:2376`) | [[term-unit-ratio]] |
+| ประเภทสินค้า | item type | `ic_inventory.item_type` 0-6 | จอสินค้า (`ItemScreen.tsx:2228`) | [[term-item-type]] |
+| ประเภทหน่วยนับ | unit type | `unit_type` 0-3 | จอสินค้า (`ItemScreen.tsx:2352`) | [[term-unit-ratio]] |
 | ประมวลผลสิ้นงวด | end of period | `menu_gl_end_of_period` | bcMenu.json:9638 | [[term-account-period]] |
 | ประมวลผลสิ้นปี | end of year | `menu_gl_end_of_year` | bcMenu.json:9652 | [[term-account-period]] |
 | ปรับปรุงสินค้าเพิ่ม | IA | `trans_flag` 66 | จอ IA (`transMenuMap.ts:1149`) | [[term-trans-flag]] |
@@ -148,7 +148,7 @@ sources: ["frontend/account/tabs/transMenuMap.ts:3", "frontend/src/config/bcMenu
 | ปิดเข้าบัญชี | close to account | `account_close` | ผังบัญชี | [[term-chart-of-account]] |
 | ปิดงวดบัญชี | closed period | `erp_account_period.status` 1 | กำหนดงวดบัญชี | [[term-account-period]] |
 | ปีบัญชี | period year | `period_year` | กำหนดงวดบัญชี | [[term-account-period]] |
-| เปลี่ยนเช็คจ่าย | replace cheque | `trans_flag` 456 → `status` 7 | จอเช็คจ่าย (`transMenuMap.ts:2193-2253`) | [[term-cheque-status]] |
+| เปลี่ยนเช็คจ่าย | replace cheque | `trans_flag` 456 → `status` 7 | จอเช็คจ่าย (`transMenuMap.ts:2253-2257`) | [[term-cheque-status]] |
 | เปลี่ยนเช็ค (เช็ครับ) | replace cheque | `trans_flag` 416 → `status` 7 | เมนูเช็ครับ | [[term-cheque-status]] |
 | ผลกระทบต่องบการเงิน | balance sheet status | `balance_sheet_status` 0-5 | ผังบัญชี | [[term-chart-of-account]] |
 | ผสมสี / สีผสม | mixed color | `item_type` 6 | จอสินค้า "7.ผสมสี" | [[term-item-type]] |
@@ -263,7 +263,7 @@ sources: ["frontend/account/tabs/transMenuMap.ts:3", "frontend/src/config/bcMenu
 | สกุลเงินหลัก | home currency | `erp_option.home_currency` | ข้อเลือกพิเศษ แท็บตั้งค่าระบบ | [[term-currency-fx]] |
 | ส่งคืนสินค้า / ลดหนี้ (ซื้อ) | PT | `trans_flag` 16 | จอ PT (`transMenuMap.ts:388`) | [[term-trans-flag]] |
 | สถานประกอบการ (สำนักงานใหญ่/สาขา) | branch type | `branch_type` 0 / 1 · `BRANCH_TYPES` | master คู่ค้า / แท็บภาษี | [[term-tax-id-branch]] |
-| สถานะการใช้เอกสาร / ใช้ครบ | doc flow status | `used_status` · `used_status_2` · `doc_success` | คำนวณจาก doc_flow (`doc_flow.go:14-17`) | [[term-doc-ref]] |
+| สถานะการใช้เอกสาร / ใช้ครบ | doc flow status | `used_status` · `used_status_2` · `doc_success` | คำนวณจาก doc_flow (`doc_flow.go:363-366`) | [[term-doc-ref]] |
 | สถานะเช็ค | cheque status | `cb_chq_list.status` | รายงานเช็ค (`report_menu_cb.go:152`) | [[term-cheque-status]] |
 | สถานะผู้จำหน่าย | AP status | `ap_status` | กำหนดเจ้าหนี้ | [[term-party-ap-ar]] |
 | สถานะยกเลิก | cancel status | `last_status` 0 ปกติ · 1 ยกเลิก | ทุกเอกสาร | [[term-last-status-cancel-approve]] |
@@ -310,7 +310,7 @@ sources: ["frontend/account/tabs/transMenuMap.ts:3", "frontend/src/config/bcMenu
 | เอกสารต้นทาง (ของจอยกเลิก/อนุมัติ) | original flag | `origFlag` | `TransMenuConfig` | [[term-last-status-cancel-approve]] |
 | เอกสารหนี้ร่วม (เจ้าหนี้และลูกหนี้) | ap_ar | `ap_ar_trans` · `ap_ar_trans_detail` | จอชำระหนี้ / วางบิล | [[term-module-prefix]] |
 | เอกสารอ้างอิง | doc ref | `doc_ref` · `doc_ref_date` | หัวเอกสาร "เอกสารอ้างอิงวันที่:" (`TransTopForm.tsx:422`) | [[term-doc-ref]] |
-| โอนเข้า | — | `trans_flag` 70 | ค่าคงที่ `trans.go:18-27` | [[term-wh-shelf]] |
+| โอนเข้า | — | `trans_flag` 70 | ค่าคงที่ `trans.go:22` | [[term-wh-shelf]] |
 | โอนเงิน (เอกสาร) | TM | `trans_flag` 422 | จอ TM (`transMenuMap.ts:1917`) | [[term-pay-tenders]] |
 | โอนออก | IM | `trans_flag` 72 | จอ IM (`transMenuMap.ts:1073`) | [[term-wh-shelf]] |
 | โอน GL | GL transfer type | `erp_option.gl_trans_type` 0 / 1 | ข้อเลือกพิเศษ แท็บบัญชีแยกประเภท | [[term-gl-journal]] |
@@ -323,11 +323,11 @@ sources: ["frontend/account/tabs/transMenuMap.ts:3", "frontend/src/config/bcMenu
 [[acc-trans-flag-map]] · [[acc-vat-register-wht]] · [[acc-gl-posting-standard]] · [[acc-rounding-decimal]] · [[proc-wh-shelf-permission]] · [[tbl-ic-trans]] · [[tbl-ic-trans-detail]] · [[tbl-ic-inventory]] · [[tbl-erp-option]]
 
 ## ที่มาในโค้ด
-- ชื่อเอกสาร ตัวย่อจอ และ `trans_flag`: `frontend/account/tabs/transMenuMap.ts:3`, `:54-2380`; ค่าคงที่ `backend/internal/application/process/trans.go:18-27`
-- ทิศทางสต็อกและแถวที่นับเป็นสต็อก: `backend/internal/application/process/transcalc.go:9-27`; `stock_rebuild.go:15-29`; `service.go:1066-1072`
+- ชื่อเอกสาร ตัวย่อจอ และ `trans_flag`: `frontend/account/tabs/transMenuMap.ts:3`, `:54-2380`; ค่าคงที่ `backend/internal/application/process/trans.go:20-27`
+- ทิศทางสต็อกและแถวที่นับเป็นสต็อก: `backend/internal/application/process/transcalc.go:14-27` (`calcFlagByTransFlag`); `stock_rebuild.go:18-29` (`stockRowsSQL`)
 - ป้ายหัวเอกสาร ท้ายเอกสาร และกริด: `frontend/account/transaction/TransTopForm.tsx`, `TransBottomPanel.tsx:104-387`, `TransItemGrid.tsx`, `TransExtraTabs.tsx:414-456`, `transLayouts.ts:35-59`
 - แท็บภาษีและ WHT: `frontend/account/transaction/JournalTaxTabs.tsx:225`, `:236-275`, `:743`, `:964-968`; `backend/internal/application/process/journaltax.go:38-68`
-- master และ enum: `frontend/account/master/ItemScreen.tsx:2237-2243`, `:2376-2379`, `:2446-2451`; `frontend/src/config/schemas/masterDetailSchemas.ts:249-265`, `:1563-1592`; `icMasterSchemas.ts:491-495`, `:807-830`
+- master และ enum: `frontend/account/master/ItemScreen.tsx:2228-2248` (ประเภทสินค้า), `:2352` (ประเภทหน่วยนับ), `:2446-2451` (ประเภทต้นทุน); `frontend/src/config/schemas/masterDetailSchemas.ts:248-267` (ผังบัญชี), `:1570-1604` (งวดบัญชี); `icMasterSchemas.ts:491-495` (`menu_setup_department_list`), `:807-830` (`menu_setup_side`)
 - ข้อเลือกพิเศษ: `frontend/src/config/schemas/erpOption/index.ts:30`, `:46-59` และไฟล์ `tab*.ts`
 - เมนู: `frontend/src/config/bcMenu.json` (บรรทัดตามที่ระบุในแต่ละแถว)
-- ยกเลิก/อนุมัติ เช็ค งวดบัญชี และสกุลเงิน: `backend/internal/application/process/doc_cancel.go:17-292`; `cheque.go:8-24`; `period.go:13-62`; `fx.go:16-188`
+- ยกเลิก/อนุมัติ เช็ค งวดบัญชี และสกุลเงิน: `backend/internal/application/process/doc_cancel.go:120-335` (`CancelDoc`, `ApproveDoc`, `insertStatusDoc`); `cheque.go:32-65` (`chequeStatusSQL`); `period.go:17-62` (`checkOpenPeriod`); `fx.go:18-60` (`fxTopFlags`, `transFx`)

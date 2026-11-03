@@ -2,7 +2,7 @@
 title: "ขายเป็นกล่อง/โหล แต่สต็อกนับเป็นชิ้น ระบบแปลงหน่วยยังไง"
 tags: [faq, ic, unit, stock]
 aliases: ["แปลงหน่วยนับ", "หลายหน่วยนับ", "หน่วยนับขนาน", "stand_value", "divide_value", "ic_unit_use", "unit_type", "ไม่พบหน่วยนับ", "ตัวตั้ง ตัวหาร"]
-sources: ["backend/internal/application/process/trans_lines_check.go:129", "backend/internal/application/process/trans_lines_check.go:181", "backend/internal/application/process/trans_lines_check.go:191", "backend/internal/application/process/service.go:214", "backend/internal/application/process/service.go:619", "backend/internal/application/process/service.go:1066", "backend/internal/application/process/report_menu_ic.go:886", "frontend/account/process/SystemProcessWorkbenchScreen.tsx:1495"]
+sources: ["backend/internal/application/process/trans_lines_check.go:129", "backend/internal/application/process/trans_lines_check.go:181", "backend/internal/application/process/trans_lines_check.go:191", "backend/internal/application/process/service.go:214", "backend/internal/application/process/service.go:605", "backend/internal/application/process/service.go:630", "backend/internal/application/process/service.go:1077", "backend/internal/application/process/report_menu_ic.go:915", "frontend/account/process/SystemProcessWorkbenchScreen.tsx:203", "frontend/account/process/SystemProcessWorkbenchScreen.tsx:1495"]
 ---
 # ขายเป็นกล่อง/โหล แต่สต็อกนับเป็นชิ้น ระบบแปลงหน่วยยังไง
 
@@ -28,9 +28,9 @@ sources: ["backend/internal/application/process/trans_lines_check.go:129", "back
 **ต้นทุน:** ถัวเฉลี่ยคิดจากจำนวนหน่วยมาตรฐาน `ic_inventory.average_cost` จึงเป็นต้นทุนต่อหน่วยมาตรฐาน (ดู [[faq-moving-average-cost]]) ส่วนราคาขายหาตามรหัสหน่วยที่ใช้ในบรรทัดโดยตรง ถ้าไม่ได้ตั้งราคาของหน่วยนั้น ระบบจะไม่แปลงจากราคาของหน่วยอื่น (ดู [[faq-price-discount-source]])
 
 ## ข้อควรระวัง
-- ถ้าแก้ตัวตั้ง/ตัวหารของหน่วยนับหลังจากใช้งานแล้ว เอกสารเก่าจะยังใช้ค่าเดิมที่คัดลอกไว้ จนกว่าจะรันเมนูคำนวณสต็อกใหม่ ซึ่งช่อง "ตรวจสอบและปรับปรุง อัตราส่วนหน่วยนับ" (`UpdateUnitRatio`) ถูกติ๊กไว้ตั้งแต่ต้น ระบบจะเขียนค่าใหม่ทับทุกบรรทัดของทุกเอกสารโดยไม่จำกัดวันที่ ทำให้จำนวนและต้นทุนย้อนหลังเปลี่ยน (ดู [[faq-stock-rebuild]])
-- เมื่อคำนวณสต็อกใหม่ สินค้าประเภท 0/2 จะถูกตั้งตัวตั้ง/ตัวหารเป็น 1 ทุกบรรทัด ไม่ว่าบรรทัดนั้นใช้หน่วยไหน ส่วนประเภท 1/3 จะคัดลอกค่าจาก `ic_unit_use`
-- ตัวตั้งหรือตัวหารที่เป็น 0 หรือว่าง จะถูกแก้เป็น 1 ตอนคำนวณสต็อกใหม่
+- ถ้าแก้ตัวตั้ง/ตัวหารของหน่วยนับหลังจากใช้งานแล้ว เอกสารเก่าจะยังใช้ค่าเดิมที่คัดลอกไว้ จนกว่าจะรันเมนูคำนวณสต็อกใหม่ ซึ่งช่อง "ตรวจสอบและปรับปรุง อัตราส่วนหน่วยนับ" (`UpdateUnitRatio`) ถูกติ๊กไว้ตั้งแต่ต้น (`SystemProcessWorkbenchScreen.tsx:203`, `:1492`) และฝั่ง backend ถือว่าเปิดเมื่อไม่ได้ส่งค่ามา (`service.go:605`) ระบบจะเขียนค่าใหม่ทับทุกบรรทัดของทุกเอกสารโดยไม่จำกัดวันที่ ทำให้จำนวนและต้นทุนย้อนหลังเปลี่ยน (ดู [[faq-stock-rebuild]])
+- เมื่อคำนวณสต็อกใหม่ สินค้าประเภท 0/2 จะถูกตั้งตัวตั้ง/ตัวหารเป็น 1 ทุกบรรทัด ไม่ว่าบรรทัดนั้นใช้หน่วยไหน ส่วนประเภท 1/3 จะคัดลอกค่าจาก `ic_unit_use` ที่มากกว่า 0 (`service.go:634-637`)
+- ตัวตั้งหรือตัวหารใน `ic_unit_use` ที่เป็น 0 หรือว่าง จะถูกแก้เป็น 1 ตอนคำนวณสต็อกใหม่ (`service.go:632-633`)
 
 ## ดูเพิ่ม
 - [[term-unit-ratio]]
@@ -44,7 +44,7 @@ sources: ["backend/internal/application/process/trans_lines_check.go:129", "back
 - `backend/internal/application/process/trans_lines_check.go:181` ใช้หน่วยนับของบรรทัด ถ้าไม่พบ "ไม่พบหน่วยนับ"
 - `backend/internal/application/process/trans_lines_check.go:191` บังคับหน่วยขนานและ `qty_2` เมื่อเป็น unit_type 2/3
 - `backend/internal/application/process/service.go:214` จำนวนหน่วยมาตรฐาน = จำนวน × ตัวตั้ง ÷ ตัวหาร
-- `backend/internal/application/process/service.go:619` `updateUnitRatioDetailTx` เขียนตัวตั้ง/ตัวหารทับเอกสารเก่า
-- `backend/internal/application/process/service.go:1066` คำนวณ `balance_qty` และ `balance_qty_2`
-- `backend/internal/application/process/report_menu_ic.go:886` ชื่อประเภทหน่วยนับ 0–3
-- `frontend/account/process/SystemProcessWorkbenchScreen.tsx:1495` ช่อง "ตรวจสอบและปรับปรุง อัตราส่วนหน่วยนับ" ติ๊กไว้ตั้งแต่ต้น
+- `backend/internal/application/process/service.go:605-609`, `:630-637` `updateUnitRatioDetailTx` เขียนตัวตั้ง/ตัวหารทับเอกสารเก่า
+- `backend/internal/application/process/service.go:1077-1130` คำนวณ `balance_qty` และ `balance_qty_2`
+- `backend/internal/application/process/report_menu_ic.go:915` ชื่อประเภทหน่วยนับ 0–3
+- `frontend/account/process/SystemProcessWorkbenchScreen.tsx:203`, `:1495` ช่อง "ตรวจสอบและปรับปรุง อัตราส่วนหน่วยนับ" ติ๊กไว้ตั้งแต่ต้น

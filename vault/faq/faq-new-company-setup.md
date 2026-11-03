@@ -2,14 +2,14 @@
 title: "เริ่มใช้บริษัท/ฐานข้อมูลใหม่ ต้องตั้งข้อมูลหลักอะไรบ้างก่อนบันทึกเอกสารได้"
 tags: [faq, setup, master-data, new-company]
 aliases: ["เปิดบริษัทใหม่", "ตั้งต้นระบบ", "ข้อมูลหลักขั้นต่ำ", "สร้างฐานข้อมูลใหม่", "ฐานใหม่บันทึกเอกสารไม่ได้", "ยังไม่ได้กำหนดงวดบัญชี", "ต้องตั้งอะไรก่อนใช้งาน", "ไม่พบรหัสสินค้า", "ไม่พบข้อมูล : รหัสลูกค้า", "new database", "ยอดยกมา"]
-sources: ["backend/internal/adapter/inbound/http/admin/workspace_google.go:395", "backend/internal/adapter/inbound/http/admin/workspace_google.go:533", "backend/internal/application/process/period.go:53", "backend/internal/application/process/period.go:128", "backend/internal/application/process/trans_validate.go:216", "backend/internal/application/process/trans_lines_check.go:169", "backend/internal/application/process/service.go:1755", "backend/internal/application/process/doc_cancel.go:410"]
+sources: ["backend/internal/adapter/inbound/http/admin/workspace_google.go:395", "backend/internal/adapter/inbound/http/admin/workspace_google.go:533", "backend/internal/application/process/period.go:53", "backend/internal/application/process/period.go:128", "backend/internal/application/process/trans_validate.go:216", "backend/internal/application/process/trans_lines_check.go:169", "backend/internal/application/process/service.go:1766", "backend/internal/application/process/doc_cancel.go:410"]
 ---
 # เริ่มใช้บริษัทใหม่ ต้องตั้งข้อมูลหลักอะไรบ้าง
 
-**ตอบสั้น:** ฐานข้อมูลใหม่มีแค่ค่าระบบ (ตัวเลือก ข้อมูลบริษัท สาขา 00000 และผู้ใช้ 2 คน) ไม่มีงวดบัญชี ผังบัญชี คลัง หน่วยนับ สินค้า ลูกค้า เจ้าหนี้ ต้องสร้างเองก่อน โดยสิ่งที่ "ขาดแล้วบันทึกไม่ได้" คืองวดบัญชี (ทุกเอกสาร) รหัสคู่ค้า รหัสสินค้า หน่วยนับ และคลัง/ที่เก็บของรายการสินค้า (เอกสารที่ตารางรายการมีคอลัมน์คลัง)
+**ตอบสั้น:** ฐานข้อมูลใหม่มีแค่ค่าระบบ (ตัวเลือก ข้อมูลบริษัท สาขา 00000 และผู้ใช้ผู้ดูแล `SUPERADMIN` กับผู้สร้างฐาน) ไม่มีงวดบัญชี ผังบัญชี คลัง หน่วยนับ สินค้า ลูกค้า เจ้าหนี้ ต้องสร้างเองก่อน โดยสิ่งที่ "ขาดแล้วบันทึกไม่ได้" คืองวดบัญชี (ทุกเอกสาร) รหัสคู่ค้า รหัสสินค้า หน่วยนับ และคลัง/ที่เก็บของรายการสินค้า (เอกสารที่ตารางรายการมีคอลัมน์คลัง)
 
 ## รายละเอียด
-- สร้างฐาน: `WorkspaceCreateDatabase` สร้าง database (`CREATE DATABASE … ENCODING 'UTF8'`) แล้วคัดลอกโครงสร้างว่างจากฐานต้นแบบ ไม่ติดข้อมูลรายการ (`workspace_google.go:533`, `:597`, `:395`) จากนั้น seed เฉพาะ `erp_option` (ตั้ง `year_type=1` ทศนิยม 2), `erp_company_profile` (สำนักงานใหญ่ สาขา 00000) และ `erp_user` 2 คน
+- สร้างฐาน: `WorkspaceCreateDatabase` สร้าง database (`CREATE DATABASE … ENCODING 'UTF8'` `:597`) แล้วคัดลอกโครงสร้างตารางว่าง (คอลัมน์ ค่าเริ่มต้น primary key และ unique) จากฐานต้นแบบชื่อ `bcdemo` โดยไม่ติดข้อมูลรายการ (`workspace_google.go:533`, `:603`, `cloneEmptySchemaFromTemplate` `:395`) จากนั้น seed เฉพาะ `erp_option` (ตั้ง `year_type=1` ทศนิยม 2), `erp_company_profile` (สำนักงานใหญ่ สาขา 00000) และ `erp_user` ระดับ 9 คือ `SUPERADMIN` กับรหัสผู้สร้างฐาน (ถ้ามีและไม่ใช่ `SUPERADMIN`) (`:466-515`) แล้วลงทะเบียนฐานใหม่ในฐานหลักของ provider (`bc_database_list`, `bc_google_workspace_db`, `bc_google_workspace_member`) ([[faq-tenant-database-select]])
 - ลำดับที่แนะนำ (รหัสเมนูตามโค้ดปัจจุบัน ดู [[faq-menu-code-to-screen]]):
   1. ข้อมูลบริษัท 1001 และข้อเลือกพิเศษ 1002 (`menu_company_profile`, `menu_option`)
   2. **งวดบัญชี 1081** (`menu_account_period`) — ไม่มีงวดที่ตรงวันที่เอกสาร ทุกเอกสารขึ้น "ได้ถูกปิดงวดไปแล้ว หรือยังไม่ได้กำหนดงวดบัญชี กรุณาตรวจสอบ" (`period.go:53-61`; ยกเว้น flag 521-523 ที่ `period.go:128`)
@@ -22,7 +22,7 @@ sources: ["backend/internal/adapter/inbound/http/admin/workspace_google.go:395",
 
 ## ข้อควรระวัง
 - ไม่พบ wizard ตั้งค่าบริษัททีละขั้นในโค้ด ต้องเปิดจอ master ทีละจอ
-- ถ้าผังบัญชีไม่มีรหัสที่ GL มาตรฐานต้องใช้ ระบบไม่ error แต่ลงรหัสแรกในรายการที่หา (ใช้เป็นทั้งรหัสและชื่อ) แม้ไม่มีในผัง (`service.go:1755-1772`) จึงควรสร้างผังก่อนเริ่มบันทึก
+- ถ้าผังบัญชีไม่มีรหัสที่ GL มาตรฐานต้องใช้ ระบบไม่ error แต่ลงรหัสแรกในรายการที่หา (ใช้เป็นทั้งรหัสและชื่อ) แม้ไม่มีในผัง (`resolveChartAccount` `service.go:1766-1783`) จึงควรสร้างผังก่อนเริ่มบันทึก
 - คำสั่ง seed ทุกตัวไม่สนใจ error ถ้าโครงสร้างต้นแบบเปลี่ยนอาจไม่มีผู้ใช้หรือตัวเลือก
 
 ## ดูเพิ่ม
@@ -34,10 +34,10 @@ sources: ["backend/internal/adapter/inbound/http/admin/workspace_google.go:395",
 - [[faq-doc-number-format]]
 
 ## ที่มาในโค้ด
-- `backend/internal/adapter/inbound/http/admin/workspace_google.go:395`, `:533`, `:597`
+- `backend/internal/adapter/inbound/http/admin/workspace_google.go:395` (`cloneEmptySchemaFromTemplate`), `:533` (`WorkspaceCreateDatabase`), `:597`, `:603`
 - `backend/internal/application/process/period.go:53-61`, `:128`
 - `backend/internal/application/process/trans_validate.go:216-232`
 - `backend/internal/application/process/trans_lines_check.go:169`, `:188`, `:257`, `:260`
-- `backend/internal/application/process/service.go:1755-1772`
+- `backend/internal/application/process/service.go:1766-1783`
 - `backend/internal/application/process/doc_cancel.go:410-412`
 - `frontend/account/tabs/transMenuMap.ts:924` (54), `:1209` (81), `:1406` (93), `:1856` (602)

@@ -2,7 +2,7 @@
 title: "เอกสารสกุลเงินต่างประเทศคำนวณและลงบัญชีกำไร/ขาดทุนอัตราแลกเปลี่ยนอย่างไร"
 tags: [faq, fx, currency, ap, ar, gl]
 aliases: ["หลายสกุลเงิน", "อัตราแลกเปลี่ยน", "กำไรขาดทุนจากอัตราแลกเปลี่ยน", "multi currency", "exchange rate", "lost_profit_exchange_amount", "trans_flag 19", "trans_flag 239", "420040", "511030"]
-sources: ["backend/internal/application/process/fx.go:18", "backend/internal/application/process/fx.go:43", "backend/internal/application/process/fx.go:129", "backend/internal/application/process/fx.go:179", "backend/internal/application/process/fx.go:252", "backend/internal/application/process/docs.go:338", "backend/internal/application/process/service.go:2159"]
+sources: ["backend/internal/application/process/fx.go:18", "backend/internal/application/process/fx.go:43", "backend/internal/application/process/fx.go:129", "backend/internal/application/process/fx.go:179", "backend/internal/application/process/fx.go:252", "backend/internal/application/process/docs.go:338", "backend/internal/application/process/service.go:2170"]
 ---
 # เอกสารสกุลเงินต่างประเทศคำนวณและลงบัญชีกำไร/ขาดทุนอัตราแลกเปลี่ยนอย่างไร
 
@@ -55,4 +55,4 @@ sources: ["backend/internal/application/process/fx.go:18", "backend/internal/app
 - `backend/internal/application/process/fx.go:150` `headerTotals`; `:179` `local`
 - `backend/internal/application/process/fx.go:223` `billFxFlags`; `:252` `fxBillPay`; `:267` `fxBill`; `:311` `refreshFxBills`
 - `backend/internal/application/process/docs.go:338` UPDATE `lost_profit_exchange_amount`
-- `backend/internal/application/process/service.go:2159` GL 19/239; `:2177` ขาดทุน 511030; `:2180` กำไร 420040
+- `backend/internal/application/process/service.go:2170` GL 19/239; `:2188` ขาดทุน 511030; `:2191` กำไร 420040

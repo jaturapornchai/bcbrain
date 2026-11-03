@@ -7,7 +7,7 @@ sources: ["backend/internal/application/process/barcode.go:123", "backend/intern
 
 # บาร์โค้ดสินค้า ส่วนลดบาร์โค้ด EAN13 และพิมพ์ป้าย (Barcode menus 2.1.7-2.1.17)
 
-กลุ่ม route `POST /process/barcode/{action}` รองรับเมนูสินค้า 6 เมนู (ตามคอมเมนต์ในโค้ด): 2.1.7 แก้บาร์โค้ดของสินค้า, 2.1.8 ส่วนลดบาร์โค้ดรายตัว, 2.1.9 ส่วนลดหลายบาร์โค้ด, 2.1.14 เพิ่มบาร์โค้ดด่วน, 2.1.16 ตรวจ/สร้าง EAN13 ใหม่, 2.1.17 พิมพ์ป้ายบาร์โค้ด ทั้งหมดพอร์ตจากโปรแกรม C# (`BCERPIC/_icBarcode.cs`, `_icBarcodeDiscount.cs`, `BCBarcodeManage/*`) ตารางหลักคือ `ic_inventory_barcode` และ `ic_inventory_barcode_price`
+กลุ่ม route `POST /process/barcode/{action}` รองรับเมนูสินค้า 6 เมนู (ตามคอมเมนต์ในโค้ด): 2.1.7 แก้บาร์โค้ดของสินค้า, 2.1.8 ส่วนลดบาร์โค้ดรายตัว, 2.1.9 ส่วนลดหลายบาร์โค้ด, 2.1.14 เพิ่มบาร์โค้ดด่วน, 2.1.16 ตรวจ/สร้าง EAN13 ใหม่, 2.1.17 พิมพ์ป้ายบาร์โค้ด (โค้ดอยู่ใน `barcode.go` และ `barcode_discount.go`) ตารางหลักคือ `ic_inventory_barcode` และ `ic_inventory_barcode_price`
 
 ## ทำงานอย่างไร
 
@@ -31,13 +31,13 @@ sources: ["backend/internal/application/process/barcode.go:123", "backend/intern
 
 ### 2. บันทึกบาร์โค้ด (`SaveBarcodes`, `barcode.go:252`)
 1. `cleanBarcodeRows`: ข้ามแถวบาร์โค้ดว่าง, ยาวเกิน 50 ตัวอักษรปฏิเสธ, ซ้ำในตารางเดียวกัน (ไม่สนตัวพิมพ์) ปฏิเสธ "บาร์โค้ดซ้ำ", หน่วยแปลงเป็นตัวพิมพ์ใหญ่, ราคา 8 ช่องผ่าน `normDecimal` (ตัด `,` ว่าง = `0`, รูปแบบผิด = "ตัวเลขไม่ถูกต้อง (...)")
-2. ถ้าส่ง `shelf` มา ต้องมี `whCode` และ `locationCode` ด้วย มิฉะนั้นปฏิเสธ (ตาม C# "ข้อมูลไม่สมบูรณ์")
+2. ถ้าส่ง `shelf` มา ต้องมี `whCode` และ `locationCode` ด้วย มิฉะนั้นปฏิเสธ "ระบุ Update Shelf แล้ว ต้องเลือกคลัง/ที่เก็บเริ่มต้นก่อน" (`barcode.go:263-266`)
 3. transaction เดียว (timeout 30 วินาที): ตรวจสินค้ามีจริง; ตรวจว่าบาร์โค้ดใหม่ไม่ถูกใช้กับสินค้าอื่น ("บาร์โค้ด X ถูกใช้แล้วกับสินค้า Y"); `DELETE` บาร์โค้ดทั้งหมดของสินค้านี้แล้ว `INSERT` ตามตาราง (`status = 1`, `line_number` ตามลำดับ, `description` ว่างใช้ชื่อสินค้า)
 4. ถ้ามี `shelf`: `appendShelf` เติมรหัสที่เก็บต่อท้าย `ic_wh_shelf.shelf_list` (คั่นด้วย `,` ไม่เติมซ้ำ) ถ้าไม่มีแถว `(สินค้า, คลัง, ที่เก็บ)` จะ `INSERT` ใหม่
 - ผล: `{itemCode, saved}`; สิ่งสำคัญ: เป็นการ **แทนที่ทั้งชุด** ส่งตารางที่ขาดแถวมา = แถวเหล่านั้นถูกลบ
 
 ### 3. ส่วนลดบาร์โค้ด (2.1.8 / 2.1.9, `barcode_discount.go`)
-- ตาราง `ic_inventory_barcode_price` เก็บส่วนลด 5 ประเภท (`discount_type` 1-5 = ลดพิเศษทั่วไป / ลดพิเศษสมาชิก / ลดโปรโมชั่น / ลดสมาชิก / ลดพนักงาน ตามคอมเมนต์หัวไฟล์) โครงสร้างข้อมูลต้องคงรูปแบบ C# เพราะ `_findPriceClass.cs` อ่านตาราง (ตามคอมเมนต์)
+- ตาราง `ic_inventory_barcode_price` เก็บส่วนลด 5 ประเภท (`discount_type` 1-5 = ลดพิเศษทั่วไป / ลดพิเศษสมาชิก / ลดโปรโมชั่น / ลดสมาชิก / ลดพนักงาน ตามคอมเมนต์หัวไฟล์ `barcode_discount.go:16-21`) -- การหาราคาในตารางสินค้าของเอกสาร ([[proc-price-engine]]) ไม่ได้อ่านส่วนลดจากตารางนี้
 - ต่อแถว: `priority`, `discountWord` (คำส่วนลดแบบขั้น เช่น `10%,5` ดู [[proc-grid-calc]]), `qtyBegin/qtyEnd`, `dateBegin/dateEnd`, `lockDay`, `lockDiscount`, `lockCodeList`, `status`
 - `discount-load`: รับ `barcode` (ไม่เกิน 25 ตัวอักษร) คืน `header` (บาร์โค้ด รหัสสินค้า คำอธิบาย หน่วย ราคา) และ `grids` 5 ชุดเสมอ เรียงตาม `priority`
 - `discount-save` (`BarcodeDiscountSave`): `replace = true` = 2.1.8 ลบแถวเดิมของบาร์โค้ดก่อนแล้วใส่ใหม่, `false` = 2.1.9 เพิ่มอย่างเดียว กับหลายบาร์โค้ด
@@ -53,10 +53,10 @@ sources: ["backend/internal/application/process/barcode.go:123", "backend/intern
 
 ### 5. พิมพ์ป้ายบาร์โค้ด (2.1.17)
 - `print-items` (`BarcodePrintItems`): รับ `barcodes[]` (1-5000) **หรือ** `docNo` (ดึงบาร์โค้ดทุกตัวที่อยู่ใน `ic_trans_detail` ของเอกสารนั้น) คืนแถวพร้อมชื่อหน่วย ราคา 8 ช่อง และ `priceFormula` = `price_0` ของ `ic_inventory_price_formula` ของสินค้า/หน่วยนั้น (ไม่มี = `0`)
-- `format` (`BarcodeFormat`): จัดการตาราง `bc_barcode_print_format` (`code`, `name`, `formatdata`): `list`, `save` (ลบแถวรหัสเดิมแล้วใส่ใหม่ใน transaction; ต้องมีรหัส <= 25 ตัวอักษรและชื่อ), `delete`; ข้อมูลรูปแบบ (หน่วย cm/inch, ขอบ, ขนาดป้าย, แถว/คอลัมน์, ชื่อบริษัท, ราคาที่แสดง ฯลฯ) เก็บเป็น JSON; อ่านแถวที่โปรแกรม C# เขียนไว้ (zip + XML) ได้ด้วย `decodeBarcodeFormat` อ่านไม่ได้จะใช้ค่าตั้งต้นของ C# (ฟิลด์ขนาดป้ายเป็น `float64` เพราะเป็นขนาดเรขาคณิต ไม่ใช่เงิน ตามคอมเมนต์)
+- `format` (`BarcodeFormat`): จัดการตาราง `bc_barcode_print_format` (`code`, `name`, `formatdata`): `list`, `save` (ลบแถวรหัสเดิมแล้วใส่ใหม่ใน transaction; ต้องมีรหัส <= 25 ตัวอักษรและชื่อ), `delete`; ข้อมูลรูปแบบ (หน่วย cm/inch, ขอบ, ขนาดป้าย, แถว/คอลัมน์, ชื่อบริษัท, ราคาที่แสดง ฯลฯ) เก็บเป็น JSON; `decodeBarcodeFormat` (`barcode.go:715`) อ่าน JSON ก่อน ถ้าไม่ใช่ลองแตก zip แล้วอ่าน XML (ข้อมูลรูปแบบเก่าที่เก็บเป็น zip + XML) อ่านไม่ได้จะใช้ค่าตั้งต้น: เซนติเมตร, แสดงราคา, ขอบบน 0.5, ขอบซ้าย 0.02, ป้าย 4 x 2, 14 แถว x 5 คอลัมน์ เริ่มแถว/คอลัมน์ 1 (ฟิลด์ขนาดป้ายเป็น `float64` เพราะเป็นขนาดเรขาคณิต ไม่ใช่เงิน)
 
 ## จุดที่ต้องระวัง
-- `barcode/save` ลบแล้วใส่ใหม่ทั้งชุด: ส่งมาไม่ครบ = ข้อมูลหาย (ตามต้นฉบับ C#); ตรวจซ้ำกับสินค้าอื่นด้วยตัวพิมพ์ใหญ่
+- `barcode/save` ลบแล้วใส่ใหม่ทั้งชุด: ส่งมาไม่ครบ = แถวที่ไม่ได้ส่งหายไป; ตรวจซ้ำกับสินค้าอื่นด้วยตัวพิมพ์ใหญ่
 - บาร์โค้ดเดียวกันในส่วนลด/การพิมพ์ ค้นแบบไม่สนตัวพิมพ์ แต่ `ean13-apply` เทียบ `barcode = $` ตรง ๆ (ตัวพิมพ์เล็กใหญ่ต้องตรง)
 - ตัวตรวจบาร์โค้ดซ้ำใน `stocktools/barcodecheck` (เมนู `menu_ic_item_barcode_checker`) เป็นคนละเครื่องมือ ดู [[proc-stock-tools]]
 - แก้ราคาบาร์โค้ดเป็นก้อนหรือทีละตัว ดู [[proc-price-engine]] (`modifyprice` ชนิด `barcode`, `checkpricesave`)

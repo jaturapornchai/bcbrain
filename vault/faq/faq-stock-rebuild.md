@@ -2,7 +2,7 @@
 title: "คำนวณยอดสต๊อกใหม่ (Rebuild Stock) ทำอะไรบ้าง ต้องกดเมื่อไหร่"
 tags: [faq, ic, stock, rebuild, cost]
 aliases: ["คำนวณยอดสต๊อกใหม่", "rebuild stock", "recalc stock", "menu_ic_recalc", "RebuildStock", "ประมวลผลสต็อกใหม่", "balance_qty ไม่ตรง", "docno= process command"]
-sources: ["frontend/src/config/bcMenu.json:2580", "backend/internal/application/process/service.go:548", "backend/internal/application/process/service.go:577", "backend/internal/application/process/service.go:619", "backend/internal/application/process/service.go:654", "backend/internal/application/process/service.go:1007", "backend/internal/application/process/stock_rebuild.go:86"]
+sources: ["frontend/src/config/bcMenu.json:2580", "backend/internal/application/process/service.go:559", "backend/internal/application/process/service.go:588", "backend/internal/application/process/service.go:630", "backend/internal/application/process/service.go:665", "backend/internal/application/process/service.go:1018", "backend/internal/application/process/stock_rebuild.go:86"]
 ---
 # คำนวณยอดสต๊อกใหม่ (Rebuild Stock) ทำอะไรบ้าง ต้องกดเมื่อไหร่
 
@@ -38,9 +38,9 @@ sources: ["frontend/src/config/bcMenu.json:2580", "backend/internal/application/
 
 ## ที่มาในโค้ด
 - `frontend/src/config/bcMenu.json:2580` เมนู `menu_ic_recalc` "คำนวณยอดสต๊อกใหม่"
-- `backend/internal/application/process/service.go:548` `RebuildStock` ทำงานใน transaction เดียว timeout 60 วินาที
-- `backend/internal/application/process/service.go:577` `rebuildStockWithOptionsTx` แยก action และลำดับขั้นตอน
-- `backend/internal/application/process/service.go:619` `updateUnitRatioDetailTx` ปรับอัตราส่วนหน่วย
-- `backend/internal/application/process/service.go:654` รูปแบบ Process Command (`docno=`, `:`, `,`)
-- `backend/internal/application/process/service.go:1007` `rebuildStockTx`
+- `backend/internal/application/process/service.go:559` `RebuildStock` ทำงานใน transaction เดียว timeout 60 วินาที
+- `backend/internal/application/process/service.go:588` `rebuildStockWithOptionsTx` แยก action และลำดับขั้นตอน
+- `backend/internal/application/process/service.go:630` `updateUnitRatioDetailTx` ปรับอัตราส่วนหน่วย
+- `backend/internal/application/process/service.go:665` รูปแบบ Process Command (`docno=`, `:`, `,`)
+- `backend/internal/application/process/service.go:1018` `rebuildStockTx`
 - `backend/internal/application/process/stock_rebuild.go:86` `backfillStockTransferInTx`

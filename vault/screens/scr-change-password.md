@@ -11,8 +11,8 @@ sources: ["frontend/account/tabs/screenRegistry.tsx:426", "frontend/account/tabs
 - **ไม่มี `menuCode`** (เปิดจาก `/admin/change-password`) = จอผู้ดูแลระบบ `ChangePasswordForm` ตั้งรหัสใหม่ให้ผู้ใช้คนอื่น ห่อด้วย `ProviderScopedScreen` (เลือก Provider ก่อน, หมายเหตุ "ตั้งรหัสผ่านใหม่ให้ผู้ใช้ในระบบ" `:429`) ดู [[scr-admin-console]]
 
 ## วิธีเปิด
-- เมนู ERP **ตั้งค่า > จัดการฐานข้อมูลและสิทธิ์ผู้ใช้ > เปลี่ยนรหัสผ่าน** รหัส `1095` (`menu_change_password`) ผูกที่ `screenRegistry.tsx:426-433` (มี fallback รหัสแบบจุด `1.11.1.6`) <!-- pragma: allowlist secret -->
-- มีรายการที่สองใน registry `menu_saletools_change_password` ชื่อ "Change Password" (`screenRegistry.tsx:434`, fallback `12.7.2`) ใช้คอมโพเนนต์เดียวกัน ชื่อนี้ไม่มีใน `bcMenu.json` แต่เป็นชื่อเก่าใน `LEGACY_MENU_ALIASES` ที่ชี้ไป `menu_change_password` (`bcMenu.ts:209`) จึงเป็นทางเข้าสำรองของเมนูเดียวกัน
+- เมนู ERP **ตั้งค่า > จัดการฐานข้อมูลและสิทธิ์ผู้ใช้ > เปลี่ยนรหัสผ่าน** รหัส `1095` (`menu_change_password`) ผูกที่ `screenRegistry.tsx:426-433`
+- มีรายการที่สองใน registry `menu_saletools_change_password` ชื่อ "Change Password" (`screenRegistry.tsx:434-441`) ใช้คอมโพเนนต์เดียวกัน ชื่อนี้ไม่มีใน `bcMenu.json` แต่ `LEGACY_MENU_ALIASES` ให้ชี้ไป `menu_change_password` (`bcMenu.ts:247`) จึงเป็นทางเข้าสำรองของเมนูเดียวกัน
 - หน้า `/admin/change-password` เป็นเพจ Next.js ที่เรียก `ChangePasswordScreen` ตรง ๆ (`src/app/(admin)/admin/change-password/page.tsx`)
 - กลไกเมนู/รหัสดู [[fe-screen-registry-menu]]
 

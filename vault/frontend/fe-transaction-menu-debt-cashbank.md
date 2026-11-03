@@ -14,23 +14,23 @@ sources: ["frontend/account/tabs/transMenuMap.ts:1207", "frontend/account/tabs/t
 
 **วิธีอ่านตาราง** เหมือนโน้ตก่อนหน้า: `trans_flag` คือรหัสชนิดเอกสาร, โหมด บันทึก/ยกเลิก/อนุมัติ, "ต้นทาง N" = `origFlag`, "บรรทัด" = บรรทัดนิยามใน `frontend/account/tabs/transMenuMap.ts`.
 
-**ตารางที่เก็บ (`kind`) และ endpoint** (จาก `UniversalTransScreen.tsx:2649-2905`)
+**ตารางที่เก็บ (`kind`) และ endpoint** (จาก `UniversalTransScreen.tsx:2656-2828` ฝั่งบันทึก และ `2901-2914` ฝั่งลบ)
 | `kind` | จำนวนเมนูหมวด 4-6 | บันทึก | ลบ |
 |---|---|---|---|
-| `ic_trans` | 69 (หมวด 4-6 ส่วนมากเป็น `ic_trans` เพราะ C# เปิด `_icTransControl`) | `POST /api/process/trans/save` | `POST /api/process/trans/delete` |
-| `ap_ar_trans` | 8 (ใบรับวางบิล/ใบวางบิล, จ่ายชำระหนี้/รับชำระหนี้ และเมนูยกเลิกของ 4 เมนูนี้ - บรรทัด 1345-1388 และ 1544-1587) | `POST /api/process/doc/save` | `POST /api/process/doc/delete` |
+| `ic_trans` | 69 (ส่วนใหญ่ของหมวด 4-6 เก็บเป็นหัว `ic_trans` + รายการ `ic_trans_detail`) | `POST /api/process/trans/save` | `POST /api/process/trans/delete` |
+| `ap_ar_trans` | 8 (ใบรับวางบิล/ใบวางบิล, จ่ายชำระหนี้/รับชำระหนี้ และเมนูยกเลิกของ 4 เมนูนี้ - ใน `transMenuMap.ts` บรรทัด 1345-1388 และ 1544-1587) | `POST /api/process/doc/save` | `POST /api/process/doc/delete` |
 | `cb_chq_list` | 5 (ทะเบียนเช็ค) | `POST /api/process/doc/save` | `POST /api/process/doc/delete` |
 | `gl_journal` | 2 (ข้อมูลรายวัน) | `POST /api/process/doc/save` | `POST /api/process/doc/delete` |
 
-- โหมดยกเลิก/อนุมัติทุกชนิด เรียก `POST /api/process/doc/cancel|approve` ผ่าน `setDocStatus` ([[fe-transaction-screens]]).
-- `kind: "cb_trans"` มีใน type แต่ **ไม่มีเมนูใดใช้** และจอจะ throw "ยังไม่รองรับ" ถ้าบันทึก/ลบ (`UniversalTransScreen.tsx:2649,2897`).
-- จอที่มีแท็บรับ/จ่ายชำระ (เงินสด/โอน/พร้อมเพย์/เช็ค/บัตร/รายได้-ค่าใช้จ่ายอื่น) ส่งข้อมูลใน `pay` ของ `saveTrans` (`UniversalTransScreen.tsx:2610-2646`) ดูโน้ต [[fe-transaction-screens]].
+- โหมดยกเลิก/อนุมัติทุกชนิด เรียก `POST /api/process/doc/cancel|approve` ผ่าน `setDocStatus` (`query-client.ts:801-821`; ผู้เรียกคือ `UniversalCancelConfirmScreen.tsx:469`; ดู [[fe-transaction-screens]]).
+- `kind: "cb_trans"` มีใน type แต่ **ไม่มีเมนูใดใช้** และจอจะ throw "ยังไม่รองรับ" ถ้าบันทึก/ลบ (`UniversalTransScreen.tsx:2656-2658,2904-2906`).
+- จอที่มีแท็บรับ/จ่ายชำระ (เงินสด/โอน/พร้อมเพย์/เช็ค/บัตร/รายได้-ค่าใช้จ่ายอื่น) ประกอบข้อมูลเป็นก้อน `pay` (`UniversalTransScreen.tsx:2609-2654`) ส่งไปกับ `saveTrans` (บรรทัด 2768) และกับ `saveDoc` เมื่อ `kind === "ap_ar_trans"` (บรรทัด 2693) ดูโน้ต [[fe-transaction-screens]].
 
 **ข้อมูลจากคอมเมนูหัวหมวด 6** (`transMenuMap.ts:1603-1608`)
-- เมนูเงินสด/ธนาคารทุกเมนูใน C# เปิด `_clone_icTrans` -> `_icTransControl` คือเก็บหัว `ic_trans` + รายการ `ic_trans_detail`; เมนูยกเลิก = เก็บเฉพาะหัว โดย `doc_ref` ชี้เอกสารต้นฉบับ.
-- `trans_type` ตาม `_transType()` ของ BCERP เดิม: เช็คจ่าย = 1, โอนเงินออก (flag 422) = 0, ที่เหลือ = 2.
-- C# ไม่กำหนด `_screen_code` ให้จอเงินสด; `prefix` ในไฟล์เป็น "ค่าเริ่มต้นของเว็บ" (ไม่ใช่ค่าจาก C#).
-- คอมเมนู `ponytail:` ที่ 1871 ระบุว่า C# เขียนแถวโอนเข้าคู่กันด้วยสำหรับ flag 422 แต่เว็บบันทึกเฉพาะขาออก; ที่ 1990 ระบุว่ายังไม่มีคอลัมน์เลขเช็ค/ตัวเลือกเช็คตามสถานะ และยังไม่คำนวณ `cb_chq_list.status` (งานฝั่ง backend แยก) - ถือเป็นข้อจำกัดที่รู้อยู่ ไม่ใช่บั๊กใหม่.
+- เมนูเงินสด/ธนาคารและบัญชีแยกประเภท 58 เมนูแบ่งตาม `kind` ในไฟล์: `ic_trans` 51, `cb_chq_list` 5, `gl_journal` 2; คอมเมนต์หัวหมวดระบุว่าเมนู `ic_trans` เก็บหัว `ic_trans` + รายการ `ic_trans_detail` ส่วนเมนูยกเลิกเก็บเฉพาะหัว โดย `doc_ref` ชี้เอกสารต้นฉบับ (`transMenuMap.ts:1605-1606`).
+- ค่า `transType` ของ 58 เมนูหมวดนี้ (นับจากข้อมูลในไฟล์): `2` 43 เมนู; `1` 11 เมนู (ทะเบียนเช็ครับ `menu_cb_chq_in_receive_master`, `menu_cb_chq_list_receive` และเมนูเช็คจ่าย `menu_cb_chq_out_*` 9 เมนู); `0` 3 เมนู (`menu_cash_transfer` flag 422, `menu_gl_journal`, `menu_gl_journal_fast`); `3` 1 เมนู (`menu_cb_credit_card_receive`). คอมเมนต์หัวหมวด (`transMenuMap.ts:1607`) สรุปไว้ว่าเช็คจ่าย = 1, โอนเงินออก 422 = 0, ที่เหลือ = 2.
+- `prefix` ของเมนูเงินสด/ธนาคารในไฟล์เป็น "ค่าเริ่มต้นของเว็บ" ตามคอมเมนต์ `transMenuMap.ts:1608`.
+- คอมเมนู `ponytail:` ที่ 1871 ระบุว่าโอนเงิน flag 422 เว็บบันทึกเฉพาะขาออก ยังไม่เขียนแถวโอนเข้าคู่กัน; ที่ 1990 ระบุว่ายังไม่มีคอลัมน์เลขเช็ค/ตัวเลือกเช็คตามสถานะ และยังไม่คำนวณ `cb_chq_list.status` (งานฝั่ง backend แยก) - ถือเป็นข้อจำกัดที่รู้อยู่ ไม่ใช่บั๊กใหม่.
 
 ### 4. ระบบเจ้าหนี้ (AP) - บรรทัด 1207-1403 (13 เมนู)
 
@@ -173,9 +173,9 @@ trans_type = 2; flag 93-103 เก็บใน `ic_trans`, flag 235 และ 23
 | บันทึกข้อมูลรายวันแบบเร็ว | `menu_gl_journal_fast` | 0 | บันทึก | gl_journal | JV | - |  | 2451 |
 
 **ข้อสังเกตจากข้อมูล**
-- `menu_gl_journal` และ `menu_gl_journal_fast` เป็น `gl_journal` ที่ `trans_type = 0`, `trans_flag = 0`, `prefix JV` (บรรทัด 2368-2380, 2451-2462) - จอสมุดรายวันบันทึกผ่าน `saveDoc` และแสดงรายการจากตาราง `gl_journal` (รหัสในช่องคู่ค้าคือ `book_code`, `UniversalTransScreen.tsx:1094-1100`). จอ `gl_journal` ทุกเมนูแสดงแถบเลือก "รายวันประจำ" จาก `gl_recurring` (`GlRecurringBar`, เงื่อนไข `kind === "gl_journal"` ที่ `UniversalTransScreen.tsx:3300`).
-- เมนูทางลัด `menu_cb_chq_list_receive/pay` (ทะเบียนเช็ค), `menu_cb_receive_money` (รายได้อื่นๆ) และ `menu_cb_pay_money` (ค่าใช้จ่ายอื่นๆ) มีบรรทัดนิยามของตัวเองต่างจากชุด 6.1-6.6 (บรรทัด 2395-2450).
-- คีย์ `menu_so_quotation` (บรรทัด 2381) ชื่อ "ใบเสนอราคาขาย" แต่ตั้งค่า `trans_flag 260`, `prefix EPO`, `partyType ap` และค้นรหัสจาก `erp_expenses_list` - ต่างจากเมนูใบเสนอราคาในหมวดขาย (ยังไม่ยืนยันเหตุผล; อาจเป็นค่าที่ตั้งผิดชื่อ ควรถามผู้ดูแลเมนู).
+- `menu_gl_journal` และ `menu_gl_journal_fast` เป็น `gl_journal` ที่ `trans_type = 0`, `trans_flag = 0`, `prefix JV` (บรรทัด 2368-2380, 2451-2462) - จอสมุดรายวันบันทึกผ่าน `saveDoc` และแสดงรายการจากตาราง `gl_journal` (รหัสในช่องคู่ค้าคือ `book_code`, `UniversalTransScreen.tsx:1091-1102`; บันทึกที่ `2659-2712`). จอ `gl_journal` ทุกเมนูแสดงแถบ "รายวันประจำ" (`GlRecurringBar`, เงื่อนไข `kind === "gl_journal"` ที่ `UniversalTransScreen.tsx:3310-3311`): โหลดต้นแบบของกิจการจาก `POST /api/process/gl/recurring` (`GlRecurringBar.tsx:119`) รวมกับต้นแบบในตัว 5 รายการ `TPL-UTIL`, `TPL-PAYROLL`, `TPL-PREPAID`, `TPL-DEPR`, `TPL-VAT-CLOSE` (22-88; ตัวในตัวที่รหัสซ้ำกับของกิจการจะถูกซ่อน 132-136); บันทึกต้นแบบใหม่ด้วย `DELETE` + `INSERT` ลงตาราง `gl_recurring` (คอลัมน์ `code`, `gl_desc`, `xmlstring` เก็บ JSON ของสมุด/คำอธิบาย/รายการบัญชี, 143-176), ลบได้เฉพาะต้นแบบที่ไม่ใช่แบบในตัว (192-201), และปุ่มกลับรายการสลับเดบิต-เครดิตของทุกบรรทัด (`UniversalTransScreen.tsx:3316-3343`).
+- เมนูทางลัด `menu_cb_chq_list_receive/pay` (ทะเบียนเช็ค), `menu_cb_receive_money` (รายได้อื่นๆ) และ `menu_cb_pay_money` (ค่าใช้จ่ายอื่นๆ) มีบรรทัดนิยามของตัวเองต่างจากชุด 6.1-6.6 (`transMenuMap.ts` บรรทัด 2395-2450).
+- คีย์ `menu_so_quotation` (`transMenuMap.ts` บรรทัด 2381) ชื่อ "ใบเสนอราคาขาย" ตั้งค่า `trans_flag 30`, `prefix SO`, `partyType ar` ซ้ำกับคีย์ `menu_so_quotation_order` ในหมวดขาย (บรรทัด 543) ทุกฟิลด์; ส่วน `menu_cb_pay_money` (บรรทัด 2436) คือเมนูที่ค้นรหัสจาก `erp_expenses_list` ใน `itemLookup` (บรรทัด 2449) และ `menu_cb_receive_money` ค้นจาก `erp_income_list` (บรรทัด 2434).
 - เมนูที่ `partyType none` ไม่แสดงช่องคู่ค้า (`showParty: partyType !== "none"`, `transLayouts.ts:316`).
 
 **ข้อควรระวัง**
@@ -186,8 +186,10 @@ trans_type = 2; flag 93-103 เก็บใน `ic_trans`, flag 235 และ 23
 - `frontend/account/tabs/transMenuMap.ts:1207-1403` - เมนูเจ้าหนี้ 13
 - `frontend/account/tabs/transMenuMap.ts:1404-1602` - เมนูลูกหนี้ 13
 - `frontend/account/tabs/transMenuMap.ts:1603-2461` - เมนูเงินสด/ธนาคาร + GL 58 (คอมเมนู 1603-1608, 1609, 1703, 1797, 1870, 1989, 2179, 2324)
-- `frontend/account/transaction/UniversalTransScreen.tsx:2649-2905` - เลือก endpoint ตาม `kind`
-- `frontend/account/transaction/GlRecurringBar.tsx:1-57` - รายวันประจำ
+- `frontend/account/transaction/UniversalTransScreen.tsx:2656-2828,2901-2914` - เลือก endpoint ตาม `kind` (บันทึก/ลบ); `UniversalTransScreen.tsx:2609-2654` - ก้อน `pay`
+- `frontend/src/lib/query-client.ts:377,683,775,797,801-821` - `saveTrans`, `deleteTrans`, `saveDoc`, `deleteDoc`, `setDocStatus`
+- `frontend/account/transaction/GlRecurringBar.tsx:22-88,119,132-136,143-176,192-201` - รายวันประจำ (ต้นแบบในตัว, โหลด, บันทึก, ลบ)
+- `frontend/account/transaction/UniversalTransScreen.tsx:3310-3343` - ติดตั้งแถบรายวันประจำและปุ่มกลับรายการ
 
 ## ดูเพิ่ม
 [[frontend-overview]] · [[fe-transaction-screens]] · [[fe-transaction-menu-purchase-sale-stock]] · [[fe-screen-registry-menu]] · [[accounting-overview]] · [[process-overview]]

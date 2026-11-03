@@ -2,7 +2,7 @@
 title: "API ประตูเขียนข้อมูล /query/exec และ /query/execBatch (Query exec endpoints)"
 tags: [api, query]
 aliases: ["/query/exec","/query/execBatch","/api/query/exec","/api/query/execBatch","queryExec","queryExecBatch","ErrMoneyTableViaExec","ErrAdminOnlyWrite","queryWriteGuard"]
-sources: ["backend/internal/adapter/inbound/http/router.go:95","backend/internal/adapter/inbound/http/query/handler.go:227","backend/internal/adapter/inbound/http/query/handler.go:281","backend/internal/application/query/service.go:95","backend/internal/application/query/service.go:137","backend/internal/domain/query/query.go:335","backend/internal/domain/query/query.go:361","backend/internal/domain/query/query.go:394","backend/internal/domain/query/write_policy.go:77","backend/internal/adapter/inbound/http/process/permission.go:135","frontend/src/app/api/query/exec/route.ts:12","frontend/src/app/api/query/execBatch/route.ts:12","frontend/src/lib/query-client.ts:44"]
+sources: ["backend/internal/adapter/inbound/http/router.go:95","backend/internal/adapter/inbound/http/query/handler.go:227","backend/internal/adapter/inbound/http/query/handler.go:281","backend/internal/application/query/service.go:95","backend/internal/application/query/service.go:137","backend/internal/domain/query/query.go:335","backend/internal/domain/query/query.go:363","backend/internal/domain/query/query.go:397","backend/internal/domain/query/write_policy.go:77","backend/internal/adapter/inbound/http/process/permission.go:138","frontend/src/app/api/query/exec/route.ts:12","frontend/src/app/api/query/execBatch/route.ts:12","frontend/src/lib/query-client.ts:44"]
 ---
 
 # API /query/exec และ /query/execBatch
@@ -11,15 +11,15 @@ sources: ["backend/internal/adapter/inbound/http/router.go:95","backend/internal
 
 ## ชั้นที่ 1: router และ right (router.go:85-102)
 
-- `Auth` (Bearer access token) แล้วตามด้วย `queryWriteGuard = RequireRight(ex.Rights, processhttp.QueryRequiredRight)`
-- `QueryRequiredRight` (process/permission.go:135-161) ตัดสิน right ตามชนิดคำสั่ง: `insert` -> Add, `update` -> Edit, `delete` -> Delete, อื่น ๆ -> Write. ผู้ใช้ที่มีสิทธิ์เมนูระดับ Admin (`rights.Admin`) ผ่านทุกชนิด; Write = Add หรือ Edit (middleware/permission.go:43-60) (ดู [[proc-permission-rights]], [[be-menu-rights-permission]])
-- ไม่ผ่านสิทธิ์ = 403 พร้อมข้อความไทยจาก `deniedMessages` (middleware/permission.go:27); `peekJSON` อ่านบอดี้สูงสุด 1 MB เพื่อดูคำสั่งแล้วคืนบอดี้ให้ handler (permission.go:231)
+- `Auth` (Bearer access token) แล้วตามด้วย `queryWriteGuard = RequireRight(ex.Rights, processhttp.QueryRequiredRight)` (router.go:85-88 สร้าง guard นี้เฉพาะเมื่อ router ได้รับ `Rights`; ถ้าไม่มี `exec`/`execBatch` จะข้ามชั้นนี้ไปเหลือชั้นที่ 2 และ 3)
+- `QueryRequiredRight` (process/permission.go:135-161) ตัดสิน right ตามชนิดคำสั่ง (path `/blob/insert` -> Write, `/query/exec` ดูคำสั่งเดียว, `/query/execBatch` ดูทั้งชุดผ่าน `sqlBatchRight`, บอดี้ที่อ่านไม่ได้ -> Write): `insert` -> Add, `update` -> Edit, `delete` -> Delete, อื่น ๆ -> Write. ผู้ใช้ที่มีสิทธิ์เมนูระดับ Admin (`rights.Admin`) ผ่านทุกชนิด; Write = Add หรือ Edit (`Allows`, middleware/permission.go:41-58) (ดู [[proc-permission-rights]], [[be-menu-rights-permission]])
+- ไม่ผ่านสิทธิ์ = 403 พร้อมข้อความไทยจาก `deniedMessages` (middleware/permission.go:31); `peekJSON` อ่านบอดี้สูงสุด 1 MB เพื่อดูคำสั่งแล้วคืนบอดี้ให้ handler (permission.go:231)
 
 ## ชั้นที่ 2: รูปแบบ SQL (domain/query/query.go)
 
 - `NewWriteStatement` (query.go:335): รับคำสั่งเดียวที่ขึ้นต้น `INSERT`/`UPDATE`/`DELETE` หรือ `WITH ... <DML>`; ปฏิเสธ DDL/คำสั่งผู้ดูแล (`ErrNotWriteOnly` = 400)
-- `ValidateUserLevel` (query.go:361): level < 9 ห้ามเขียน `bc_user_list`, `bc_database_list*`, `erp_option` (`ErrForbiddenTable` -> 403)
-- ชุด `execBatch`: `NewWriteBatchStatements` (query.go:394) ไม่เกิน 1000 คำสั่ง (`MaxExecBatchStatements`, query.go:77) และรวมไม่เกิน 2 MB (`MaxExecBatchBytes`, query.go:81)
+- `ValidateUserLevel` (query.go:363): level < 9 ห้ามเขียน `bc_user_list`, `bc_database_list*`, `erp_option` (`ErrForbiddenTable` -> 403)
+- ชุด `execBatch`: `NewWriteBatchStatements` (query.go:397) ไม่เกิน 1000 คำสั่ง (`MaxExecBatchStatements`, query.go:77) และรวมไม่เกิน 2 MB (`MaxExecBatchBytes`, query.go:81)
 
 ## ชั้นที่ 3: write lockdown
 
@@ -28,7 +28,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:95","backend/internal
 1. SQL ที่หาตารางเป้าหมายไม่ได้ = `ErrAdminOnlyWrite`
 2. ตารางเงิน/สต็อก/GL (ตระกูล `ic_trans*`, `ap_ar_trans*`, `as_trans*`, `cb_trans*`, `cb_chq_list`, `gl_journal*` และอื่น ๆ) หรือ `ic_inventory` ที่แก้คอลัมน์ยอดคงเหลือ (`balance_qty`, `average_cost` ฯลฯ) = `ErrMoneyTableViaExec` ข้อความ "…only be changed through /api/process"
 3. level < 9 เขียนได้เฉพาะตารางใน allow-list เดิม (`write_policy_legacy.go:9`) นอกนั้น `ErrAdminOnlyWrite`
-4. ทั้งสองกรณีแมปเป็น `KindForbidden` = 403 (service.go:104-112)
+4. ทั้งสองกรณีแมปเป็น `KindForbidden` = 403 (service.go:102-109; ชุดคำสั่งที่ service.go:143-150)
 
 ## POST /query/exec
 

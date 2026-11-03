@@ -2,7 +2,7 @@
 title: "กำหนดข้อเลือกพิเศษต่างๆ (OptionsForm)"
 tags: [screens, config]
 aliases: ["OptionsForm", "1002", "menu_option", "ข้อเลือกพิเศษ", "ตั้งค่าระบบ", "erp_option", "ประเภทธุรกิจ"]
-sources: ["frontend/account/tabs/screenRegistry.tsx:267", "frontend/account/config/OptionsForm.tsx:34", "frontend/account/config/OptionsForm.tsx:72", "frontend/account/config/OptionsForm.tsx:149", "frontend/account/config/OptionsForm.tsx:206", "frontend/account/config/OptionsForm.tsx:286", "frontend/account/config/OptionsForm.tsx:457", "frontend/src/config/schemas/erpOption/index.ts:22", "frontend/src/config/schemas/erpOption/index.ts:35", "frontend/src/config/editionConfig.ts:47", "frontend/src/config/editionConfig.ts:301", "frontend/src/config/bcMenu.ts:277"]
+sources: ["frontend/account/tabs/screenRegistry.tsx:267", "frontend/account/config/OptionsForm.tsx:34", "frontend/account/config/OptionsForm.tsx:72", "frontend/account/config/OptionsForm.tsx:149", "frontend/account/config/OptionsForm.tsx:206", "frontend/account/config/OptionsForm.tsx:286", "frontend/account/config/OptionsForm.tsx:457", "frontend/src/config/schemas/erpOption/index.ts:24", "frontend/src/config/schemas/erpOption/index.ts:35", "frontend/src/config/editionConfig.ts:47", "frontend/src/config/editionConfig.ts:299", "frontend/src/config/bcMenu.ts:315"]
 ---
 # กำหนดข้อเลือกพิเศษต่างๆ (OptionsForm)
 
@@ -11,7 +11,7 @@ sources: ["frontend/account/tabs/screenRegistry.tsx:267", "frontend/account/conf
 
 ## วิธีเปิด
 - เมนู **ตั้งค่า > ตั้งค่า ERP > กำหนดข้อเลือกพิเศษต่างๆ** รหัสเมนู `1002` (`menu_option`) ผูกกับ `OptionsForm` ที่ `screenRegistry.tsx:267-270`
-- `menu_option` อยู่ใน `ADMIN_ONLY_MENU_SET` (`bcMenu.ts:277-280`) จึงเห็นเฉพาะผู้ดูแลระบบ
+- `menu_option` อยู่ใน `ADMIN_ONLY_MENU_SET` (`bcMenu.ts:315-318`) จึงเห็นเฉพาะผู้ดูแลระบบ
 - กลไกเมนู/รหัสดู [[fe-screen-registry-menu]]
 
 ## โครงหน้าจอ
@@ -22,7 +22,7 @@ sources: ["frontend/account/tabs/screenRegistry.tsx:267", "frontend/account/conf
 
 ## ส่วนที่ 0 เลือกประเภทธุรกิจ (`id="opt-sec-business_types"`, `:457`)
 - เลือกได้หลายประเภทพร้อมกัน **ธุรกิจทั่วไป (`general`) ล็อกเป็นฐานเสมอ** (ข้อความหัวส่วน `:466-472`)
-- การ์ดประเภทธุรกิจมาจาก `BC_BUSINESS_TYPES` (`editionConfig.ts:301`) รวม 17 ประเภท ได้แก่ general, retail, wholesale, construction, pharmacy, animal_feed, fertilizer, it_mobile, auto_parts, gold_jewelry, optical_shop, food_beverage, cosmetics_clinic, fashion_apparel, agri_buying_mill, water_gas_packaging, furniture_appliance_leasing
+- การ์ดประเภทธุรกิจมาจาก `BC_BUSINESS_TYPES` (`editionConfig.ts:299`) รวม 17 ประเภท ได้แก่ general, retail, wholesale, construction, pharmacy, animal_feed, fertilizer, it_mobile, auto_parts, gold_jewelry, optical_shop, food_beverage, cosmetics_clinic, fashion_apparel, agri_buying_mill, water_gas_packaging, furniture_appliance_leasing
 - การ์ดแต่ละใบแสดงป้าย "เปิดใช้" หรือ "+N ช่อง" (จำนวนช่องเพิ่มเติมของสินค้า + ลูกหนี้ `:540-547`) และบรรทัด `authorityBadge` (มาตรฐานอ้างอิงของธุรกิจนั้น)
 - แถบสรุป (`:561-600`) บอกว่าเปิดช่องเพิ่มของ "สินค้า" และ "ลูกหนี้" กี่ช่อง และมีปุ่มลัดเปิดจอเฉพาะธุรกิจ (`featuredMenus` -> `tabsCtx.openScreen(menuKey)`)
 - ปุ่มส่วนหัวที่โผล่เมื่อเลือกธุรกิจเฉพาะทาง (`specializedCount > 0`, `:476`)
@@ -31,7 +31,7 @@ sources: ["frontend/account/tabs/screenRegistry.tsx:267", "frontend/account/conf
 - ค่าประเภทธุรกิจอ่านจากคอลัมน์ `business_types` ของ `erp_option` ถ้ามี: ตอนโหลดถ้าค่าใน DB มีมากกว่า 1 ประเภทและค่าในหน่วยความจำมีไม่เกิน 1 จะใช้ค่าจาก DB (`:166-173`)
 
 ## ส่วนค่ากำหนด 9 หมวด (schema `erpOptionSchema`)
-`erpOptionSchema` ประกอบด้วย 9 tab ตามลำดับ `tab1System ... tab9Mobillyst` (`erpOption/index.ts:47-62`) คำอธิบายใต้หัวแต่ละส่วนมาจาก `TAB_DESCRIPTIONS` (`OptionsForm.tsx:34-44`)
+`erpOptionSchema` ประกอบด้วย 9 tab ตามลำดับ `tab1System ... tab9Mobillyst` (`erpOption/index.ts:46-61`) คำอธิบายใต้หัวแต่ละส่วนมาจาก `TAB_DESCRIPTIONS` (`OptionsForm.tsx:34-44`)
 
 | id | หัวข้อ | ตัวอย่างช่อง (ชื่อคอลัมน์ : ความหมาย) |
 |---|---|---|
@@ -56,12 +56,12 @@ sources: ["frontend/account/tabs/screenRegistry.tsx:267", "frontend/account/conf
 
 ## ชนิดช่องและการตรวจข้อมูล
 - ชนิดที่ใช้: `checkbox` (ส่วนใหญ่), `radio`, `number`, `text`, `password`, `date`, `lookup`, `heading`, `blank` (วาดโดย `FieldControl`)
-- ช่อง `lookup` (เช่น `home_currency`, `report_font`) เปิด popup ค้นหา `BcLookupModal` ผ่าน `handleLookup` (`:127`) เมื่อเลือกจะ `form.setField(targetField, item.code)` และเก็บชื่อแสดงแยก (`:670-680`)
+- ช่อง `lookup` (เช่น `home_currency`, `report_font`) เปิด popup ค้นหา `BcLookupModal` ผ่าน `handleLookup` (`:127`) เมื่อเลือกจะ `form.setField(targetField, item.code)` และเก็บชื่อแสดงแยก (`:672-684`)
 - การตรวจมีแค่ความยาวสูงสุด (`max=` ใน schema) และสถานะถูกแก้หรือยัง ไม่มีกฎ required ข้ามช่องในจอนี้
 - ก่อนบันทึก ค่าสตริงที่มีเครื่องหมาย `~` จะถูกตัดเหลือส่วนหน้า `~` (`:226-232`) ใช้กับค่าที่แสดงเป็น "รหัส~ชื่อ" ของช่อง lookup
 
 ## การโหลดและการบันทึก (4 ตาราง)
-ข้อมูลกระจายอยู่ 4 ตาราง ช่องนอก `erp_option` ตั้งชื่อนำหน้าด้วยตารางเพื่อกันชื่อชน (`erpOption/index.ts:11-28`)
+ข้อมูลกระจายอยู่ 4 ตาราง ช่องนอก `erp_option` ตั้งชื่อนำหน้าด้วยตารางเพื่อกันชื่อชน (`TABLE_PREFIX` `erpOption/index.ts:24-28`)
 
 | คำนำหน้า | ตาราง |
 |---|---|
@@ -83,13 +83,12 @@ sources: ["frontend/account/tabs/screenRegistry.tsx:267", "frontend/account/conf
 - บันทึกแบบ **ลบทั้งตารางแล้ว insert แถวเดียวใหม่** ของ `erp_option`, `erp_option_etax_inet`, `erp_option_mobillyst` (และแถว `config_type = 0` ของ `erp_thai_qr_config`) คอลัมน์ที่ไม่อยู่ใน schema จะไม่ถูกเขียนกลับ ค่าจะหายหลังบันทึก
 - หมวดที่ถูกซ่อนตามรุ่นยังอยู่ใน `erpOptionSchema` จึงถูกรวมใน `collectFields(erpOptionSchema)` (`:224`) ค่าของหมวดที่ซ่อนจึงถูกเขียนกลับตามค่าที่โหลดมา
 - บันทึกสำเร็จแล้วจอปิดเอง ถ้าจะตั้งหลายหมวดต่อกันต้องแก้ทั้งหมดก่อนกดบันทึกครั้งเดียว
-- คอมเมนต์ในโค้ดเรียกจอนี้ว่า "จอ 1.1.2" (`erpOption/index.ts:2`) เป็นรหัสแบบจุดแบบเก่า รหัสเมนูที่ใช้จริงตอนนี้คือ `1002` ([[fe-screen-registry-menu]])
 
 ## ที่มาในโค้ด
 - `frontend/account/tabs/screenRegistry.tsx:267-270` — ผูก `menu_option` กับ `OptionsForm`
-- `frontend/src/config/bcMenu.ts:277-280` — `ADMIN_ONLY_MENU_SET`
+- `frontend/src/config/bcMenu.ts:315-318` — `ADMIN_ONLY_MENU_SET`
 - `frontend/account/config/OptionsForm.tsx:34-44` — `TAB_DESCRIPTIONS`; `:60-83` สิทธิ์/รุ่น/แท็บที่มองเห็น; `:127-145` lookup + ค่าแนะนำ; `:149-196` โหลด 4 ตาราง; `:206-330` บันทึก; `:332-354` ปิดจอ; `:364-668` โครงหน้าจอ
-- `frontend/src/config/schemas/erpOption/index.ts:11-62` — คำนำหน้าตาราง, `mergeOptionTables`, `erpOptionSchema`
+- `frontend/src/config/schemas/erpOption/index.ts:24-61` — คำนำหน้าตาราง, `mergeOptionTables`, `erpOptionSchema`
 - `frontend/src/config/schemas/erpOption/tab1System.ts` ... `tab9Mobillyst.ts` — ช่องแต่ละหมวด
-- `frontend/src/config/editionConfig.ts:47-100` (รุ่น), `:301` (ประเภทธุรกิจ)
+- `frontend/src/config/editionConfig.ts:47-100` (รุ่น), `:279-299` (ลำดับและรายละเอียดประเภทธุรกิจ)
 - ดูเพิ่ม: [[scr-company-profile]] · [[fe-query-client-sql-builder]] · [[fe-numeric-money]] · [[screens-overview]]

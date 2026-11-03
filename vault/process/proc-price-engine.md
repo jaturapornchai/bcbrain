@@ -2,18 +2,20 @@
 title: "เครื่องมือหาราคาและแก้ราคา (Price engine / price center / modify price)"
 tags: [process, price, ic_inventory_price, price-center, pricing, master]
 aliases: ["findSalePrice", "findPurchasePrice", "priceFormulaRow", "price center", "ศูนย์ราคา", "transgrid/priceinfo", "TransGridPriceInfo", "checkpricesave", "CheckPriceSave", "modifyprice", "ModifyPrice", "ปรับปรุงราคา", "ตรวจสอบราคา", "ic_inventory_price"]
-sources: ["backend/internal/application/process/price_engine.go:18", "backend/internal/application/process/price_engine.go:67", "backend/internal/application/process/price_engine.go:103", "backend/internal/application/process/price_engine.go:205", "backend/internal/application/process/price_engine.go:237", "backend/internal/application/process/price_center.go:39", "backend/internal/application/process/price_center.go:47", "backend/internal/application/process/price_center.go:81", "backend/internal/application/process/price_center.go:129", "backend/internal/application/process/price_center.go:210", "backend/internal/application/process/price_info.go:66", "backend/internal/application/process/check_price.go:48", "backend/internal/application/process/modify_price.go:22", "backend/internal/application/process/modify_price.go:84", "backend/internal/application/process/modify_price.go:396", "backend/internal/application/process/trans_grid.go:488"]
+sources: ["backend/internal/application/process/price_engine.go:18", "backend/internal/application/process/price_engine.go:67", "backend/internal/application/process/price_engine.go:103", "backend/internal/application/process/price_engine.go:205", "backend/internal/application/process/price_engine.go:237", "backend/internal/application/process/price_center.go:39", "backend/internal/application/process/price_center.go:47", "backend/internal/application/process/price_center.go:81", "backend/internal/application/process/price_center.go:129", "backend/internal/application/process/price_center.go:210", "backend/internal/application/process/price_info.go:66", "backend/internal/application/process/check_price.go:48", "backend/internal/application/process/modify_price.go:22", "backend/internal/application/process/modify_price.go:84", "backend/internal/application/process/modify_price.go:396", "backend/internal/application/process/trans_grid.go:490", "backend/internal/application/process/trans_grid.go:497", "backend/internal/application/process/trans_grid.go:525"]
 ---
 
 # เครื่องมือหาราคาและแก้ราคา (Price engine / price center / modify price)
 
-เมื่อผู้ใช้กรอกสินค้า/จำนวนในตารางสินค้าของเอกสาร backend ต้องหาราคาให้เองตามลำดับเดียวกับโปรแกรม C# เดิม (`_findPriceClass.cs`, `_findPurchasePriceClass.cs`) ถ้าบริษัทเปิด `erp_option.use_price_center` ราคาขายทั้งหมดจะไปถามบริการศูนย์ราคาภายนอกแทน นอกจากนี้มีหน้าจอดูรายการราคา (price info), หน้าแก้ราคาบาร์โค้ดทีละรายการ (check price) และหน้าปรับปรุงราคาทีละหลายแถว (modify price)
+เมื่อผู้ใช้กรอกสินค้า/จำนวนในตารางสินค้าของเอกสาร backend หาราคาให้เองตามลำดับขั้นใน `price_engine.go` (หน้าเว็บไม่คำนวณราคาเอง) ถ้าบริษัทเปิด `erp_option.use_price_center` ราคาขายทั้งหมดจะไปถามบริการศูนย์ราคาภายนอกแทน นอกจากนี้มีหน้าจอดูรายการราคา (price info), หน้าแก้ราคาบาร์โค้ดทีละรายการ (check price) และหน้าปรับปรุงราคาทีละหลายแถว (modify price)
 
 ## ทำงานอย่างไร
 
 ### 1. จุดเรียก (จากตารางสินค้า)
 - ตอนแก้จำนวน (`onQty` ใน `trans_grid.go`) ถ้า flag เอกสารอยู่ใน `salePriceFlags` (30, 34, 36, 44, 46, 48, 76, 144) จำนวน `<> 0` และไม่ได้ดึงมาจากเอกสารอ้างอิง/ไม่ใช่ของแถม -> `g.salePrice` -> `applySalePrice` (`trans_grid.go:490-495`, `:564`)
-- flag ซื้อ `purchasePriceFlags` (2, 6, 12, 310) เรียก `findPurchasePrice` เฉพาะเมื่อ option `GetPurchasePrice` เปิด (`trans_grid.go:96-97`, `:497`, `:529`) -- รายละเอียดการคำนวณแถวอยู่ที่ [[proc-grid-calc]]
+- flag ซื้อ `purchasePriceFlags` (2, 6, 12, 310) เรียก `findPurchasePrice` เฉพาะเมื่อ option `GetPurchasePrice` เปิด จำนวน `<> 0` และผ่าน `purchaseRepriced` (แถวไม่มีเอกสารอ้างอิง; ใบสั่งซื้อยอมให้มีอ้างอิงได้เมื่อ option `HidePrAmount` เปิด, ใบขอซื้อต้องไม่มีอ้างอิงและ `HidePrAmount` ปิด) (`trans_grid.go:96-97`, `:497`, `:512`, `:525`)
+- ใบตรวจนับ (flag 76) ที่ไม่เปิด option `CountStockDisplaySalePrice` ไม่หาราคาขาย แต่ใส่ `ic_inventory.average_cost` เป็นราคา (`trans_grid.go:484-489`)
+- จำนวนติดลบถูกปฏิเสธ ("จำนวน ... ผิดพลาด" แล้วตั้งเป็น 0) ยกเว้นใบปรับปรุงสต็อก (`trans_grid.go:477-481`) -- รายละเอียดการคำนวณแถวอยู่ที่ [[proc-grid-calc]]
 - ข้อมูลที่ใช้ค้นคือ `priceQuery`: `ItemCode`, `UnitCode`, `Barcode`, `PartyCode` (= `custCode` ของหัวเอกสาร), `DocDate`, `CurrencyCode`, `Qty`, `VatRate`, `VatType`, `SaleType` (= `inquiryType` ของเอกสาร) (`trans_grid.go:461`)
 
 ### 2. ลำดับหาราคาขาย (`findSalePrice`, `price_engine.go:103`)
@@ -39,42 +41,43 @@ sources: ["backend/internal/application/process/price_engine.go:18", "backend/in
 
 ### 3. ผลที่ตกถึงแถวสินค้า (`applySalePrice`, `trans_grid.go:564`)
 - เขียน `PriceType`, `PriceMode`, `PriceRoworder` (แถว `ic_inventory_price` ที่ใช้ — 0 สำหรับสูตร/บาร์โค้ด/ราคาล่าสุด), `PriceGuid` (ศูนย์ราคาเท่านั้น), `Price`, `SetRefPrice`, `Price0` (เมื่อมี `StandPrice`)
-- เขียนราคาลงแถวแม้ไม่พบ (ได้ 0) ตามคอมเมนต์ C#
+- เขียนราคาลงแถวเสมอ แม้ไม่พบราคา (ราคากลายเป็น 0); ถ้าได้คำส่วนลดจากสูตรราคา (`DiscountWordFormula`) ใส่ส่วนลดนั้นก่อน แล้ว `DefaultDiscount` (ถ้ามี) ทับอีกที
 - คำเตือน (`salePriceWarnings`, `trans_grid.go:540`): option `WarningPrice1` เปิดและไม่พบราคา (สินค้า `ItemType` ไม่ใช่ 3/5) -> "ไม่พบราคาสินค้า"; option `WarningPrice2` เปิดและพบราคาแต่เป็น 0 -> ถามยืนยันใช้ราคาอีกชนิด (VatType 0 แต่มีแต่ราคารวมใน, หรือกลับกัน) พร้อม `YesPrice` ที่แปลงด้วย VAT ของเอกสาร
 
 ### 4. ลำดับหาราคาซื้อ (`findPurchasePrice`, `price_engine.go:237`)
 1. `ic_inventory_purchase_price` เฉพาะผู้ขาย: `supplier_code = custCode` และ `price_type = 3`
 2. ราคาซื้อทั่วไป: `price_type = 1`
 3. ราคาซื้อล่าสุดจาก `ic_trans_detail` ของ `trans_flag IN (12, 315)` (`last_status = 0`, `qty <> 0`, `price_exclude_vat > 0`) -- คอลัมน์ราคาเป็น `d.price` หรือ `d.price_2` เมื่อ `MultiCurrency` เปิด
-- ใช้วันที่ **วันนี้** (ไม่ใช่วันที่เอกสาร) ตามคอมเมนต์ C# cs:10534 (`purchasePrice` ส่ง `g.today`)
+- ใช้วันที่ **วันนี้** ของเซิร์ฟเวอร์ (`g.today`, `trans_grid.go:136`, `:529`) ไม่ใช่วันที่เอกสาร ในการเทียบช่วง `from_date..to_date`
 - เลือกคอลัมน์ราคา: `sale_price2` เมื่อ `VatType <> 0`; ถ้า option `PurchaseZeroVatUsePrice1` เปิด ใช้ `sale_price2` เฉพาะ `VatType = 1` (รวมใน) ส่วนที่เหลือใช้ `sale_price1`
 - ส่วนลดของแถวราคา (`discount`) ถูกคืนใน `DefaultDiscount` และ `purchasePrice` ตั้งเป็นส่วนลดแถวเมื่อเจอ (`trans_grid.go:533-535`)
-- แถวของแถม (`IsPermium = 1`) ได้ราคา 0 โดยไม่ค้น
+- ราคาซื้อล่าสุดกรองสกุลเงินของหัวเอกสาร (`h.currency_code`) เมื่อ `MultiCurrency` เปิด และไม่เลือกคอลัมน์ตาม VatType (`price_engine.go:267-284`)
+- แถวของแถม (`IsPermium = 1`) ไม่ค้นราคา (`purchasePrice` คืน 0) และทุกครั้งที่ผลเป็น 0 (ของแถม / ไม่พบ / แถวราคาเป็น 0) `onQty` **คงราคาที่ผู้ใช้พิมพ์ไว้** ไม่เขียนทับ (`trans_grid.go:502-505`) -- ต่างจากฝั่งขายที่เขียน 0 ลงแถว
 
 ### 5. ศูนย์ราคา (`price_center.go`)
 - `loadPriceCenter` อ่าน `erp_option.use_price_center`, `price_list_server`, `home_currency` ครั้งเดียวต่อคำขอตาราง (`trans_grid.go:156`)
 - ถ้าเปิด: `gridCtx.salePrice` ไม่ค้น `ic_inventory_price` เลย ส่ง GET ไปยัง `price_list_server` พารามิเตอร์ `item_code`, `unit_code`, `qty`, `cust_code` (ถ้ามี), `doc_date`, `sale_type`, `vat_type`, `branch` (+ `use_currency`, `currency`, `home_currency` เมื่อหลายสกุลเงิน) และต่อส่วน `?...` ที่ตั้งไว้ใน `price_list_server` ท้ายคำขอ
-- ตรวจครั้งเดียวต่อคำขอว่าบริการใหม่ (`/BCPriceCenter/pricelistservice`) ตอบ 200 หรือไม่ ถ้าไม่ใช้พาธเก่า (`/BCJavaRESTService/service/pricelist/price`)
+- ตรวจครั้งเดียวต่อคำขอว่าบริการใหม่ (`/BCPriceCenter/pricelistservice`) ตอบ 200 หรือไม่ ถ้าไม่ตอบใช้พาธเก่า (ค่าคงที่ `priceCenterOldPath`) (`price_center.go:25-26`, `:166-170`)
 - `sale_type` ที่ส่ง: 0 ถ้าจอไม่ใช่ flag 30/34/36/44; เป็น 2 เมื่อ `inquiryType` 0 หรือ 2 และเครดิตเกิน 7 วัน; นอกนั้น 1 (`centerSaleType`, `:95`). `vat_type` แปลงเป็น 1/2/3 และ "ไม่กระทบภาษี" ส่งว่าง (`centerVatType`)
 - ตอบกลับต้องเป็น JSON `{price, price_guid}`: ราคา 0 หรือไม่มี = ไม่พบ; พบแล้ว `Type = Mode = 99`, `price_guid` เก็บลงแถว (ยาวเกิน 55 ตัวอักษรถูกปฏิเสธเพราะคอลัมน์ `ic_trans_detail.price_guid` ยาว 55) (`parseCenterPrice`, `:210`)
 - ความปลอดภัย: `priceCenterClient` ไม่ใช้ proxy และตรวจ IP ปลายทางทุกการต่อ (รวมทุก redirect) ปฏิเสธ loopback / link-local / unspecified (`priceCenterDialGuard`, `:47`); ตอบกลับอ่านได้ไม่เกิน 1 MB; งบเวลาต่อหนึ่งคำขอตาราง 30 วินาที (`priceCenterBudget`); ค่าที่ต่อ URL ผ่าน `url.QueryEscape`
-- สาขา POS ของศูนย์ราคา (`_findPricePOS`) **ยังไม่พอร์ต** (ระบุไว้ในคอมเมนต์หัวไฟล์ รอลุงจืดตัดสิน)
+- ศูนย์ราคา **ยังไม่ใช้กับ POS** (คอมเมนต์หัวไฟล์ `price_center.go:21-22` ระบุว่ายังไม่มีผู้เรียกจากฝั่ง POS และรอลุงจืดตัดสิน)
 - ศูนย์ราคาล้มเหลว = error "ดึงราคาจากศูนย์ราคา ไม่สำเร็จ" (ไม่ถอยกลับไปราคาในฐานข้อมูล)
 
 ### 6. หน้าต่างดูราคา (`POST /process/transgrid/priceinfo`)
 - `TransGridPriceInfo` (`price_info.go:66`) รับ `itemCode`, `custCode` ผลลัพธ์ 3 ชุด: `normal` (`price_type 1`, `price_mode 1`), `group` (`price_type 2`, `price_mode 1` กรองด้วย `ar_customer_detail.group_main` ของลูกค้าถ้ามี), `standard` (`price_type 1`, `price_mode 0`) พร้อม `custGroup`
-- แต่ละแถวมี `unitCode/unitName`, `salePrice1/2`, `fromQty/toQty`, `fromDate/toDate`, `saleType`, `status`, ชื่อกลุ่ม และ `roworder` (หน้าจอใช้ไฮไลต์แถวที่แถวสินค้าใช้อยู่ ตามคอมเมนต์ cs:78-90)
+- แต่ละแถวมี `unitCode/unitName`, `salePrice1/2`, `fromQty/toQty`, `fromDate/toDate`, `saleType`, `status`, ชื่อกลุ่ม และ `roworder` (หน้าจอใช้ไฮไลต์แถวที่ตรงกับ `price_roworder` ของแถวสินค้า)
 - ตารางเรียงตาม `unit_code, roworder`; ตัวเลขผ่าน `trimDecimal` (ไม่ใช้ float)
 - สิทธิ์ `read`
 
 ### 7. แก้ราคาบาร์โค้ดทีละรายการ (`POST /process/stocktools/checkpricesave`)
-- `CheckPriceSave` (`check_price.go:48`) รับ `barcode`, `newPrice` (+ `StockScope` ของ provider/database/user) — พอร์ตจาก `_checkPriceUserControl.cs:72-111`
+- `CheckPriceSave` (`check_price.go:48`) รับ `barcode`, `newPrice` (+ `StockScope` ของ provider/database/user) (หน้าจอ "ตรวจสอบราคา")
 - เงื่อนไข: ต้องมีบาร์โค้ด (แปลงตัวพิมพ์ใหญ่) และราคาใหม่ต้อง **มากกว่า 1** (`priceFloor`) ทศนิยมตาม `stockScales`
-- ใน transaction เดียว: ล็อกแถว `ic_inventory_barcode` (`FOR UPDATE`) อ่านราคาเดิม -> `UPDATE ... SET price` ทุกแถวที่ `upper(barcode)` ตรงกัน -> เขียนตาราง `logs` ผ่าน `writeProcessLog` (เมนู "ตรวจสอบราคา", รายละเอียด `oldPrice`/`newPrice`); ไม่พบบาร์โค้ด -> "ไม่พบบาร์โค้ด ..."
+- ใน transaction เดียว: อ่านราคาเดิมจากแถวแรกตาม `roworder` พร้อมล็อก (`FOR UPDATE`) -> `UPDATE ... SET price` ทุกแถวที่ `upper(barcode)` ตรงกัน -> เขียนตาราง `logs` ผ่าน `writeProcessLog` (เมนู "ตรวจสอบราคา", รายละเอียด `oldPrice`/`newPrice`); ไม่พบบาร์โค้ด -> "ไม่พบบาร์โค้ด ..."
 - คืน `{barcode, oldPrice, newPrice}`; สิทธิ์ `write`
 
 ### 8. ปรับปรุงราคาหลายแถว (`POST /process/modifyprice/{preview|apply}`)
-เมนู 2.1.25 ตามคอมเมนต์ handler (`docpicture_handler.go:111`) พอร์ตจาก `BCERPIC/_icModifyPrice.cs` หน้าเว็บอ่านไฟล์เข้าตาราง ส่งแถวมาเป็น `rows` (แต่ละแถวเป็น map ชื่อคอลัมน์ -> ข้อความ)
+เมนู 2.1.25 (handler `docpicture_handler.go:111`) หน้าเว็บอ่านไฟล์เข้าตาราง ส่งแถวมาเป็น `rows` (แต่ละแถวเป็น map ชื่อคอลัมน์ -> ข้อความ)
 
 **ชนิดราคา (`kind`)** กำหนดที่ `modifyPriceKinds` (`modify_price.go:32`)
 | `kind` | ตาราง | `price_type` / `price_mode` | คอลัมน์ราคา |
@@ -95,8 +98,8 @@ sources: ["backend/internal/application/process/price_engine.go:18", "backend/in
 - ฟิลด์ข้อความยาวเกิน 50 ตัวอักษร -> skip; ชนิดสินค้าต้องมี `ic_code` และ `unit_code`; ชนิด `barcode` ต้องมี `barcode`
 - `sale_type`/`tax_type` ต้องเป็นจำนวนเต็ม 0-32767; `from_date`/`to_date` (`ปปปป-ดด-วว`) มีผลเมื่อใส่ครบคู่; `from_qty`/`to_qty` มีผลเมื่อทั้งคู่ไม่ใช่ 0 (ใช้กับ `ic_inventory_price` เท่านั้น)
 - ช่องราคาว่าง = ไม่แก้; ใส่ 0 จะข้ามเว้นแต่ผู้ใช้ติ๊ก `zeroOption`; ถ้าไม่มีช่องราคาที่ต้องแก้ -> skip
-- `match` ค้นแถวเดิมด้วยคีย์ที่กรอก (สินค้า+หน่วย+ประเภท/โหมด และ `sale_type`/คีย์ลูกค้า/`tax_type`/ช่วงวันที่/ช่วงจำนวนเฉพาะที่กรอก): เจอ -> `update` แถวแรกตาม `roworder`; ไม่เจอ -> `insert` (ชนิด `barcode` ไม่เจอ = skip "ไม่พบบาร์โค้ด")
-- ค่าตั้งต้นตอน `insert` ของ `ic_inventory_price`: จำนวน 1..999999 และวันที่ 1 ม.ค.-31 ธ.ค. ของปีปัจจุบัน ถ้าไม่ได้ระบุ (`insertValues`, `:359`) -- โค้ดเก่า C# ทิ้ง `sale_type`/`tax_type` ตอน insert แล้วเกิดแถวซ้ำทุกรอบ ฝั่ง Go เขียนค่านี้ลงด้วย
+- `match` ค้นแถวเดิมด้วยคีย์ที่กรอก (สินค้า+หน่วย+ประเภท/โหมด และ `sale_type`/คีย์ลูกค้า/`tax_type` (เฉพาะสูตรราคา)/ช่วงวันที่/ช่วงจำนวน เฉพาะช่องที่กรอก; ชนิด `barcode` ค้นด้วย `barcode` ตรงตัวอย่างเดียว); ราคาเดิม (`oldPrice`) = คอลัมน์ราคาแรกของชนิดนั้น: เจอ -> `update` แถวแรกตาม `roworder`; ไม่เจอ -> `insert` (ชนิด `barcode` ไม่เจอ = skip "ไม่พบบาร์โค้ด")
+- ค่าตั้งต้นตอน `insert` ของ `ic_inventory_price`: จำนวน 1..999999 และวันที่ 1 ม.ค.-31 ธ.ค. ของปีปัจจุบัน ถ้าไม่ได้ระบุ (`insertValues`, `:359`); `sale_type` ที่กรอกถูกเขียนลงแถวใหม่ทุกชนิด และ `tax_type` เขียนลงเฉพาะสูตรราคา เพื่อให้รอบถัดไปจับคู่แถวเดิมได้ ไม่เกิดแถวซ้ำ (`:382-388`)
 
 **สิทธิ์:** `modifyprice/preview` = `read`, `modifyprice/apply` = `write` (`permission.go:32,42`) ดู [[proc-permission-rights]]
 
@@ -112,7 +115,7 @@ sources: ["backend/internal/application/process/price_engine.go:18", "backend/in
 - `backend/internal/application/process/price_info.go:50` - `priceInfoSQL`; `:66` `TransGridPriceInfo`
 - `backend/internal/application/process/check_price.go:31` - `checkPriceArgs`; `:48` `CheckPriceSave`
 - `backend/internal/application/process/modify_price.go:22` - `modifyPriceMaxRows`; `:32` `modifyPriceKinds`; `:84` `modifyPrice`; `:145` `planModifyPrice`; `:193` `parseModifyPriceRow`; `:260` `match`; `:303` `run`; `:359` `insertValues`; `:396` `writeModifyPriceLog`
-- `backend/internal/application/process/trans_grid.go:96-97` - `salePriceFlags`, `purchasePriceFlags`; `:156` โหลดศูนย์ราคา; `:461` `priceQuery`; `:490-497` จุดเรียก; `:529` `purchasePrice`; `:540` `salePriceWarnings`; `:564` `applySalePrice`
+- `backend/internal/application/process/trans_grid.go:96-97` - `salePriceFlags`, `purchasePriceFlags`; `:156` โหลดศูนย์ราคา; `:461` `priceQuery`; `:470` `onQty`; `:490-505` จุดเรียก; `:512` `purchaseRepriced`; `:525` `purchasePrice`; `:540` `salePriceWarnings`; `:564` `applySalePrice`
 - `backend/internal/application/process/grid_calc.go:232` - `calcFormulaPrice`
 - `backend/internal/application/process/workflow.go:65` - `writeProcessLog`
 - `backend/internal/adapter/inbound/http/process/transgrid_handler.go:54` - action `priceinfo`; `stocktools_handler.go:168` - `checkpricesave`; `docpicture_handler.go:111-135` - `modifyprice`; `permission.go:29,32,42,44` - สิทธิ์

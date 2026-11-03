@@ -32,7 +32,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:329", "backend/intern
 - `VerifyPosDevice` (:310): แกะโทเคน ตรวจรูปแบบ `p/d/m` และ secret 32 ไบต์ แล้วเทียบแฮชด้วย `subtle.ConstantTimeCompare` ผิดทุกกรณีตอบข้อความเดียวกัน (401 "รหัสเชื่อมเครื่อง POS ไม่ถูกต้องหรือถูกยกเลิก")
 
 ### ระบบ "ส่วนต่าง" (`pos_sync.go:24-28`)
-1. ตารางต้นทางมี trigger `pos_sync_log` (ฟังก์ชัน :77) ที่ INSERT/UPDATE/DELETE แล้วบันทึกว่า "คีย์นี้เปลี่ยน" ลง `pos_sync_change(entity, entity_key, xid xid8, changed_at)` หนึ่งแถวต่อคีย์ (upsert ตีตรา `xid` ใหม่ด้วย `pg_current_xact_id()`) -- การแก้จากโปรแกรม BC เดสก์ท็อปถูกจับด้วยวิธีเดียวกัน
+1. ตารางต้นทางมี trigger `pos_sync_log` (ฟังก์ชัน :77) ที่ INSERT/UPDATE/DELETE แล้วบันทึกว่า "คีย์นี้เปลี่ยน" ลง `pos_sync_change(entity, entity_key, xid xid8, changed_at)` หนึ่งแถวต่อคีย์ (upsert ตีตรา `xid` ใหม่ด้วย `pg_current_xact_id()`) -- การแก้จากโปรแกรมอื่นที่เขียนลงตารางเดียวกันก็ถูกจับด้วยวิธีเดียวกัน (คอมเมนต์ `pos_sync.go:28`)
 2. ตารางต้นทาง -> entity (`posSyncSources` :118): `ic_inventory`/`ic_inventory_barcode`/`ic_unit_use`/`images` -> `product`; `ar_customer` -> `member`; `pos_promotions` -> `promotion`; `coupon_list` -> `coupon`; `posconfig`/`pos_id`/`erp_thai_qr_config`/`pos_point_condition` -> `config` (คีย์ `*`)
 3. `ic_inventory`/`ar_customer` ผูก trigger เฉพาะ column ที่เครื่องใช้ (ไม่รวม `balance_qty`/`average_cost`) เพื่อให้การคำนวณสต็อกหลังขายไม่ทำให้ทุกเครื่องโหลดสินค้าซ้ำ (คอมเมนต์ :115-117)
 4. `images`: ฟังก์ชัน `pos_sync_log_image` (:99) แยก `image_id` ขึ้นต้น `CONTRACT` = รูปสมาชิก (`member`) นอกนั้น = รูปสินค้า (`product`)
@@ -56,7 +56,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:329", "backend/intern
 คืน `{shift, settlements[], bills[]}` ของเครื่อง: กะที่เปิดอยู่ (`pos_period.period_status = 0` ล่าสุด; ไม่มี = ตั้ง `shift = null`), รายการรับ/ส่งเงิน `poscashiersettle` ตั้งแต่วันเริ่มกะ (ไม่มีกะ = วันนี้ตามวันของเซิร์ฟเวอร์), และบิลดิบจาก `pos_bill_inbox` (สถานะ `pending|done|error|cancelled`, payload ตามที่เครื่องส่ง) สูงสุด 5000 บิล (`posRestoreMaxBills` :131) แคตตาล็อกและเลขบิลถัดไปกลับมาทางการซิงก์ปกติ (คอมเมนต์ :112-115)
 
 ### รูปภาพ (`pos_media.go`, `pos/media.go`)
-- `GET /pos/image?e=product|member&k=<รหัส>&v=` คืน **รูปย่อ JPEG เสมอ** พร้อม `Cache-Control: private, max-age=31536000, immutable` (`pos/media.go:25-56`) ตัวต้นฉบับอยู่ใน MinIO (คีย์ต้องขึ้นต้น `<ฐาน>/` ของบริษัทตัวเอง -- ไม่ตามแถวที่ชี้ไปบริษัทอื่น, `PosImage` :28-65) หรือเป็น bytea ใน `images.image_file` ของ BC เดสก์ท็อป (ย่อต่อคำขอ ตามคอมเมนต์ `ponytail` ใน `pos/media.go`)
+- `GET /pos/image?e=product|member&k=<รหัส>&v=` คืน **รูปย่อ JPEG เสมอ** พร้อม `Cache-Control: private, max-age=31536000, immutable` (`pos/media.go:25-56`) ไฟล์รูปเต็มอยู่ใน MinIO (คีย์ต้องขึ้นต้น `<ฐาน>/` ของบริษัทตัวเอง -- ไม่ตามแถวที่ชี้ไปบริษัทอื่น, `PosImage` :28-65) หรือเป็น bytea ใน `images.image_file` เมื่อแถวไม่มี `image_url` (ย่อต่อคำขอ ตามคอมเมนต์ `ponytail` ใน `pos/media.go:45-46`)
 - `POST /pos/media?kind=slip&ref=<doc_no>` รับ PNG/JPEG ไม่เกิน 5 MB (`posMediaMaxBytes`) รองรับเฉพาะ `kind=slip` และต้องมีบิลนั้นของเครื่องนี้ใน `pos_bill_inbox` แล้ว (ยังไม่มี = 409 ให้ส่งบิลก่อน) เก็บที่ MinIO ด้วยคีย์ที่อิงแฮชเนื้อหา (ส่งซ้ำได้ผลเดิม) แล้ว `RecordPosMedia` ลง `bc_doc_images` ช่อง 0 แบบแทนที่แถวเดิม
 
 ## ที่มาในโค้ด

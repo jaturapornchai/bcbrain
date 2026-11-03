@@ -41,7 +41,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:40", "backend/interna
 - [[proc-lookup-filters]] - ตัวกรองหน้าค้นหา (คู่ค้า, เอกสารอ้างอิง, คลัง, สินค้าถูกกัน)
 
 #### ข้อมูลหลัก ราคา บาร์โค้ด
-- [[proc-master-data]] - ข้อมูลหลักแบบหัว-รายการ รหัสอัตโนมัติ เลย์เอาต์ DataList
+- [[proc-master-data]] - ข้อมูลหลักแบบหัว-รายการ (รวมงวดบัญชี สูตรโปรโมชัน POS แคมเปญท้ายใบเสร็จ) รหัสอัตโนมัติ เลย์เอาต์ DataList
 - [[proc-item-master-detail]] - ข้อมูลสินค้าและข้อมูลสินค้าเพิ่มเติม
 - [[proc-price-engine]] - เครื่องมือหาราคา ศูนย์ราคา และแก้ราคา (`modifyprice`)
 - [[proc-barcode]] - บาร์โค้ดสินค้า ส่วนลดบาร์โค้ด EAN13 พิมพ์ป้าย

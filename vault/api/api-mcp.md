@@ -26,7 +26,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:360","backend/interna
 - รูปแบบ: `bcmcp_ro_<base64url(provider)>.<id 32 hex>.<base64url(secret)>` (token.go:101); `ParseToken` จำกัดความยาว 220 และบังคับ prefix `bcmcp_ro_` (token.go:27,112-117). โหมดเดียวที่มีคือ `readonly` (token.go:25).
 - รับ token จาก `Authorization: Bearer <token>` หรือ header `X-MCP-Token` (`extractBearerOrHeaderToken` gateway.go:822).
 - `Authenticate` (gateway.go:254): แยก provider + id จาก token → ตรวจ cache ในหน่วยความจำ `authCache` (30 วินาที) ที่ผูกกับ hash+วันหมดอายุ → ถ้าไม่มีใน cache อ่าน `bc_mcp_access_tokens` + `bc_mcp_token_databases` เทียบ SHA-256 hash แบบ constant-time (`verifyTokenHash`). ทุกความล้มเหลวคืน `ErrDenied` (ไม่บอกเหตุ). ถูกเพิกถอนแล้ว evict cache ทันที.
-- ชื่อฐานข้อมูลที่ token ใช้ได้ต้องตรง `^[a-z0-9_]{1,63}$` (token.go:37); ฐานข้อมูลที่ขึ้นต้นด้วย prefix ของฐานระบบหลัก (ไม่ใช่ฐานบริษัท) ถูกปฏิเสธเสมอทั้งตอนใช้งานและตอนสร้าง token (gateway.go:170, token.go:241; `DatabaseSelection` token.go:133).
+- ชื่อฐานข้อมูลที่ token ใช้ได้ต้องตรง `^[a-z0-9_]{1,63}$` (token.go:37); ฐานข้อมูลที่ขึ้นต้นด้วย prefix ของฐานระบบหลัก (ไม่ใช่ฐานบริษัท) ถูกปฏิเสธเสมอทั้งตอนใช้งานและตอนสร้าง token (gateway.go:136, token.go:170, token.go:241; `DatabaseSelection` token.go:133).
 
 ## 2. POST /mcp — JSON-RPC
 
@@ -66,7 +66,7 @@ GET `/mcp` (ที่ไม่ได้ขอ SSE) คืน JSON อธิบ�
 
 ## 3. Tools (11 ตัว)
 
-catalog ที่ `readOnlyToolsCatalog` (gateway.go:1142-1308), การส่งต่อที่ `executeReadOnlyTool` (case ที่ gateway.go:1484-1498).
+catalog ที่ `readOnlyToolsCatalog` (gateway.go:1110-1328), การส่งต่อที่ `executeReadOnlyTool` (gateway.go:1336; case ของ 8 tool ที่ใช้ฐานข้อมูลอยู่ที่ :1484-1498 ส่วน `bc_ui_workflow_spec`, `bc_system_workflow_guide`, `bc_list_databases` ตอบก่อนเลือกฐาน).
 
 | tool | input สำคัญ | ขีดจำกัด/พฤติกรรม |
 |---|---|---|
@@ -75,7 +75,7 @@ catalog ที่ `readOnlyToolsCatalog` (gateway.go:1142-1308), การส่
 | `bc_list_databases` | ไม่มี | `{mode, providerCode, authorizedDatabases}` |
 | `bc_company_overview` | `database`/`databases` | ข้อมูลกิจการ (`erp_company_profile`), ค่าเริ่มต้นระบบ/ทศนิยม/ปีปฏิทิน (`erp_option`) และ KPI ภาพรวม |
 | `bc_list_tables` | `keyword`, `limit` (100, สูงสุด 300), `offset`, `format` | ค้นตารางพร้อมจำนวนคอลัมน์และจำนวนแถวโดยประมาณ |
-| `bc_describe_table` | `table` หรือ `tables`, `includeSamples` | โครงสร้างคอลัมน์ (และแถวตัวอย่าง) ทีละตารางหรือหลายตารางในครั้งเดียว |
+| `bc_describe_table` | `table` หรือ `tables` (สูงสุด 10 ตาราง, gateway.go:1729), `includeSamples` | โครงสร้างคอลัมน์ (และแถวตัวอย่าง 3 แถว; ค่าเริ่มต้น true เมื่อดูตารางเดียว) |
 | `bc_query_readonly` | `sql`, `limit` (100, สูงสุด 500), `offset`, `format`, `omitEmpty` | SELECT/WITH เดียว; ห่อด้วย `LIMIT n+1 OFFSET m` เพื่อรู้ `has_more` |
 | `bc_batch_readonly` | `queries[]` (สูงสุด 5, แต่ละอัน `{key, sql, limit}` limit 50 สูงสุด 200) | รันใน snapshot read-only transaction เดียว |
 | `bc_document_lookup` | `docNo`, `keyword`, `custCode`, `transFlag`, `dateFrom`, `dateTo`, `limit` (50, สูงสุด 200) | ค้นเอกสารพร้อมรายละเอียด |
@@ -83,13 +83,13 @@ catalog ที่ `readOnlyToolsCatalog` (gateway.go:1142-1308), การส่
 | `bc_run_report` | `menuKey` (บังคับ), `mode`, `dateFrom`, `dateTo`, `fromCode`, `toCode`, `keyword` | รันรายงานตามเมนู |
 
 พารามิเตอร์ร่วม:
-- `database` (ฐานเดียว) หรือ `databases` (หลายฐาน) — **ห้ามส่งพร้อมกัน**; สูงสุด 20 ฐานต่อครั้ง; ซ้ำ/ว่าง/นอก allow-list = error; ไม่ระบุใช้ฐานแรกที่ token อนุญาต (`DatabaseSelection` token.go:133). หลายฐานรันขนานจำกัดพร้อมกัน 4 (gateway.go:1509-1515).
+- `database` (ฐานเดียว) หรือ `databases` (หลายฐาน) — **ห้ามส่งพร้อมกัน** (token.go:136); สูงสุด 20 ฐานต่อครั้ง (token.go:149); ซ้ำ/ว่าง/นอก allow-list = error (token.go:154,170); ไม่ระบุใช้ฐานแรกที่ token อนุญาต (`DatabaseSelection` token.go:133). หลายฐานรันขนานจำกัดพร้อมกัน 4 (gateway.go:1509-1515).
 - `format` ∈ `compact` (ค่าเริ่มต้น, ตารางแบบ columns+rows), `records`, `markdown` (compact.go:9-30).
 - `omitEmpty` (ค่าเริ่มต้น true) ตัดคอลัมน์ที่ว่าง/ศูนย์ทั้งคอลัมน์.
 
 ### กติกาความปลอดภัยของ SQL
 
-- `validateReadOnlySQL` (gateway.go:1801) ใช้ `domainquery.NewStatement` (domain/query/query.go:290): อนุญาต SELECT/WITH คำสั่งเดียว ห้าม DML/DDL และ pattern ต้องห้าม.
+- `validateReadOnlySQL` (gateway.go:1801) ใช้ `domainquery.NewStatement` (domain/query/query.go:290): อนุญาต SELECT/WITH คำสั่งเดียว ห้าม DML/DDL และ pattern ต้องห้าม; ห้ามอ่านคอลัมน์รหัสผ่านของ `erp_user` (SQL ที่อ้าง `erp_user` พร้อม `password`/`pass`/`*` ถูกปฏิเสธ, :1808-1810).
 - `forbiddenReadTables` (gateway.go:30) บล็อกการอ่านตารางที่อ่อนไหว (บัญชีผู้ใช้/รหัสผ่าน, ตารางโทเค็น MCP, บัญชี Google และตารางรหัสผ่านของระบบ PostgreSQL).
 - `runReadOnlyQueryWithCols` (gateway.go:1552): transaction `ReadOnly` + RepeatableRead + `SET LOCAL statement_timeout='15s'`.
 - ผลทั้งหมดถูก cache/ตัดแบบ compact เพื่อประหยัด token ของ AI (compact.go).

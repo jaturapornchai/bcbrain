@@ -13,7 +13,7 @@ sources: ["frontend/src/config/schemas/erpOption/tab1System.ts:22", "frontend/ac
 - การแปลงตอนแสดง: ถ้า `year_type=1` ให้ปีที่เก็บ + 543 (`dateText.ts:8-26`, `numeric.ts:422-444`)
 - การพิมพ์ปีเอง: ถ้าพิมพ์ปีเกิน 2400 ระบบถือว่าเป็น พ.ศ. แล้วลบ 543 ก่อนเก็บ (`dateText.ts:15,22`); ถ้าพิมพ์ปี 2 หลัก เช่น `15/03/69` จะเติมเป็น 2569 เมื่อตั้ง พ.ศ. และ 2069 เมื่อตั้ง ค.ศ. (`dateText.ts:51-66`)
 - รายงาน: วันที่ที่กรอกในเงื่อนไขรายงานถ้าเกิน 2400 จะลบ 543 เช่นกัน (`report.go:163-180`) และหน้ารายงานอ่านค่า `year_type` มาแสดงผล (`report.go:185-197`, `frontend/account/report/UniversalReportScreen.tsx:412`)
-- ข้อความรายการบัญชี (คำอธิบายที่ใช้ `&DOC_DATE&`/`&TAX_DATE&`) และรหัสรูปแนบเอกสาร (`bc_doc_images.image_id`) ใช้ปี พ.ศ. เมื่อ `year_type=1` (`gl_post.go:57-68`, `service.go:1559`, `doc_picture.go:200-206`, `:242-250`)
+- ข้อความรายการบัญชี (คำอธิบายที่ใช้ `&DOC_DATE&`/`&TAX_DATE&`) และรหัสรูปแนบเอกสาร (`bc_doc_images.image_id`) ใช้ปี พ.ศ. เมื่อ `year_type=1` (`gl_post.go:57-68`, `service.go:1570`, `doc_picture.go:200-206`, `:242-250`)
 - ฐานข้อมูลใหม่ที่สร้างจากระบบ จะ seed `erp_option.year_type = 1` (พ.ศ.) ให้ (`workspace_google.go:505-507`)
 
 ## ข้อควรระวัง

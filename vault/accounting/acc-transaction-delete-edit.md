@@ -2,12 +2,12 @@
 title: "การลบ แก้ไข และล็อกเอกสาร (Transaction Delete / Edit Guards)"
 tags: [accounting, transaction, delete, edit, audit]
 aliases: ["ลบเอกสาร", "แก้ไขเอกสาร", "ห้ามแก้ไข", "Lock เด็ดขาด", "เอกสารถูกอ้างอิง", "DeleteTrans", "ยกเลิกเอกสาร"]
-sources: ["backend/internal/application/process/trans.go:382", "backend/internal/application/process/trans.go:395", "backend/internal/application/process/trans_validate.go:95", "backend/internal/application/process/trans_validate.go:112", "backend/internal/application/process/trans_validate.go:132", "backend/internal/application/process/trans_validate.go:142", "backend/internal/application/process/trans_deposit.go:246", "backend/internal/application/process/trans_tax.go:22", "backend/internal/application/process/period.go:68"]
+sources: ["backend/internal/application/process/trans.go:382", "backend/internal/application/process/trans.go:395", "backend/internal/application/process/trans_validate.go:95", "backend/internal/application/process/trans_validate.go:112", "backend/internal/application/process/trans_validate.go:132", "backend/internal/application/process/trans_validate.go:142", "backend/internal/application/process/trans_deposit.go:246", "backend/internal/application/process/trans_tax.go:22", "backend/internal/application/process/period.go:68", "backend/internal/application/process/trans_validate.go:44", "backend/internal/application/process/trans_validate.go:68", "backend/internal/application/process/trans_validate.go:106", "backend/internal/application/process/hidden_cost.go:404", "backend/internal/application/process/doc_cancel.go:585", "backend/internal/application/process/doc_flow.go:234", "backend/internal/application/process/period.go:95"]
 ---
 
 # การลบ แก้ไข และล็อกเอกสาร
 
-การแก้ไขเอกสาร = บันทึกทับด้วยเลขเดิม (`IsNew` = false) ซึ่งใน `saveTransTx` จะลบแถวเดิมแล้ว insert ใหม่ การลบใช้ `DeleteTrans` ที่ลบแถวดิบทั้งหมดแล้ว rebuild สต็อก/GL/serial ใหม่ ทั้งสองทางผ่านด่านตรวจชุดเดียวกัน คือ lock, สถานะเอกสาร และงวดบัญชีของวันที่ที่บันทึกไว้เดิม
+การแก้ไขเอกสาร = บันทึกทับด้วยเลขเดิม (`IsNew` = false) ซึ่งใน `saveTransTx` จะลบแถวเดิมแล้ว insert ใหม่ การลบใช้ `DeleteTrans` ที่ลบแถวดิบทั้งหมดแล้ว rebuild สต็อก/GL/serial ใหม่ ทั้งสองทางผ่านด่าน lock และสถานะเอกสารชุดเดียวกัน แต่ตรวจงวดบัญชีต่างกัน: แก้ไขตรวจงวดของ `doc_date` ใหม่ที่กำลังบันทึก ส่วนลบตรวจงวดของ `doc_date` ที่เก็บไว้เดิม
 
 ## ทำงานอย่างไร
 
@@ -23,8 +23,8 @@ sources: ["backend/internal/application/process/trans.go:382", "backend/internal
    - `approve_status` >= 1 เฉพาะ flag 34 (สั่งจอง)
    - `is_doc_copy` = 1
    - ยกเว้น: flag 30 (เสนอราคา) แก้ได้เมื่อเปิด `erp_option.doc_sale_order_edit`
-3. แก้ไขเอกสารที่ไม่มีอยู่จริง = "ไม่พบเอกสารที่จะแก้ไข" (กันผู้ใช้สิทธิ์แก้ไขอย่างเดียวสร้างเอกสารใหม่)
-4. งวดบัญชี: การลบตรวจงวดของ `doc_date` ที่เก็บอยู่ (`checkStoredDocPeriod` period.go:68) ดู [[acc-period-close]]
+3. แก้ไขเอกสารที่ไม่มีอยู่จริง = "ไม่พบเอกสารที่จะแก้ไข" (trans_validate.go:68) (กันผู้ใช้สิทธิ์แก้ไขอย่างเดียวสร้างเอกสารใหม่)
+4. งวดบัญชี: การแก้ไขตรวจงวดของ `doc_date` ใหม่ (`checkOpenPeriod` trans_validate.go:44-48 ยกเว้น flag 521-523) ส่วนการลบตรวจงวดของ `doc_date` ที่เก็บอยู่ (`checkStoredDocPeriod` trans_validate.go:106 → period.go:68) ดู [[acc-period-close]]
 
 ### ลำดับการลบ (`deleteTransTx` trans.go:395)
 1. `lockTransDoc` และ `lockStockItems`
@@ -34,14 +34,14 @@ sources: ["backend/internal/application/process/trans.go:382", "backend/internal
 5. `docFlowTx`, `rebuildSerialTx`, `rebuildTransDerived` (สต็อก, GL, เช็ค)
 
 ### การยกเลิก (cancel) ต่างจากการลบ
-- เอกสารที่ยกเลิกยังเก็บแถวไว้ โดยตั้ง `last_status` = 1
+- การยกเลิกสร้างเอกสารยกเลิกแยก แล้ว `deriveLastStatus` ตั้ง `last_status` = 1 ให้ต้นฉบับ (เก็บแถวเดิมไว้) ยกเว้นเอกสารยกเลิก flag 3/7/31/37/39 ที่เป็นการยกเลิกรายบรรทัด (cancel_type 2) จะไม่ตั้ง `last_status` ของหัวต้นฉบับ (`cancelTypeFilter` doc_flow.go:234, `deriveLastStatus` :239-252)
 - แถว VAT ยังอยู่ แต่รายงานภาษีจะทำให้เป็นศูนย์จาก `ic_trans.last_status` (comment trans_tax.go:22-23)
 - สต็อกไม่นับบรรทัดที่ `last_status` <> 0 (stock_rebuild.go:18)
-- GL ของเอกสารยกเลิกกลับรายการด้วย `reverseCancelledGL` (doc_cancel.go:585) ซึ่งอยู่นอกขอบเขตโน้ตนี้ (รายละเอียดยังไม่ยืนยัน)
+- GL ของต้นฉบับยังอยู่ `reverseCancelledGL` (doc_cancel.go:585-672) ลงรายการกลับในชื่อเอกสารยกเลิก: สลับเดบิต/เครดิตทุกบรรทัด ชื่อบัญชีขึ้นต้นด้วย "*" ลงวันที่และงวดของเอกสารยกเลิก
 - งวดของการยกเลิกตรวจทั้งวันที่เอกสารยกเลิกและวันที่ต้นฉบับ (`checkCancelPeriod` period.go:95)
 
 ### Edge case
-- `deleteTransTx` ไม่ตรวจงวดเอง ด่านงวดอยู่ใน `checkTransScreenDelete` (trans_validate.go:95) ซึ่ง caller ต้องเรียกก่อน (ยังไม่ได้ตรวจว่าทุก caller เรียก)
+- `deleteTransTx` ไม่ตรวจงวดเอง มีผู้เรียก 2 ทาง: `DeleteTrans` เรียก `checkTransScreenDelete` (trans_validate.go:95) ก่อนเสมอ (trans.go:388-391) ส่วนการลบเอกสารปรับต้นทุนแฝง 66 ใน `dropHiddenCostTx` (hidden_cost.go:404) เรียกตรง จึงไม่ผ่านด่าน lock/สถานะ/งวด
 - การลบเรียง lock เดียวกับการบันทึก จึงไม่ deadlock กับเอกสารที่บันทึกพร้อมกัน
 
 ## ที่มาในโค้ด

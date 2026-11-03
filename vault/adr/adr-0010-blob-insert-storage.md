@@ -29,7 +29,7 @@ sources: ["backend/docs/adr/0010-blob-insert-bytea-not-object-storage.md:7", "ba
 - `backend/internal/adapter/inbound/http/blob/handler.go:2` — คอมเมนต์หัวไฟล์: ส่งรูปเข้า MinIO เก็บแค่ URL.
 - `backend/internal/adapter/inbound/http/blob/handler.go:137` — `zipValuesToMinIO`.
 - `backend/internal/domain/blob/blob.go:7` — คอมเมนต์เก่าที่ยังอ้าง ADR-0010.
-- `backend/docs/adr/0010-blob-insert-bytea-not-object-storage.md:7` — ข้อความ ADR เดิม.
+- `backend/docs/adr/0010-blob-insert-bytea-not-object-storage.md:7` — ข้อความใน ADR.
 
 ## ดูเพิ่ม
 

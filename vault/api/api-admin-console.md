@@ -52,7 +52,7 @@ POST /api/v1/admin/users   (X-Admin-Api-Key: <adminKey>)
 
 ## ผู้เรียกฝั่งหน้าเว็บ
 
-Next route อยู่ใต้ `src/app/api/admin/` และเรียก `proxyToService` ซึ่งแนบกุญแจให้ (api-server.ts:388,496):
+Next route อยู่ใต้ `src/app/api/admin/` และเรียก `proxyToService` ซึ่งแนบกุญแจให้ (api-server.ts:402,510):
 
 | Next route | ไปที่ Go | หน้าจอที่เรียก |
 |---|---|---|

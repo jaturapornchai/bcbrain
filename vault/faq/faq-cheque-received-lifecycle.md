@@ -2,7 +2,7 @@
 title: "เช็ครับ ตั้งแต่รับ-นำฝาก-ผ่าน-คืน-ขาดสิทธิ์ ลงบัญชีและเปลี่ยนสถานะอย่างไร"
 tags: [faq, cheque, cash-bank, gl, ar]
 aliases: ["เช็ครับ", "นำฝากเช็ค", "เช็คผ่าน", "เช็คคืน", "เช็คเด้ง", "received cheque", "cb_chq_list status", "trans_flag 410", "trans_flag 411", "1122-01 เช็คระหว่างเรียกเก็บ"]
-sources: ["backend/internal/application/process/cheque.go:32", "backend/internal/application/process/cheque.go:68", "backend/internal/application/process/cheque.go:220", "backend/internal/application/process/service.go:2243", "backend/internal/application/process/service.go:2283", "backend/internal/application/process/service.go:1865", "backend/internal/application/process/report_menu_cb.go:152"]
+sources: ["backend/internal/application/process/cheque.go:32", "backend/internal/application/process/cheque.go:68", "backend/internal/application/process/cheque.go:220", "backend/internal/application/process/service.go:2254", "backend/internal/application/process/service.go:2294", "backend/internal/application/process/service.go:1876", "backend/internal/application/process/report_menu_cb.go:152"]
 ---
 # เช็ครับ ตั้งแต่รับ-นำฝาก-ผ่าน-คืน-ขาดสิทธิ์ ลงบัญชีและเปลี่ยนสถานะอย่างไร
 
@@ -44,8 +44,8 @@ sources: ["backend/internal/application/process/cheque.go:32", "backend/internal
 ธนาคารใช้ `erp_pass_book.account_code_1` ของสมุดบัญชีในเอกสาร ไม่มีใช้ 1112/1113/1111 ([[tbl-erp-pass-book]])
 
 ## ข้อควรระวัง
-- แท็บรับชำระลงเช็คที่ "1122" รหัสเดียว (`service.go:1865`) แต่เอกสารนำฝาก/คืนใช้ "1122-00" ก่อน (`service.go:2249`) ถ้าผังมี 1122-00 ยอดจะค้างคนละบัญชี
-- บันทึก 411 ไปแก้ GL ของเอกสาร 410 อีกใบ (`service.go:2283`) ถ้ายกเลิก/ลบ 411 ต้อง rebuild GL ของ 410 ด้วย ([[faq-gl-rebuild-when]])
+- แท็บรับชำระลงเช็คที่ "1122" รหัสเดียว (`service.go:1876`) แต่เอกสารนำฝาก/คืนใช้ "1122-00" ก่อน (`service.go:2260`) ถ้าผังมี 1122-00 ยอดจะค้างคนละบัญชี
+- บันทึก 411 ไปแก้ GL ของเอกสาร 410 อีกใบ (`service.go:2294`) ถ้ายกเลิก/ลบ 411 ต้อง rebuild GL ของ 410 ด้วย ([[faq-gl-rebuild-when]])
 - 416 ลง Dr ธนาคาร ไม่ได้ลงเช็คใบใหม่ การลงเช็คใหม่ ไม่ชัดจากโค้ดเส้นมาตรฐาน
 - เอกสารเช็คไม่มีการตรวจงวดบัญชี (`period.go:107-108`)
 - ถ้ารหัสเอกสารมีรูปแบบ GL ระบบใช้รูปแบบแทน ([[faq-gl-template-doc-format]])
@@ -61,8 +61,8 @@ sources: ["backend/internal/application/process/cheque.go:32", "backend/internal
 - `backend/internal/application/process/cheque.go:32` `chequeStatusSQL` (คอมเมนต์ `:16-31`)
 - `backend/internal/application/process/cheque.go:68` `RebuildChequeStatus`; `:329` `RebuildCheque`
 - `backend/internal/application/process/cheque.go:220` `chequeCandidateWhere`; `:266` `ChequeCandidates`
-- `backend/internal/application/process/service.go:2243` GL เช็ครับ 410-418; `:2249` บัญชีเช็ครับ
-- `backend/internal/application/process/service.go:2283` 411 แก้ GL ของ 410
-- `backend/internal/application/process/service.go:1865` แท็บรับชำระ เช็ค = 1122
+- `backend/internal/application/process/service.go:2254` GL เช็ครับ 410-418; `:2260-2261` บัญชีเช็ครับ
+- `backend/internal/application/process/service.go:2294` 411 แก้ GL ของ 410
+- `backend/internal/application/process/service.go:1876` แท็บรับชำระ เช็ค = 1122
 - `backend/internal/application/process/cheque_forward.go:10` `chequeForwardStmts` เช็คยกมา 405/406
 - `backend/internal/application/process/report_menu_cb.go:152` ชื่อสถานะเช็ค

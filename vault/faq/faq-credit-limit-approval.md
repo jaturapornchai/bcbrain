@@ -2,7 +2,7 @@
 title: "ขายเกินวงเงินเครดิตลูกค้าได้ไหม ต้องให้ใครอนุมัติ"
 tags: [faq, ar, credit, sale, erp-option]
 aliases: ["เกินวงเงินเครดิต", "วงเงินเครดิตลูกค้า", "credit limit", "ยอดวงเงินเครดิตของลูกค้า เกินที่กำหนดไว้", "lock_credit_money", "password_ar_credit", "approve_ar_credit", "ถูกปิดสถานะเครดิต", "erp_credit_request"]
-sources: ["backend/internal/application/process/trans_save_rules.go:488", "backend/internal/application/process/trans_save_rules.go:503", "backend/internal/application/process/trans_save_rules.go:522", "backend/internal/application/process/trans_save_rules.go:597", "backend/internal/application/process/trans_save_rules.go:610", "backend/internal/application/process/trans_credit.go:33", "backend/internal/application/process/trans_credit.go:50", "backend/internal/application/process/trans_credit.go:147"]
+sources: ["backend/internal/application/process/trans_save_rules.go:488", "backend/internal/application/process/trans_save_rules.go:503", "backend/internal/application/process/trans_save_rules.go:522", "backend/internal/application/process/trans_save_rules.go:597", "backend/internal/application/process/trans_save_rules.go:610", "backend/internal/application/process/trans_credit.go:33", "backend/internal/application/process/trans_credit.go:50", "backend/internal/application/process/trans_credit.go:147", "backend/internal/application/process/trans_credit.go:19", "backend/internal/application/process/trans_save_rules.go:519"]
 ---
 # ขายเกินวงเงินเครดิตลูกค้าได้ไหม ต้องให้ใครอนุมัติ
 
@@ -27,8 +27,8 @@ sources: ["backend/internal/application/process/trans_save_rules.go:488", "backe
 **ใบสั่งจอง 34 / ใบสั่งขาย 36:** ตรวจเมื่อเปิด `sr_ss_credit_check` ยอดที่ใช้เทียบคือ ยอดเอกสาร + ยอดลูกหนี้ + ยอดจอง/สั่งขายค้าง + เช็คในมือ ถ้าเกินวงเงิน (หรือลูกค้าเป็นสถานะ 2) ระบบถามว่าจะบันทึกเพื่อขออนุมัติหรือไม่ ถ้าตอบตกลง เอกสารจะถูกพักไว้ (`is_hold`) พร้อมสร้างคำขอใน `erp_credit_request` ถ้าเปิด `check_credit_sale_reserve_sale_order` จะไม่ให้บันทึก "เกินวงเงินเครดิตลูกค้า" ส่วนจองเงินสด 34 จะถูกพักไว้เพื่อตรวจสัดส่วนเงินมัดจำ
 
 ## ข้อควรระวัง
-- ขั้นขออนุมัติแบบ OTP ของ `request_ar_credit` ยังไม่ได้พอร์ต ถ้าเปิดสวิตช์นี้ไว้ การขายเกินวงเงินจะถูกห้ามเสมอ และลูกค้าสถานะ 2 ก็ขายไม่ได้ (คอมเมนต์ใน `checkCreditLimit`)
-- เช็ครับในมือถูกตัดเศษเหลือเต็มบาท (`trunc`) ตาม C# เดิม หนี้คงค้างจึงอาจต่ำกว่ายอดจริงไม่เกิน 1 บาท
+- โค้ดไม่มีขั้นขออนุมัติแบบ OTP ของ `request_ar_credit` ถ้าเปิดสวิตช์นี้ไว้ การขายเกินวงเงินจะถูกห้ามเสมอ และลูกค้าสถานะ 2 ก็ขายไม่ได้ (`trans_credit.go:19-22`, `trans_save_rules.go:519-522`)
+- เช็ครับในมือถูกตัดเศษเหลือเต็มบาท (`trunc`) หนี้คงค้างจึงอาจต่ำกว่ายอดจริงไม่เกิน 1 บาท
 - ยอดลูกหนี้ที่ใช้ตรวจวงเงินไม่นับ 254 (ตามสูตรรายงานสถานะ) ดู [[faq-ap-ar-balance-where]]
 - ใบสั่งแบบเชื่อของลูกค้าที่วงเงิน ≤1 บาท (ไม่ได้ตั้งวงเงิน) จะถูกส่งขออนุมัติทุกใบ หรือถูกห้ามถ้าเปิด `check_credit_sale_reserve_sale_order` ซึ่งต่างจากใบขาย 44 ที่วงเงิน 0 แปลว่าไม่ตรวจ
 

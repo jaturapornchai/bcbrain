@@ -90,6 +90,12 @@ const CASES = [
   ["token.go", "tbl-bc-mcp-tokens", "api-mcp"],
   ["ar_customer columns", "tbl-ar-customer"],
   ["permission.go RequiredRight", "proc-permission-rights", "be-menu-rights-permission"],
+  ["ระบบในชุด BC มีอะไรบ้าง", "systems-overview"],
+  ["POS ขายตอนเน็ตหลุด ออฟไลน์", "sys-pos-offline-storage", "sys-pos-sync-client", "sys-pos-overview"],
+  ["ศูนย์บริการรถยนต์ รับรถถึงปิดบิล", "sys-autocare-job-flow", "sys-autocare-overview"],
+  ["ใบกำกับภาษีอิเล็กทรอนิกส์ e-Tax", "sys-etax-overview", "sys-etax-document-stamp"],
+  ["คลังสินค้า หยิบ แพ็ค ส่ง", "sys-wms-fulfillment-pick-pack-ship", "sys-wms-overview"],
+  ["ขนส่ง ยืนยันส่งของ POD", "sys-tms-trip-pod-flow", "sys-tms-overview"],
 ];
 let top1 = 0, top5 = 0, askHit = 0;
 const notFirst = [];

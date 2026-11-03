@@ -2,18 +2,19 @@
 title: "รายละเอียดการซื้อ/การขาย 4 ช่อง (BuySaleInformationScreen)"
 tags: [screens, report]
 aliases: ["รายละเอียดการขาย", "รายละเอียดการซื้อ", "BuySaleInformationScreen", "หน้าจอวิเคราะห์ข้อมูลการขายและลูกหนี้", "หน้าจอวิเคราะห์ข้อมูลการซื้อและเจ้าหนี้", "menu_so_sale_information", "menu_po_buy_information"]
-sources: ["frontend/account/report/BuySaleInformationScreen.tsx:27-40", "frontend/account/report/BuySaleInformationScreen.tsx:63-103", "frontend/account/report/BuySaleInformationScreen.tsx:105-199", "frontend/account/tabs/screenRegistry.tsx:741-765", "frontend/src/config/bcMenu.ts:212-213"]
+sources: ["frontend/account/report/BuySaleInformationScreen.tsx:27-40", "frontend/account/report/BuySaleInformationScreen.tsx:63-103", "frontend/account/report/BuySaleInformationScreen.tsx:105-199", "frontend/account/tabs/screenRegistry.tsx:741-765", "frontend/src/config/bcMenu.ts:250-251", "frontend/account/tabs/TabWorkspace.tsx:618", "frontend/src/app/(app)/home/page.tsx:19"]
 ---
 
 # รายละเอียดการซื้อ/การขาย 4 ช่อง (BuySaleInformationScreen)
 
-หน้าจอวิเคราะห์ "ลูกค้า/เจ้าหนี้รายหนึ่งซื้อหรือขายอะไรไปบ้าง" แบ่งเป็น 4 ช่อง (quadrant) ในจอเดียว ใช้คอมโพเนนต์เดียวกัน 2 โหมด: ขาย (`mode="sale"`) และซื้อ (`mode="buy"`) (BuySaleInformationScreen.tsx:27-40) หัวไฟล์อ้างว่าพอร์ตมาจากหน้าจอ C# `BCERPICInfo._buyAndSaleInformation` (บรรทัด 1-10 ของไฟล์) ต่างจากรายงานอื่นที่เป็นตระกูล [[fe-report-screens]] ตรงที่หน้าจอนี้ **ไม่ผ่าน backend report engine** แต่ยิง SQL จากเบราว์เซอร์ผ่าน `queryList` (ดู [[fe-query-client-sql-builder]])
+หน้าจอวิเคราะห์ "ลูกค้า/เจ้าหนี้รายหนึ่งซื้อหรือขายอะไรไปบ้าง" แบ่งเป็น 4 ช่อง (quadrant) ในจอเดียว ใช้คอมโพเนนต์เดียวกัน 2 โหมด: ขาย (`mode="sale"`) และซื้อ (`mode="buy"`) (BuySaleInformationScreen.tsx:27-40) ต่างจากรายงานอื่นที่เป็นตระกูล [[fe-report-screens]] ตรงที่หน้าจอนี้ **ไม่ผ่าน backend report engine** แต่ยิง SQL จากเบราว์เซอร์ผ่าน `queryList` (ดู [[fe-query-client-sql-builder]])
 
 ## วิธีเปิด (และข้อควรระวังเรื่องเมนู)
 
-- registry มี 2 คีย์ที่ชี้มาที่จอนี้: `menu_po_buy_information` (รหัสเก่า 3.8.7 ชื่อ "รายละเอียดการซื้อ") และ `menu_so_sale_information` (รหัสเก่า 4.10.22 ชื่อ "รายละเอียดการขาย") เปิดเป็นแท็บ (`mode: "tab"`) (screenRegistry.tsx:741-765)
-- แต่ใน `bcMenu.json` ปัจจุบัน **ไม่มีเมนูใบที่ชื่อสองคีย์นี้** — `bcMenu.ts` ทำ alias ให้สองชื่อนี้ชี้ไปที่ `menu_po_report_purchase` (3049 "รายงานการซื้อสินค้า/ตั้งหนี้") และ `menu_so_report_invoice` (4045 "รายงานการขายสินค้าและบริการ") (bcMenu.ts:212-213) ซึ่งทั้งสองเมนูเป็นใบประเภท RPT เปิดด้วย `UniversalReportScreen` ([[scr-universal-report]]) ไม่ใช่จอนี้
-- ผลคือในเมนูปัจจุบันไม่พบทางเปิดจอ 4 ช่องนี้โดยตรง ค้นทั้ง `frontend/` (ไม่รวม `.next/`) ไม่พบโค้ดอื่นที่เปิดสองคีย์นี้ นอกจาก registry เอง ถือเป็น **จอที่ลงทะเบียนไว้แต่ไม่มีเมนูชี้** (ดูตารางความไม่สอดคล้องใน [[screens-overview]])
+- registry มี 2 คีย์ที่ชี้มาที่จอนี้: `menu_po_buy_information` (ชื่อ "รายละเอียดการซื้อ", `mode="buy"`) และ `menu_so_sale_information` (ชื่อ "รายละเอียดการขาย", `mode="sale"`) เปิดเป็นแท็บ (`mode: "tab"`) (screenRegistry.tsx:741-765)
+- แต่ `bcMenu.json` **ไม่มีใบเมนูที่ชื่อสองคีย์นี้** — `bcMenu.ts` ทำ alias ให้สองชื่อนี้ชี้ไปที่ node ของ `menu_po_report_purchase` (3049 "รายงานการซื้อสินค้า/ตั้งหนี้") และ `menu_so_report_invoice` (4045 "รายงานการขายสินค้าและบริการ") (`bcMenu.ts:250-251`, ใส่ในตารางค้นชื่อที่ `:256-261`) alias นี้มีผลเฉพาะการหารหัส/ข้อความเมนูจากชื่อ (`getMenuCodeByName` / `getMenuTextByName`, `bcMenu.ts:276-282`) registry จึงตั้งรหัส 3049/4045 ให้สองคีย์นี้ (`screenRegistry.tsx:1058-1061`) แต่การคลิกเมนู 3049/4045 ไม่ได้มาเปิดจอนี้
+- การคลิกเมนูเหล่านั้นส่งชื่อ node (`menu_po_report_purchase` / `menu_so_report_invoice`) ให้ `openScreen` (`MenuBar.tsx:989`, `TabWorkspace.tsx:536-540`) ซึ่งไม่มีคีย์นี้ใน `BASE_SCREENS` ตัวลงทะเบียนเมนูจึงสร้างจอรายงานทั่วไปให้ (`registerAllMenus` `screenRegistry.tsx:1382-1395`; โหมด `report_po` / `report_so` ตามหมวดบนสุด `:1333-1378`) ซึ่งเป็น [[scr-universal-report]] ไม่ใช่จอนี้
+- ทางเปิดที่พบในโค้ดมีทางเดียวคือใส่ชื่อคีย์ใน URL `/home?open=menu_po_buy_information` หรือ `/home?open=menu_so_sale_information` (`frontend/src/app/(app)/home/page.tsx:7,17-19`) แล้ว `TabWorkspace` เปิดคีย์ที่มีใน `SCREENS` ให้ (`TabWorkspace.tsx:618-623`) ค้นทั้ง `frontend/` (ไม่รวม `.next/`) ไม่พบโค้ดอื่นที่เปิดสองคีย์นี้ ถือเป็น **จอที่ลงทะเบียนไว้แต่ไม่มีเมนูชี้** (ดู [[screens-overview]])
 
 ## หน้าตาและการทำงาน
 
@@ -48,13 +49,13 @@ sources: ["frontend/account/report/BuySaleInformationScreen.tsx:27-40", "fronten
 
 ## ข้อควรระวัง
 
-- **นับใบสั่งขาย (36) รวมกับใบขาย (44) ในยอดเดียวกัน** ถ้าสั่งขายแล้วออกใบขายต่อ ยอดสะสมอาจซ้ำสองเท่า และไม่นับ 48 (รับคืน/ลดหนี้) หรือ 144 (ใบกำกับเต็มรูป) จึงไม่ใช่ยอดขายสุทธิ ฝั่งซื้อไม่นับ 16 (ส่งคืน/ลดหนี้) ด้วย (บรรทัด 39 เทียบ [[acc-trans-flag-map]])
+- **นับใบสั่งขาย (36) รวมกับใบขาย (44) ในยอดเดียวกัน** ถ้าสั่งขายแล้วออกใบขายต่อ ยอดสะสมอาจซ้ำสองเท่า และไม่นับ 48 (รับคืน/ลดหนี้) หรือ 144 (ใบกำกับเต็มรูป) จึงไม่ใช่ยอดขายสุทธิ ฝั่งซื้อไม่นับ 16 (ส่งคืน/ลดหนี้) ด้วย (บรรทัด 39 ดูคู่กับ [[acc-trans-flag-map]])
 - **ประวัติบิลของสินค้า (50 แถว) ไม่กรอง `last_status`** ต่างจากอีก 4 คิวรีที่ตัดเอกสารยกเลิก — บิลที่ยกเลิกแล้วอาจโผล่ในช่องนี้ (คิวรีบรรทัด 177-195)
 - **สรุปเช็คในมือไม่กรองตาม `chq_type`** กรองเพียง `ap_ar_code` ตรงกับรหัสที่เลือก และ `status=0` (บรรทัด 129-133) เช็คทั้งรับและจ่ายของรหัสนั้นปนกัน ดูตาราง [[tbl-cb-chq-list]]
 - **ยิง SQL จากเบราว์เซอร์** (ข้อยกเว้นของหลัก "รายงานผ่าน backend") สอดคล้องกับ [[fe-query-client-sql-builder]]
 - **โหลดรายชื่อซ้ำเกินจำเป็น**: `loadCustomers` มี `keyword`, `onlyWithDebt` และ `selectedCust` ในรายการ deps ของ `useCallback` (บรรทัด 99) และ `useEffect` เรียกซ้ำทุกครั้งที่ฟังก์ชันเปลี่ยน (บรรทัด 101-103) จึงเกิดการค้นหาทุกครั้งที่พิมพ์ทีละตัวอักษร **และโหลดรายชื่อใหม่ทุกครั้งที่คลิกเลือกแถว** (คิวรีมี subquery SUM ต่อลูกค้า 100 ราย)
-- ตัวเลขเงินแสดงด้วย `formatMoneyDisplay(…, getBcDecimals(…))` จากสตริง `::text` ของ SQL ไม่ผ่าน JS float จริง แต่ `.filter(Number(balance_amount) > 0)` ของโหมด "เฉพาะมียอด" แปลงเป็น Number เพื่อเปรียบเทียบกับศูนย์เท่านั้น (บรรทัด 93) ดูหลักใน [[fe-numeric-money]]
-- สรุปสถานะ "วงเงินเครดิต" เป็นค่า master ไม่ใช่ยอดคงค้างจริง จึงไม่ใช้ตัดสินได้ว่าเกินวงเงินหรือไม่ เทียบกับหน้าที่ตรวจวงเงินจริงใน [[scr-modal-price-credit]]
+- ตัวเลขเงินแสดงด้วย `formatMoneyDisplay(…, getBcDecimals(…))` จากสตริง `::text` ของ SQL ไม่ผ่าน JS float จริง แต่ `.filter(Number(balance_amount) > 0)` ของโหมด "เฉพาะมียอด" แปลงเป็น Number เพื่อตรวจว่าเป็นศูนย์หรือไม่เท่านั้น (บรรทัด 93) ดูหลักใน [[fe-numeric-money]]
+- สรุปสถานะ "วงเงินเครดิต" เป็นค่า master ไม่ใช่ยอดคงค้างจริง จึงไม่ใช้ตัดสินได้ว่าเกินวงเงินหรือไม่ ส่วนหน้าที่ตรวจวงเงินจริงอยู่ใน [[scr-modal-price-credit]]
 
 ## ที่มาในโค้ด
 
@@ -64,5 +65,6 @@ sources: ["frontend/account/report/BuySaleInformationScreen.tsx:27-40", "fronten
 - ประวัติบิลของสินค้า (LIMIT 50): `…/BuySaleInformationScreen.tsx:173-199`
 - ส่วนหน้าจอ (หัว, ปุ่ม, 4 ช่อง): `…/BuySaleInformationScreen.tsx:202-450`
 - ลงทะเบียน 2 คีย์: `frontend/account/tabs/screenRegistry.tsx:741-765`
-- alias ไปเมนูรายงานปัจจุบัน: `frontend/src/config/bcMenu.ts:212-213`
+- alias ไปเมนูรายงานปัจจุบัน: `frontend/src/config/bcMenu.ts:250-251`
+- เส้นทางเปิดจอ: `frontend/shared/layout/MenuBar.tsx:989`; `frontend/account/tabs/TabWorkspace.tsx:536-540,618-623`; `frontend/src/app/(app)/home/page.tsx:7-19`; `frontend/account/tabs/screenRegistry.tsx:1058-1061,1333-1378`
 - ดูภาพรวมจอรายงานทั้งหมดที่ [[fe-report-screens]] และผังเมนูที่ [[screens-overview]]

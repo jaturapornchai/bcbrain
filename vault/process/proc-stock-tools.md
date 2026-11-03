@@ -36,7 +36,7 @@ sources: ["backend/internal/adapter/inbound/http/process/stocktools_handler.go:8
 
 ### ตรวจบาร์โค้ด (`barcodecheck`)
 - `BarcodeCheckInput.barcodes[]` ตัดช่องว่างต้น-ท้าย ข้ามค่าว่าง แต่ละตัวยาวเกิน 50 ตัวอักษรไม่ผ่าน; ต้องมี 1 ถึง 2000 รายการ (`barcodeCheckMax`, `stock_tools.go:77`)
-- ค้นใน `ic_inventory_barcode` อ่านอย่างเดียว คืน `rows[]` (`barcode`, `found`, `itemCode`, `name`, `unitCode`, `price`..`price4`) ตามลำดับ input และ `notFound[]` (คอมเมนต์ :101-103: C# แสดงรายการที่ไม่พบเมื่อพบอย่างน้อย 1 ตัว ส่วนที่นี่แสดงเสมอ)
+- ค้นใน `ic_inventory_barcode` อ่านอย่างเดียว คืน `rows[]` (`barcode`, `found`, `itemCode`, `name`, `unitCode`, `price`..`price4`) ตามลำดับ input และ `notFound[]` (`notFound[]` ส่งกลับเสมอ แม้ไม่พบเลยสักตัว; คอมเมนต์ :101-103)
 - ตัวจัดการบาร์โค้ดเต็ม (บันทึก, ลดราคา, EAN13) แยกอยู่ที่ route `barcode/{action}` ดู [[proc-barcode]]
 
 ### วิเคราะห์ Serial (`serialanalyze`)
@@ -47,7 +47,7 @@ sources: ["backend/internal/adapter/inbound/http/process/stocktools_handler.go:8
 - `SerialCountSave` บันทึกใบตรวจนับ `ic_trans` flag 76 พร้อม `ic_trans_detail` และ `ic_trans_serial_number` ต่อ serial (คอมเมนต์ :351-353); ต้องมี `whCode`+`shelfCode`, `docDate` รูปแบบ `YYYY-MM-DD`, serial 1-5000 ตัว (`serialCountMax` :323) ไม่ว่าง ไม่ซ้ำ (ตัวพิมพ์ใหญ่); เซิร์ฟเวอร์อ่าน serial ซ้ำจาก `ic_serial` เอง; บันทึก `docNo` เดิมซ้ำจะแทนที่เอกสาร; รวมเป็นบรรทัดต่อสินค้า (qty = จำนวน serial, ราคาของ serial ตัวแรก) ใน `groupSerialLines` (:332)
 
 ### รหัสสินค้าถัดไป (`itemnextcode`)
-อ้าง C# `_icmainScreenTopControl.cs:402-458` (คอมเมนต์ :635-638): ถ้าพิมพ์รหัสรูปแบบ `erp_doc_format` ใช้ `autoRunPattern`/`autoRunNext`; มิฉะนั้นหารหัสสูงสุดที่ขึ้นต้นด้วยข้อความที่พิมพ์แล้วบวกเลขท้าย 1 (`typedPrefixNext`: "A" กับ "A0099" ให้ "A0100") ไม่จองเลข ตัว primary key ของ `ic_inventory` กันบันทึกรหัสซ้ำ input `code`, `date` (ค่าตั้งต้นวันนี้) คืน `code`, `format`
+(คอมเมนต์ :635-638) ถ้าพิมพ์รหัสรูปแบบ `erp_doc_format` ใช้ `autoRunPattern`/`autoRunNext`; มิฉะนั้นหารหัสสูงสุดที่ขึ้นต้นด้วยข้อความที่พิมพ์แล้วบวกเลขท้าย 1 (`typedPrefixNext`: "A" กับ "A0099" ให้ "A0100") ไม่จองเลข ตัว primary key ของ `ic_inventory` กันบันทึกรหัสซ้ำ input `code`, `date` (ค่าตั้งต้นวันนี้) คืน `code`, `format`
 
 ## ที่มาในโค้ด
 - `backend/internal/adapter/inbound/http/process/stocktools_handler.go:89-185` - `StockTools` switch ตาม `{action}`

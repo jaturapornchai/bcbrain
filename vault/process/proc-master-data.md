@@ -20,10 +20,10 @@ sources: ["backend/internal/application/process/master_detail.go:24", "backend/i
   1. `prepare`: ฟิลด์/ตารางที่ไม่อยู่ใน whitelist -> "ฟิลด์ไม่ถูกต้อง"/"ไม่รู้จักตาราง"; ตรวจสินค้าถ้า `itemKeyed`; `prepareHeader` (โหมด `new` แต่รหัสมีอยู่ -> "รหัส ... มีอยู่แล้ว", โหมด `edit` แต่ไม่พบ -> "ไม่พบรายการ"); `prepareGrid` (เกิน 500 แถว หรือเกิน `maxRows` ของ grid -> "จำนวนแถวเกินกำหนด"); `prep` ของ spec; `checkRefs`
   2. `write`: เขียนหัว -> `clear` -> แต่ละ grid (`insertRow` หรือ `updateRow` เมื่อ `updatePK` ตั้งไว้) นับจำนวนแถวที่บันทึก
 - ชนิดข้อมูลของทุกค่าอ่านจาก `information_schema.columns` ของตารางนั้น (`col`, cache ต่อคำขอ) แล้ว `mdNormalize`: ตัวเลขผ่าน `normDecimal`, จำนวนเต็ม (ว่าง = 0, ช่วง int32), วันที่ `YYYY-MM-DD` (ตัดเหลือ 10 ตัว), ข้อความตรวจความยาวคอลัมน์; ค่าผูกเป็น parameter ทั้งหมด
-- ตัวตรวจสินค้า (`checkItem`): สินค้าต้องมี, `item_type` ตรงกับ spec (ชุดสินค้าใช้ 3), และคอลัมน์ gate (`update_price` หรือ `update_detail` ใน `ic_inventory`) ต้องเป็น 1 มิฉะนั้น "ไม่อนุญาตให้แก้ไขข้อมูลนี้" (ตาม C# `_checkEditData`)
+- ตัวตรวจสินค้า (`checkItem`): สินค้าต้องมี, `item_type` ตรงกับ spec (ชุดสินค้าใช้ 3), และคอลัมน์ gate (`update_price` หรือ `update_detail` ใน `ic_inventory`) ต้องเป็น 1 มิฉะนั้น "สินค้า ... ไม่อนุญาตให้แก้ไขข้อมูลนี้ (ตั้งค่าที่ข้อมูลสินค้า)" (`master_detail.go:511-529`)
 - `MasterDetailDelete`: ตรวจ `uses` (ถ้า `table.col` ยังชี้รหัสนี้ -> "ไม่อนุญาตให้ลบ ...: <ข้อความ>") แล้วลบ `clear` + `delChildren` + หัว; หน้าที่ผูกกับสินค้า (price, discount, set) ลบเฉพาะแถวของสินค้านั้น ไม่ลบสินค้า
 
-#### เมนูที่ลงทะเบียนใน `mdSpecs` (`master_detail_specs.go:144-`)
+#### เมนูที่ลงทะเบียนใน `mdSpecs` (`master_detail_specs.go:144-559`)
 | menuKey | ตารางหลัก (อ่านจากโค้ด) |
 |---|---|
 | `menu_ic_item_set` | `ic_inventory_set_detail` (ชุดสินค้า) |
@@ -38,12 +38,16 @@ sources: ["backend/internal/application/process/master_detail.go:24", "backend/i
 | `menu_ic_purchase_premium` | `ic_purchase_permium*` |
 | `menu_setup_user_group`, `menu_setup_user_group_warehouse_shelf` | `erp_user_group*`, `erp_user_group_wh_shelf` (ดู [[proc-wh-shelf-permission]]) |
 | `menu_sale_plan` | `erp_sale_plan*` |
+| `menu_account_period` | `erp_account_period` (ตารางงวดบัญชี ล้างแล้วเขียนใหม่ทั้งชุด, :473-482) |
+| `menu_view_manager_custom` | `erp_view_table_custom` + `erp_view_column_custom` (รูปแบบการค้นหาข้อมูล, :484-495) |
+| `pos_promotion_formula` | `ic_promotion_formula` + ตาราง `ic_promotion_formula_condition`/`_group_qty`/`_price_discount`/`_action` (:497-525) |
+| `menu_setup_pos_slip_campaign` | `pos_slip_campaign` + `pos_slip_campaign_items` (:527-) |
 | `menu_account_period`, `menu_view_manager_custom` | (ยังไม่ได้อ่านรายละเอียด; `erp_view_table_custom`/`erp_view_column_custom` สำหรับเมนูหลัง) |
 | `pos_promotion_formula`, `menu_setup_pos_slip_campaign` | (ยังไม่ได้อ่านรายละเอียด) |
 
 ### 2. รหัสลูกหนี้/เจ้าหนี้อัตโนมัติ (`master/nextcode`, `master/codeleave`)
 - `kind` เลือกตารางจาก map คงที่ `masterCodeTables`: `customer` -> `ar_customer`, `supplier` -> `ap_supplier` (ไม่รับชื่อตารางจาก body); รหัสยาวสุด 25 (`masterCodeMaxLen`); วันที่ใช้เขตเวลา UTC+7 (`thaiToday`)
-- `MasterNextCode` (= C# `MyLib._getAutoRun`): เอารหัสมากสุด (`ORDER BY code DESC LIMIT 1`) แล้ว `runRightToLeft` เพิ่มตัวเลขท้ายรหัส 1 และเติมศูนย์ให้ความกว้างเดิม; ถ้ารหัสสุดท้ายมีเลขท้ายน้อยกว่า 2 หลัก (หรือไม่มี) ผลเป็นค่าว่าง (ตามที่ C# ทำ ตามคอมเมนต์)
+- `MasterNextCode` (`master_autorun.go:64`; ใช้ตอนเพิ่มใหม่ / F2 / รหัสที่พิมพ์ซ้ำตอนบันทึก): เอารหัสมากสุด (`ORDER BY code DESC LIMIT 1`) แล้ว `runRightToLeft` เพิ่มตัวเลขท้ายรหัส 1 และเติมศูนย์ให้ความกว้างเดิม; (ยาวขึ้นได้ถ้าเลขล้น เช่น 99 -> 100); ถ้ารหัสสุดท้ายมีเลขท้ายน้อยกว่า 2 หลัก (หรือไม่มี) ผลเป็นค่าว่าง (`runRightToLeft`, `master_autorun.go:147-160`)
 - `MasterCodeLeave` (ตอนออกจากช่องรหัส): รหัสที่พิมพ์ตรงกับ `erp_doc_format.code` -> รันตามรูปแบบนั้นผ่าน `autoRunPattern` + `autoRunNext` ([[proc-doc-flow-numbering]]) โดยไม่กรองวันที่; ถ้ารูปแบบไม่มี `#` -> error "รูปแบบรหัส ... ไม่มี # สำหรับเลขรัน"; ถ้าไม่ตรงรูปแบบใด ๆ ถือเป็นคำนำหน้าแล้วหารหัสถัดไปด้วย `typedPrefixNext` (`stock_tools.go:739`) -- เฉพาะลูกค้า ถ้า `erp_option.disable_ar_autorun = 1` ไม่ทำอะไร (เจ้าหนี้ไม่มีตัวเลือกนี้); ถ้าผลเท่ารหัสที่พิมพ์ จะไม่เปลี่ยนช่อง
 - ตัวนี้ไม่จองรหัส: การบันทึกจริงยังทำจากเบราว์เซอร์ และคีย์หลักของ `ar_customer`/`ap_supplier` กันรหัสซ้ำ (คอมเมนต์หัวไฟล์)
 - มี route `master/assetdepdefaults` (อัตราค่าเสื่อมและวันหยุดตั้งต้นของหน้าสินทรัพย์ `AssetDepDefaults`, `asset_depreciation.go:40`) -- ไม่ได้อ่านลงรายละเอียด (ยังไม่ยืนยัน)
@@ -68,7 +72,7 @@ sources: ["backend/internal/application/process/master_detail.go:24", "backend/i
 - `backend/internal/application/process/master_detail.go:237` - `mdKey`; `:256` `prepare`; `:298` `prepareHeader`; `:338` `prepareGrid`
 - `backend/internal/application/process/master_detail.go:416` - `mdNormalize`; `:449` `col`; `:512` `checkItem`; `:535` `checkRefs`
 - `backend/internal/application/process/master_detail.go:675` - `write`; `:807` `updateRow`
-- `backend/internal/application/process/master_detail_specs.go:144` - `mdSpecs`
+- `backend/internal/application/process/master_detail_specs.go:144-559` - `mdSpecs`
 - `backend/internal/application/process/master_autorun.go:23-62` - `masterCodeTables`, ตัวช่วยตรวจ
 - `backend/internal/application/process/master_autorun.go:64` - `MasterNextCode`; `:83` `MasterCodeLeave`; `:147` `runRightToLeft`
 - `backend/internal/application/process/master_datalist.go:50` - `datalistDDL`; `:90` `checkDatalistConfig`; `:109` `DatalistGet`; `:132` `DatalistSave`

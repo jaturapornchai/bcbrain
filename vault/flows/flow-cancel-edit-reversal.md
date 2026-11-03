@@ -2,7 +2,7 @@
 title: "แก้ไข ลบ ยกเลิกเอกสาร และผลย้อนกลับ (Edit, Delete, Cancel & Reversal)"
 tags: [flows, close]
 aliases: ["ยกเลิกเอกสาร", "แก้ไขเอกสาร", "ลบเอกสาร", "กลับรายการ", "cancel reversal"]
-sources: ["backend/internal/application/process/doc_cancel.go:135", "backend/internal/application/process/doc_cancel.go:585", "backend/internal/application/process/trans.go:267", "backend/internal/application/process/trans_validate.go:112", "backend/internal/application/process/docs.go:483"]
+sources: ["backend/internal/application/process/doc_cancel.go:135", "backend/internal/application/process/doc_cancel.go:585", "backend/internal/application/process/trans.go:267", "backend/internal/application/process/trans_validate.go:112", "backend/internal/application/process/docs.go:483", "backend/internal/application/process/docs.go:421", "backend/internal/application/process/doc_flow.go:234", "backend/internal/application/process/service.go:1689", "backend/internal/application/process/trans_validate.go:44"]
 ---
 # แก้ไข ลบ ยกเลิกเอกสาร และผลย้อนกลับ (Edit, Delete, Cancel & Reversal)
 
@@ -11,7 +11,7 @@ sources: ["backend/internal/application/process/doc_cancel.go:135", "backend/int
 - ลบ: เอกสารหายไปพร้อมข้อมูลที่ derive จากมัน
 - ยกเลิก: สร้างเอกสารยกเลิกใบใหม่ที่อ้างใบเดิม แล้วกลับรายการ GL ในวันที่ยกเลิก
 
-ทั้งสามทางจะคำนวณสต็อก/GL/เช็คใหม่ด้วย `rebuildTransDerived` เสมอ ดู [[acc-transaction-delete-edit]] และ [[proc-doc-cancel-approve]]
+แก้ไข/ลบเอกสารสินค้า และการยกเลิก จะคำนวณสต็อก/GL/เช็คใหม่ด้วย `rebuildTransDerived` เสมอ ส่วนการลบเอกสารหนี้ (`/doc/delete`) ลบ GL ตามเลขที่เอกสารไปเลยแล้วคำนวณ doc flow ใหม่ ไม่ผ่าน `rebuildTransDerived` ดู [[acc-transaction-delete-edit]] และ [[proc-doc-cancel-approve]]
 
 ## ภาพรวม
 
@@ -19,8 +19,10 @@ sources: ["backend/internal/application/process/doc_cancel.go:135", "backend/int
 flowchart TD
   E["แก้ไข (/trans/save isNew=false)"] --> L1{"ล็อก/ใช้แล้ว/อนุมัติ/ยกเลิก?"}
   L1 -->|"ผ่าน"| RW["ลบ + เขียนใหม่ใน transaction เดียว"]
-  D["ลบ (/trans/delete, /doc/delete)"] --> L1
+  D["ลบ (/trans/delete)"] --> L1
   L1 -->|"ผ่าน"| DEL["ลบเอกสาร + ข้อมูล derive"]
+  DD["ลบเอกสารหนี้ (/doc/delete)"] --> L1
+  L1 -->|"ผ่าน"| DGL["ลบเอกสารหนี้ + GL + VAT/WHT ตามเลขที่ แล้ว docFlowTx"]
   C["ยกเลิก (/doc/cancel)"] --> P{"งวดเปิด? ถูกอ้างอิงต่อแล้ว?"}
   P -->|"ผ่าน"| CD["สร้างใบยกเลิก (flag ยกเลิก, doc_ref = ใบเดิม)"]
   CD --> LS["ใบเดิม last_status = 1"]
@@ -36,10 +38,10 @@ flowchart TD
 |---|---|---|---|---|
 | 1 | แก้ไขเอกสารสินค้า (`SaveTrans` เอกสารเดิม) | [[tbl-ic-trans]], [[tbl-ic-trans-detail]] + ตารางลูก (ลบแล้วเขียนใหม่) | ล็อกเอกสารและสินค้า แล้วคำนวณสต็อกของสินค้าทั้งชุดเก่าและใหม่ สร้าง GL ใหม่ | `backend/internal/application/process/trans.go:267`, `:510`, `:593` |
 | 2 | ลบเอกสารสินค้า (`DeleteTrans`) | ลบ ic_trans และข้อมูลลูก, GL อัตโนมัติ | สต็อกของสินค้าในใบถูกคำนวณใหม่ GL ของใบหายไป | `backend/internal/application/process/trans.go:382`, `:395` |
-| 3 | ลบเอกสารหนี้ (`DeleteDoc` → `apArPlan`) | ลบ [[tbl-ap-ar-trans-detail]], [[tbl-ap-ar-trans]], [[tbl-cb-trans]], [[tbl-cb-trans-detail]], [[tbl-cb-chq-list]] | ยอดค้างของบิลกลับมา (คำนวณสด) · GL ของ 19/239 ถูกสร้างใหม่ | `backend/internal/application/process/docs.go:166`, `:179`, `:220`, `:483` |
-| 4 | ยกเลิกเอกสาร (`CancelDoc`) หน้าจอ `UniversalCancelConfirmScreen` | ใบยกเลิกใหม่ใน `ic_trans`/`ap_ar_trans` (flag ยกเลิก + `doc_ref`) · ยกเลิกรายบรรทัด (`CancelType=2`) เขียนรายการยกเลิกด้วย | ใบเดิม `last_status=1` → หลุดจาก `stockRowsSQL` และรายงาน VAT · สถานะ doc flow ของใบต้นทางคำนวณใหม่ | `backend/internal/application/process/doc_cancel.go:120`, `:135`, `:162-178`, `:181`, `:187`, `:190`, `frontend/account/transaction/UniversalCancelConfirmScreen.tsx` |
-| 5 | กลับรายการ GL ของใบยกเลิก | [[tbl-gl-journal]], [[tbl-gl-journal-detail]] ในเลขที่ใบยกเลิก | สลับ Dr/Cr ของ GL ใบเดิมทุกบรรทัด ลงวันที่ใบยกเลิก ชื่อบัญชีขึ้นต้นด้วย `*` · GL ใบเดิมยังอยู่ ผลรวมสุทธิเป็นศูนย์ | `backend/internal/application/process/doc_cancel.go:585-662`, `backend/internal/application/process/service.go:1678` |
-| 6 | คืนสถานะ (Undo) | ลบใบยกเลิกและรายการกลับ | ใบเดิมกลับมาเป็น last_status 0 สต็อก/GL คำนวณใหม่ | `backend/internal/application/process/doc_cancel.go:151-157`, `:339`, `:625` |
+| 3 | ลบเอกสารหนี้ (`DeleteDoc` → `apArPlan`) | ลบ [[tbl-ap-ar-trans-detail]], [[tbl-ap-ar-trans]], [[tbl-cb-trans]], [[tbl-cb-trans-detail]], [[tbl-cb-chq-list]] + GL ([[tbl-gl-journal]], [[tbl-gl-journal-detail]]) ตาม doc_no และแถว VAT/WHT | GL ของใบถูกลบทิ้ง ไม่สร้างใหม่ (สร้าง GL ใหม่ของ 19/239 เกิดตอนบันทึกเท่านั้น) · doc flow ของเอกสารที่อ้างถึงคำนวณใหม่ | `backend/internal/application/process/docs.go:166`, `:179`, `:214-218`, `:389-391`, `:421-423`, `:483` |
+| 4 | ยกเลิกเอกสาร (`CancelDoc`) หน้าจอ `UniversalCancelConfirmScreen` | ใบยกเลิกใหม่ใน `ic_trans`/`ap_ar_trans` (flag ยกเลิก + `doc_ref`) · ยกเลิกรายบรรทัด (`CancelType=2`) เขียนรายการยกเลิกด้วย | ใบเดิม `last_status=1` (คัดลอกไปบรรทัด serial ap_ar detail และ cb_trans) → หลุดจาก `stockRowsSQL` และรายงาน VAT · ยกเว้นใบยกเลิก 3/7/31/37/39 แบบรายบรรทัด (`CancelType=2`) ไม่ตั้ง `last_status` ของหัวใบเดิม (`doc_flow.go:234-252`) · สถานะ doc flow ของใบต้นทางคำนวณใหม่ | `backend/internal/application/process/doc_cancel.go:120`, `:135`, `:162-178`, `:181`, `:187`, `:190`, `frontend/account/transaction/UniversalCancelConfirmScreen.tsx` |
+| 5 | กลับรายการ GL ของใบยกเลิก | [[tbl-gl-journal]], [[tbl-gl-journal-detail]] ในเลขที่ใบยกเลิก | สลับ Dr/Cr ของ GL ใบเดิมทุกบรรทัด ลงวันที่ใบยกเลิก ชื่อบัญชีขึ้นต้นด้วย `*` · GL ใบเดิมยังอยู่ ผลรวมสุทธิเป็นศูนย์ | `backend/internal/application/process/doc_cancel.go:585-672`, `backend/internal/application/process/service.go:1689` |
+| 6 | คืนสถานะ (Undo) | ลบใบยกเลิกและ GL ของใบยกเลิก (รายการกลับ) | ใบเดิมกลับมาเป็น last_status 0 สต็อก/GL คำนวณใหม่ | `backend/internal/application/process/doc_cancel.go:151-157`, `:339`, `:365`, `:625` |
 | 7 | อนุมัติ/ไม่อนุมัติ (`ApproveDoc`) | ใบสถานะใหม่ (เช่น 4, 8, 38, 52) | ไม่มีผลบัญชี | `backend/internal/application/process/doc_cancel.go:205`, `:215`, `backend/internal/adapter/inbound/http/router.go:180` |
 
 คู่ใบยกเลิก ← ใบเดิม (`cancelOrigFlags`, `doc_cancel.go:49-60`):
@@ -60,6 +62,7 @@ flowchart TD
 ## จุดตรวจสอบ/validation
 
 - แก้/ลบ/ยกเลิกต้องอยู่ในงวดเปิด:
+  - แก้ไขตรวจงวดของวันที่ใหม่ที่กำลังบันทึก ยกเว้น 521-523 (`trans_validate.go:44-48`)
   - ยกเลิกใช้ `checkCancelPeriod` (`doc_cancel.go:143`, `period.go:95`)
   - ลบตรวจวันที่ที่เก็บไว้ (`period.go:68`, `:116`)
   - ดู [[flow-period-year-close]]
@@ -93,9 +96,9 @@ flowchart TD
 
 - `backend/internal/application/process/trans.go:267`, `:382`, `:395`, `:510`, `:593` — บันทึก/ลบ/derive
 - `backend/internal/application/process/trans_validate.go:43`, `:68`, `:112-124`, `:142-155` — ตรวจก่อนแก้/ลบ
-- `backend/internal/application/process/docs.go:166`, `:179`, `:220`, `:483` — ลบเอกสารหนี้
-- `backend/internal/application/process/doc_cancel.go:49-60`, `:120-190`, `:205-260`, `:339`, `:433`, `:497-543`, `:585-662` — ยกเลิก/อนุมัติ/กลับรายการ
-- `backend/internal/application/process/service.go:1678` — เรียก `reverseCancelledGL` ระหว่างสร้าง GL
+- `backend/internal/application/process/docs.go:166`, `:179`, `:214-218`, `:421-423`, `:483` — ลบเอกสารหนี้
+- `backend/internal/application/process/doc_cancel.go:49-60`, `:120-190`, `:205-260`, `:339`, `:433`, `:497-543`, `:585-672` — ยกเลิก/อนุมัติ/กลับรายการ
+- `backend/internal/application/process/service.go:1689` — เรียก `reverseCancelledGL` ระหว่างสร้าง GL
 - `backend/internal/application/process/period.go:68`, `:95`, `:116` — งวดตอนลบ/ยกเลิก
 - `backend/internal/adapter/inbound/http/router.go:176-180` — route `/trans/delete`, `/doc/save`, `/doc/delete`, `/doc/cancel`, `/doc/approve`
 - `frontend/account/transaction/UniversalCancelConfirmScreen.tsx` — จอยืนยันยกเลิก

@@ -15,6 +15,7 @@ export const GROUPS: Record<string, { label: string; color: string }> = {
   glossary: { label: "คำศัพท์ไทย ↔ โค้ด", color: "#f7c6ff" },
   history: { label: "ประวัติ & บทเรียน", color: "#ffd9a8" },
   faq: { label: "ถาม-ตอบ", color: "#fff3a0" },
+  systems: { label: "ระบบงานในชุด BC", color: "#6ee77a" },
 };
 
 export const groupOf = (folder: string) => GROUPS[folder] ?? { label: folder, color: "#c9d1ff" };

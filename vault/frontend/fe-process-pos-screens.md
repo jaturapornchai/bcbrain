@@ -12,7 +12,7 @@ sources: ["frontend/account/process/SystemProcessWorkbenchScreen.tsx:34", "front
 
 ## ทำงานอย่างไร
 
-### จอประมวลผล (`SystemProcessWorkbenchScreen`, 2,151 บรรทัด)
+### จอประมวลผล (`SystemProcessWorkbenchScreen`, 2,165 บรรทัด)
 
 - กฎของไฟล์ (comment `:27`): อ่านข้อมูลดูอย่างเดียวให้เบราว์เซอร์ `queryList` ผ่าน `querySQL()`; การเขียนทุกอย่างต้องผ่าน `/api/process/*`
 - `workflow(action, body)` (`:34-38`) = `POST /api/process/workflow/<action>` แล้วโยน Error ถ้าไม่ ok; `ACTIONS` whitelist ของ proxy (`src/app/api/process/workflow/[action]/route.ts:12-32`) มี 19 คำสั่ง: `change-code, journal-list, journal-pass, gl-check, gl-close, audit-list, fa-depreciation, asset-sale, province-list, province-load, check-ic-trans, point-recal, import-transport-label, ai-report-sql, ai-report-analyze, ai-bank-reconcile, ai-audit-copilot, ai-smart-reorder, ai-auto-gl` (ไม่อยู่ในรายการ = 404 `NOT_FOUND`) แล้ว proxy ไป `/api/v1/process/workflow/<action>` (`route.ts:50-58`)
@@ -33,14 +33,14 @@ sources: ["frontend/account/process/SystemProcessWorkbenchScreen.tsx:34", "front
 | `change_code` | ตารางหลักตามชนิด (`CHANGE_CODE_KIND`) จำกัด 200 แถว | `change-code` ส่ง `kind`, `menuName`, `pairs` (รหัสเดิม -> รหัสใหม่) | `:56-65`, `:447-452`, `:675-689` |
 | `audit_log` | workflow `audit-list` ส่ง `kind`, ช่วงวันที่, `search` | - (ดูอย่างเดียว) | `:67-76`, `:453-465` |
 | `system_tool` | แยกตาม `menuKey` ใน `loadSystemToolData` (SQL ดูข้อมูล) | `province-load`, `check-ic-trans` (apply), `point-recal`, `import-transport-label`, หรือสร้างไฟล์ส่งออก WHT ในเบราว์เซอร์ | `:466-499`, `:690-738`, `:1808-2087` |
-| `not_ported` | แสดงข้อความตรง ๆ แทนปุ่มปลอม (ตาราง `NOT_PORTED_PROCESS_MENUS` ตอนนี้ว่าง) | - | `:51-54`, `:153-156` |
+| `not_ported` | แสดงกล่องเตือนสีเหลืองแทนปุ่มประมวลผล ว่าเมนูนี้ยังไม่มีการประมวลผลและไม่บันทึกหรือแก้ไขข้อมูลใด ๆ (ตาราง `NOT_PORTED_PROCESS_MENUS` ตอนนี้ว่าง; `notPorted` ยังเป็นจริงเมื่อ `change_code` ไม่รู้ชนิด หรือ `audit_log` ไม่รู้ชนิด) | - | `:51-54`, `:153-156`, `:1283-1290` |
 
 - ปิดงวด/ค่าเสื่อมเป็นแบบ 2 ขั้น: "ประมวลผล" (preview, `save: false`) แล้ว "บันทึก" (`save: true`, ต้องยืนยัน `window.confirm`) ปุ่มบันทึกใช้ได้เมื่อมีผล preview แล้วเท่านั้น (`previewSave` `:189`, `:812-830`); ค่าเสื่อมสร้างเอกสารซ้ำชุดเดิมได้ backend เป็นคนแทนเอกสารเดิม และปฏิเสธการลบถ้ามีการขายสินทรัพย์หลังเอกสารนั้น (comment `:565-566`, ฝั่ง backend ยังไม่ยืนยัน)
 - ตาราง `CHANGE_CODE_KIND` จับคู่ menuKey -> ชนิด/ตารางหลัก/ป้าย: สินค้า `ic_inventory`, เจ้าหนี้ `ap_supplier`, ลูกหนี้ `ar_customer`, ผังบัญชี `gl_chart_of_account` (เมนูคู่ `menu_change_code_*` และ `menu_*_change_code`)
 - `AUDIT_KIND` แปลง menuKey เป็นชนิด log: `login`, `menu`, `trans`, `master`, `full` (`:67-76`)
 - AI Copilot Suite: ปุ่มเปิดแผงที่ toolbar (`aiCopilotOpen` `:209`, `:841-851`) แผง (`:875-1281`) มีการ์ด 4 ใบ (แท็บ 5 อัน รวม "แสดงครบทั้ง 4 ระบบ") เรียก workflow `ai-bank-reconcile`, `ai-audit-copilot` (ตรวจผิดปกติก่อนปิดงวด), `ai-smart-reorder` (จุดสั่งซื้อ 2 หน่วยนับ), `ai-auto-gl` (แนะนำผังบัญชี/แยกภาษี) (`:301-367`); ผลที่ได้แสดงอย่างเดียว handler แค่เก็บผลลง state ไม่เขียนข้อมูลและไม่แตะตารางหลักของจอ ดู [[scr-system-process-workbench]] และ [[proc-ai-copilot]]
 
-#### เมนูไหนไปจอประมวลผลโหมดไหน (`buildDynamicScreen`, `screenRegistry.tsx:1105-1260`)
+#### เมนูไหนไปจอประมวลผลโหมดไหน (`buildDynamicScreen` เริ่ม `screenRegistry.tsx:1067`, ส่วนจอประมวลผลอยู่ที่ `:1105-1260`)
 
 | กลุ่มเมนู (menuKey) | mode | ที่มา |
 |---|---|---|
@@ -54,32 +54,34 @@ sources: ["frontend/account/process/SystemProcessWorkbenchScreen.tsx:34", "front
 | `menu_province_auto`, `menu_warehouse_location_auto`, `menu_ic_barcode_dup`, `menu_ic_barcode_check_13`, `menu_gl_chart_check`, `menu_gl_wht_export`/`menu_export_wht`, `menu_flow_chart`, `menu_backup_data`/`data_backup`, `menu_restore_data`, `menu_import_master`, `menu_so_send_etax`, `menu_ar_point_recal`, `menu_checking_ic_trans`, `menu_welcome_page`, `menu_resource_view` ฯลฯ (รายการเต็มที่ `:1214-1256`) และเมนูใต้ `menu_setup` ที่ไม่เข้ากฎอื่น | `system_tool` | `:1214-1260`, `:1359-1365` |
 | `menu_asset_sale` | ไม่ใช่ workbench แต่เป็น `AssetSaleScreen` ใน `account/transaction/AssetSaleScreen.tsx` เรียก `/api/process/workflow/asset-sale` (`API` `:30`) | `screenRegistry.tsx:1110-1113` |
 
-เมนู `menu_ic_change_code` และ `menu_log_view` ยังลงทะเบียนมือใน `BASE_SCREENS` ด้วย (2.25 และ 1.10.14, `screenRegistry.tsx:952-984`) ผลเหมือนกัน
+เมนู `menu_ic_change_code` และ `menu_log_view` ยังลงทะเบียนมือใน `BASE_SCREENS` ด้วย (`screenRegistry.tsx:952-984`) ผลเหมือนกัน; สองชื่อนี้ไม่มีใน `bcMenu` จึงใช้ค่าสำรอง "2.25" และ "1.10.14" ที่ `getMenuCodeByName` แปลงเป็นรหัสเมนู 2250 และ 1114 (`bcMenu.ts:267-277`)
 
 ### จอตั้งค่า POS (`PosSetupAndControlScreen`, 4,948 บรรทัด)
 
-- `PosSetupTabKey` มี 8 tab (`:37-45`): `startup, machines, promotions, loyalty, qr, coupons, shifts, bills`; tab เริ่มต้นเลือกจากชื่อเมนูโดย `resolveTabFromMenuKey` (`:134-145`): ชื่อมี `pos_machine`/`pos_screen`+`config` -> machines, `promotion`/`slip_campaign` -> promotions, `point_rate` -> loyalty, `qr_payment`/`edc`/`usb_qr` -> qr, `coupon` -> coupons, `receive_money`/`send_money` -> shifts, `invoice` -> bills, อื่น ๆ -> startup
+- `PosSetupTabKey` มี 8 tab (`:37-45`): `startup, machines, promotions, loyalty, qr, coupons, shifts, bills`; tab เริ่มต้น: ถ้าจอที่ลงทะเบียนส่ง `initialTab` มาจะใช้ค่านั้นก่อน (`:135`) ไม่งั้นเลือกจากชื่อเมนูโดย `resolveTabFromMenuKey` (`:134-145`): ชื่อมี `pos_machine`/`pos_screen`+`config` -> machines, `promotion`/`slip_campaign` -> promotions, `point_rate` -> loyalty, `qr_payment`/`edc`/`usb_qr` -> qr, `coupon` -> coupons, `receive_money`/`send_money` -> shifts, `invoice` -> bills, อื่น ๆ -> startup
 - ตารางจอที่ลงทะเบียน (`createPosSetupScreen`, `screenRegistry.tsx:133`):
 
-| ชื่อจอ (ไทย) | menuKey (รหัส) | tab เริ่มต้น |
-|---|---|---|
-| กำหนดค่าเริ่มต้น POS | `menu_config_pos_startup` (1.1.23) | startup |
-| กำหนดรหัสเครื่อง POS | `menu_config_pos_machine` (1.1.24) | machines |
-| กำหนดเงื่อนไขการสะสมแต้มและโปรโมชั่น POS | `menu_pos_point_rate` (1.1.25) | loyalty |
-| กำหนดคุณสมบัติของเครื่อง POS | `menu_config_pos_screen` (1.1.26) | machines |
-| กำหนดค่าเครื่องรูดบัตรเครดิต | `menu_edc_config` (1.1.16) | qr |
-| กำหนดค่าจอแสดงผล QR Code | `menu_usb_qr_display_config` (1.1.17) | qr |
-| Download ระบบเสียงพูด | `menu_pos_sound_download_install` (1.3.3) | startup |
-| รายละเอียดคูปองส่วนลด POS | `menu_coupon_list` (1.5.9) | coupons |
-| สร้างคูปองแบบเร็ว | `menu_coupon_generate` (5.3) | coupons |
-| บันทึกรับเงิน (เงินทอนเข้าลิ้นชัก POS) | `menu_save_pos_receive_money` (5.4) | shifts |
-| บันทึกนำส่งเงินสดปิดกะ POS | `menu_save_send_money_pos` (5.5) | shifts |
-| รายการใบกำกับภาษีอย่างย่อ (POS Bills) | `pos_invoice_list_pos` (5.6) | bills |
-| รายการใบกำกับภาษีเต็มรูป (POS) | `pos_full_invoide_list_pos` (5.7) | bills |
-| ยกเลิกใบกำกับภาษีอย่างย่อ (POS) | `pos_invoice_cancel_pos` (5.8) | bills |
-| ออกแบบจอขาย POS | `client_design`, `menu_pos_design_screen` (กฎใน `buildDynamicScreen`) | machines |
+| ชื่อจอ (ไทย) | menuKey | รหัสเมนูที่ใช้จริง | tab เริ่มต้น |
+|---|---|---|---|
+| กำหนดค่าเริ่มต้น POS | `menu_config_pos_startup` | 1016 | startup |
+| กำหนดรหัสเครื่อง POS | `menu_config_pos_machine` | 1017 | machines |
+| กำหนดเงื่อนไขสะสมแต้ม | `menu_pos_point_rate` | 1019 | loyalty |
+| กำหนดคุณสมบัติของเครื่อง POS | `menu_config_pos_screen` | 1018 | machines |
+| กำหนดค่าเครื่องรูดบัตรเครดิต | `menu_edc_config` | 1020 | qr |
+| กำหนดค่าจอแสดงผล QR Code | `menu_usb_qr_display_config` | 1021 | qr |
+| Download ระบบเสียงพูด | `menu_pos_sound_download_install` | 1051 | startup |
+| รายละเอียดคูปอง | `menu_coupon_list` | 1074 | coupons |
+| สร้างคูปองแบบเร็ว | `menu_coupon_generate` | 5030 (ค่าสำรอง) | coupons |
+| บันทึกรับเงิน (เงินทอนเข้าลิ้นชัก POS) | `menu_save_pos_receive_money` | 5040 (ค่าสำรอง) | shifts |
+| บันทึกนำส่งเงินสดปิดกะ POS | `menu_save_send_money_pos` | 5050 (ค่าสำรอง) | shifts |
+| รายการใบกำกับภาษีอย่างย่อ (POS Bills) | `pos_invoice_list_pos` | 5060 (ค่าสำรอง) | bills |
+| รายการใบกำกับภาษีเต็มรูป (POS) | `pos_full_invoide_list_pos` | 5070 (ค่าสำรอง) | bills |
+| ยกเลิกใบกำกับภาษีอย่างย่อ (POS) | `pos_invoice_cancel_pos` | 5080 (ค่าสำรอง) | bills |
+| ออกแบบหน้าจอขาย POS | `client_design` (`menu_pos_design_screen` ไม่อยู่ใน `bcMenu`; กฎใน `buildDynamicScreen`) | 1050 | machines |
 
-(ที่มา: `screenRegistry.tsx` ตามรายการลงทะเบียน `createPosSetupScreen(...)` และ `:1285-1292`)
+ชื่อจอที่แสดงมาจาก `getMenuTextByName` (ถ้าชื่อเมนูอยู่ใน `bcMenu` ใช้ข้อความในเมนู ไม่งั้นใช้ข้อความที่ลงทะเบียนในโค้ด) ส่วนรหัสมาจาก `getMenuCodeByName` (`bcMenu.ts:276-278`): ถ้าไม่พบชื่อใน `bcMenu` จะนำรหัสสำรองแบบจุด ("5.3", "5.4" ฯลฯ ที่ส่งใน `createPosSetupScreen`) ไปแปลงเป็นเลขหมวด + 3 หลักด้วย `normalizeFallbackMenuCode` (`bcMenu.ts:267-274`) จึงได้ 5030-5080 <!-- pragma: allowlist secret -->
+
+(ที่มา: `screenRegistry.tsx` ตามรายการลงทะเบียน `createPosSetupScreen(...)` และ `:1284-1294`)
 
 - endpoint ที่จอเรียก (`fetch` ตรงไป `/api/pos/*` ไม่ใช่ `/api/process/*`; โค้ดของ route `/api/pos` อยู่นอกขอบเขตที่อ่าน ยังไม่ยืนยันภายใน):
 
@@ -96,21 +98,21 @@ sources: ["frontend/account/process/SystemProcessWorkbenchScreen.tsx:34", "front
 
 - กฎการแก้ไข: ถ้า `rights.readOnly` ห้ามบันทึก, ลบต้อง `rights.canDelete` และถามยืนยันก่อนลบเสมอ (`:758-760`, `:816-830`); ข้อความ error จาก backend (เช่น doc_format ซ้ำ) แสดงตามที่ได้ (`:803-806`)
 - หลังบันทึกจะซิงก์ไปเครื่อง POS และโหลด bootstrap ใหม่ (`loadBootstrap`) เสมอ; ใน tab machines แสดงสถานะซิงก์ต่อเครื่องจาก `formatSyncTime` (`:200`)
-- `PosDemoWorkspace.tsx` (322 บรรทัด) เป็นหน้าเดโมที่ห่อ `PosSetupAndControlScreen` ไว้ใน viewport desktop/tablet/mobile + โหมด `cashier|config`; ค้น `account/` และ `src/` แล้วไม่พบว่าถูก import ที่ไหน (นอกขอบเขตที่อ่านอาจมี ยังไม่ยืนยัน)
+- `PosDemoWorkspace.tsx` (343 บรรทัด) เป็นหน้าเดโมที่ห่อ `PosSetupAndControlScreen` ไว้ใน viewport desktop/tablet/mobile + โหมด `cashier|config`; โหลดแบบ `dynamic` (ปิด SSR) ใน `PersistentWorkspaceHost.tsx:23-27` และแสดงเมื่อโมดูลปัจจุบันเป็น `pos` (`PersistentWorkspaceHost.tsx:552`)
 
 ## ข้อควรระวัง
 
 - เพิ่มเมนูประมวลผลใหม่: ต้องเพิ่มชื่อ menuKey ใน `buildDynamicScreen` ให้เข้า mode ที่ถูก และถ้าเป็น `change_code`/`audit_log` ต้องเพิ่มลง `CHANGE_CODE_KIND` / `AUDIT_KIND` ด้วย ไม่งั้นจอจะเข้าสถานะ `notPorted` (`:153-156`)
 - ถ้าจะเรียก workflow action ใหม่ต้องเพิ่มลง `ACTIONS` ของ proxy ก่อน ไม่งั้นได้ 404
 - รหัส holding/branch ของ POS (`DATA` / `00000`) ถูกใส่ตายตัวตอนเรียก bootstrap ถ้าหลายสาขาต้องแก้ตรงนี้
-- เมนูส่งออก WHT (`menu_gl_wht_export`/`menu_export_wht`) สร้างไฟล์ข้อความคั่น `|` จากแถวในจอเอง (ไม่ผ่าน backend) ถ้าสูตรภาษีเปลี่ยนต้องแก้ใน `SystemProcessWorkbenchScreen.tsx` (ดู `:717-735`, โค้ดสร้างไฟล์อยู่แถว `:731`) (ตรวจสูตรกับกรมสรรพากรก่อนแก้)
+- เมนูส่งออก WHT (`menu_gl_wht_export`/`menu_export_wht`) สร้างไฟล์ข้อความคั่น `|` จากแถวในจอเอง (ไม่ผ่าน backend) ถ้าสูตรภาษีเปลี่ยนต้องแก้ใน `SystemProcessWorkbenchScreen.tsx` (ดู `:717-734`, โค้ดสร้างไฟล์อยู่แถว `:728-733`) (ตรวจสูตรกับกรมสรรพากรก่อนแก้)
 
 ## ที่มาในโค้ด
 
 - `frontend/account/process/SystemProcessWorkbenchScreen.tsx:27-76` helper, mode, `CHANGE_CODE_KIND`, `AUDIT_KIND`
-- `frontend/account/process/SystemProcessWorkbenchScreen.tsx:374-508` โหลดข้อมูลตาม mode; `:516-738` ประมวลผล; `:301-367` AI Copilot; `:1808-2087` `loadSystemToolData`
+- `frontend/account/process/SystemProcessWorkbenchScreen.tsx:374-508` โหลดข้อมูลตาม mode; `:516-738` ประมวลผล; `:301-367` AI Copilot; `:1808-2093` `loadSystemToolData`
 - `frontend/src/app/api/process/workflow/[action]/route.ts:12-58` whitelist และ proxy
-- `frontend/account/tabs/screenRegistry.tsx:82-95` `createProcessScreen`; `:1105-1260` คัดแยกเมนูประมวลผล
+- `frontend/account/tabs/screenRegistry.tsx:82-99` `createProcessScreen`; `:1105-1260` คัดแยกเมนูประมวลผล
 - `frontend/account/pos/PosSetupAndControlScreen.tsx:37-145` tab; `:177-197` `callPos`; `:488-546` โหลด; `:757-870` บันทึก/ลบ
 - `frontend/account/transaction/AssetSaleScreen.tsx:30` endpoint `asset-sale`
 

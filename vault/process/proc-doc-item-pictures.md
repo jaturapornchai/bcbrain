@@ -16,7 +16,7 @@ sources: ["backend/internal/application/process/doc_picture.go:27", "backend/int
 - `DocPictureFormats` ผูกโมดูลกับ `erp_doc_format.screen_code` ผ่าน map `docPictureFormats` โมดูล `ic`, `po`, `so`, `ap`, `ar`, `cb`; โมดูล `gl` ไม่มีรายการประเภทเอกสาร
 - **คีย์ของรูป** (`docPictureKey`) ก่อนอื่นตรวจว่าเอกสารมีจริง:
   - ไม่ใช่ GL: ค้น `doc_no` + `doc_format_code` ใน `ic_trans`, `ap_ar_trans` หรือ `cb_trans` (อย่างใดอย่างหนึ่ง) ถ้าไม่พบ -> `KindNotFound` "ไม่พบเอกสาร"; คีย์คือ `doc_no` ตามที่พิมพ์
-  - GL: ค้น `gl_journal` ด้วย `doc_date` + `doc_no` + `book_code`; คีย์ = วันที่ `d/MM/yyyy` + `doc_no` + `book_code` แล้วลบ `/` ออก (`glPictureKey`, ตามคอมเมนต์คือ `_codepic` ของ C#) ปีเป็น พ.ศ. เมื่อ `erp_option.year_type = 1` หรือเมื่อไม่มีแถว `erp_option` เลย (ค่าเริ่มต้นแบบ th-TH ของเดสก์ท็อป)
+  - GL: ค้น `gl_journal` ด้วย `doc_date` + `doc_no` + `book_code`; คีย์ = วันที่ `d/MM/yyyy` + `doc_no` + `book_code` แล้วลบ `/` ออก (`glPictureKey`, `doc_picture.go:204-205`) ปีเป็น พ.ศ. เมื่อ `erp_option.year_type = 1` หรือเมื่อไม่มีแถว `erp_option` เลย (ค่าเริ่มต้น th-TH, `doc_picture.go:247`)
   - คีย์ยาวเกิน 50 ตัวอักษร (`docPictureKeyLen`, เพราะ `image_id` เป็น varchar(50)) -> error "เก็บรูปไม่ได้"
 
 ### รูปสินค้า (`itempicture/*`)
@@ -43,7 +43,7 @@ sources: ["backend/internal/application/process/doc_picture.go:27", "backend/int
 1. ล็อก `pg_advisory_xact_lock(hashtext('docpic:' || ตาราง || ':' || คีย์))` กันสองคนบันทึกชุดเดียวกันพร้อมกัน
 2. ตรวจว่า `roworder` ของรูปที่ขอเก็บ (`keep`) ยังอยู่ครบ ถ้าไม่ -> `KindConflict` "รูปนี้ถูกเปลี่ยนโดยผู้ใช้อื่น"
 3. ลบรูปที่ไม่อยู่ใน `keep`, เรียง `image_order` ใหม่, แล้วแทรกรูปใหม่ `(image_id, image_file, guid_code, image_order)`
-- คอมเมนต์ในโค้ดระบุว่าพอร์ตจาก Java `_SaveImageList`
+- การบันทึกแทนที่รูปทั้งชุดแล้วเรียง `image_order` ใหม่เริ่มที่ 0 (คอมเมนต์ `item_picture.go:20`)
 
 ### สิทธิ์
 - `docpicture/formats|docs|get|image` และ `itempicture/list|get|image` = `read`; `docpicture/save` และ `itempicture/save` = `write` ([[proc-permission-rights]])

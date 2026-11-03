@@ -2,15 +2,15 @@
 title: "รายละเอียดลูกหนี้ สินเชื่อ ผู้ติดต่อ รูปภาพ (CustomerDetailScreen)"
 tags: [screens, master]
 aliases: ["CustomerDetailScreen", "รายละเอียดลูกหนี้", "6002", "menu_ar_detail_2", "วงเงินสินเชื่อ", "ผู้ติดต่อลูกหนี้", "ar_contactor", "ar_item_by_customer", "ar_customer_cashier_list"]
-sources: ["frontend/account/master/CustomerDetailScreen.tsx:109", "frontend/account/master/CustomerDetailScreen.tsx:248", "frontend/account/master/CustomerDetailScreen.tsx:296", "frontend/account/master/CustomerDetailScreen.tsx:634", "frontend/account/master/CustomerDetailScreen.tsx:725", "frontend/account/master/CustomerDetailScreen.tsx:870", "frontend/account/master/CustomerDetailScreen.tsx:960", "frontend/account/master/CustomerDetailScreen.tsx:1094", "frontend/account/master/CustomerDetailScreen.tsx:1128", "frontend/account/master/CustomerDetailScreen.tsx:1360", "frontend/account/tabs/screenRegistry.tsx:569"]
+sources: ["frontend/account/master/CustomerDetailScreen.tsx:109", "frontend/account/master/CustomerDetailScreen.tsx:248", "frontend/account/master/CustomerDetailScreen.tsx:294", "frontend/account/master/CustomerDetailScreen.tsx:635", "frontend/account/master/CustomerDetailScreen.tsx:729", "frontend/account/master/CustomerDetailScreen.tsx:870", "frontend/account/master/CustomerDetailScreen.tsx:970", "frontend/account/master/CustomerDetailScreen.tsx:1095", "frontend/account/master/CustomerDetailScreen.tsx:1140", "frontend/account/master/CustomerDetailScreen.tsx:1362", "frontend/account/tabs/screenRegistry.tsx:569"]
 ---
 # รายละเอียดลูกหนี้ (CustomerDetailScreen)
 
-จอทะเบียนลูกหนี้แบบเต็ม เมนู **6002** "รายละเอียดลูกหนี้" (`menu_ar_detail_2`, รหัสเก่า 6.1.2, `screenRegistry.tsx:569-574`) เป็นแบบ "ฟอร์มยาวหน้าเดียว" รวมข้อมูลหลักของ [[scr-customer]] (6001) กับข้อมูลการค้า วงเงินสินเชื่อ การวางบิล มิติ กลุ่ม ผู้ติดต่อ แคชเชียร์ สินค้าที่ผูกกับลูกหนี้ รูปภาพ และพิกัด ตาราง [[tbl-ar-customer]] + [[tbl-ar-customer-detail]] ส่วนตารางย่อยดูท้ายหัวข้อ กลไกเมนูดู [[fe-screen-registry-menu]]
+จอทะเบียนลูกหนี้แบบเต็ม เมนู **6002** "รายละเอียดลูกหนี้" (`menu_ar_detail_2`, `screenRegistry.tsx:569-574`) เป็นแบบ "ฟอร์มยาวหน้าเดียว" รวมข้อมูลหลักของ [[scr-customer]] (6001) กับข้อมูลการค้า วงเงินสินเชื่อ การวางบิล มิติ กลุ่ม ผู้ติดต่อ แคชเชียร์ สินค้าที่ผูกกับลูกหนี้ รูปภาพ และพิกัด ตาราง [[tbl-ar-customer]] + [[tbl-ar-customer-detail]] ส่วนตารางย่อยดูท้ายหัวข้อ กลไกเมนูดู [[fe-screen-registry-menu]]
 
 ## โครงจอ
 - ซ้าย: รายการลูกหนี้ (รหัส · ชื่อ 1 · โทรศัพท์ · เขตการขนส่ง · เว็บไซต์ · ระดับราคา · หมายเหตุ · ผู้แก้ไขล่าสุด) ค้นจากรหัส/ชื่อ/ที่อยู่/โทรศัพท์ จำกัด 500 แถว (`:248-256`) กลไกรายการดู [[scr-data-list-and-lookup]]
-- ขวา: แถบ "ข้ามไปยังส่วน" 8 ปุ่ม เลื่อนไปยังส่วนที่ต้องการในหน้าเดียวกัน (`:1360-1383`) แล้วส่วนต่างๆ เรียงลงมา (ทุกส่วนแสดงพร้อมกัน ไม่ใช่แท็บที่ซ่อนอีกส่วน)
+- ขวา: แถบ "ข้ามไปยังส่วน" 8 ปุ่ม เลื่อนไปยังส่วนที่ต้องการในหน้าเดียวกัน (`:1362-1383`) แล้วส่วนต่างๆ เรียงลงมา (ทุกส่วนแสดงพร้อมกัน ไม่ใช่แท็บที่ซ่อนอีกส่วน)
 - ป้ายหัวจอ 6002 อ่านจากเมนู; ปุ่ม แก้ไข / เพิ่มใหม่ / ลบ / บันทึก / ปิดหน้าจอ เหมือน 6001
 - โหมดอ่านอย่างเดียวขึ้นป้าย "โหมดแสดงผล (Read-Only)" ตอนยังไม่กดแก้ไข
 
@@ -29,21 +29,21 @@ sources: ["frontend/account/master/CustomerDetailScreen.tsx:109", "frontend/acco
 การ์ดข้อมูลเฉพาะธุรกิจ `BusinessExtFieldsCard` ใช้ร่วมกับ 6001 ชนิดฟิลด์ตามธุรกิจที่เปิดไว้ใน [[scr-options]]
 
 ## ปุ่มลัดและพฤติกรรมเฉพาะ
-- **Ctrl+S** บันทึก **Esc** ยกเลิกการแก้ (ผูกในจอเอง, `:1094-1110`; ทำงานเฉพาะแท็บที่ active); รหัสใหม่มีปุ่ม "ใส่รหัสถัดไปอัตโนมัติ" และรันรหัสเมื่อออกจากช่อง ใช้กลไกเดียวกับ 6001
-- **สถานะลูกหนี้ = บุคคลธรรมดา** ช่อง "ชื่อ 1" ถูกล็อก (อ่านอย่างเดียว) และระบบประกอบให้เองจาก คำนำหน้า+ชื่อ แล้วเว้นวรรคตามด้วยนามสกุล (`updateFullNameIfPersonality`, `:119-135`) ถ้าเลือก "นิติบุคคล" ชื่อ 1 แก้เองได้
-- ตารางย่อย (ผู้ติดต่อ/แคชเชียร์/สินค้า/รูป) ไม่อยู่ใน `form.values` จึงนับเป็น "แก้ไข" แยกด้วย `subDirty` ไม่งั้นแก้แค่ตารางย่อยแล้วกดบันทึกไม่ได้ (`:116-119`)
+- **Ctrl+S** บันทึก **Esc** ยกเลิกการแก้ (ผูกในจอเอง, `:1095-1110`; ทำงานเฉพาะแท็บที่ active); รหัสใหม่มีปุ่ม "ใส่รหัสถัดไปอัตโนมัติ" และรันรหัสเมื่อออกจากช่อง ใช้กลไกเดียวกับ 6001 ตอนกด เพิ่มใหม่ (`handleStartNew` `:496-592`) จอเปิดฟอร์มค่าเริ่มต้นและโฟกัสช่องรหัสก่อน แล้วจึงขอรหัสถัดไปมาเติมเฉพาะเมื่อช่องรหัสยังว่าง
+- **สถานะลูกหนี้ = บุคคลธรรมดา** ช่อง "ชื่อ 1" ถูกล็อก (อ่านอย่างเดียว) และระบบประกอบให้เองจาก คำนำหน้า+ชื่อ แล้วเว้นวรรคตามด้วยนามสกุล (`updateFullNameIfPersonality`, `:124-140`) ถ้าเลือก "นิติบุคคล" ชื่อ 1 แก้เองได้
+- ตารางย่อย (ผู้ติดต่อ/แคชเชียร์/สินค้า/รูป) ไม่อยู่ใน `form.values` จึงนับเป็น "แก้ไข" แยกด้วย `subDirty` ไม่งั้นแก้แค่ตารางย่อยแล้วกดบันทึกไม่ได้ (`:120-122`)
 - รายการสินเชื่อใช้ช่องตัวเลขทศนิยมไม่ติดลบ และแปลงเข้า SQL ด้วย `decimalSql` ไม่ปัดผ่านเลขทศนิยมไบนารี ดู [[fe-numeric-money]]
 
-## การบันทึก (`:634-935`)
+## การบันทึก (`:635-965`)
 ตรวจ: สิทธิ์ → รหัสว่าง "กรุณาระบุ 'รหัสลูกหนี้'" → ชื่อ 1 ว่าง "กรุณาระบุ 'ชื่อ 1'" → รหัสซ้ำเมื่อเพิ่มใหม่ (เสนอรหัสถัดไป) จากนั้นชุดคำสั่งเดียว (`queryExecBatch`):
 1. INSERT หรือ UPDATE `ar_customer`
 2. UPDATE `ar_customer_detail` ถ้ามีแถวอยู่แล้ว มิฉะนั้น INSERT (นับก่อนด้วย `count(*)`)
 3. ซิงก์ตารางย่อยแบบ **ลบทั้งหมดแล้วใส่ใหม่**: `ar_contactor`, `ar_customer_cashier_list`, `ar_item_by_customer`
-4. รูปภาพ: เฉพาะช่องที่ผู้ใช้เปลี่ยน (`dirty`) ลบแล้วใส่ที่ `images` รหัสภาพ `CONTRACT<รหัส>` ตามลำดับช่อง ไม่แตะรูปที่โปรแกรม desktop เก็บในที่อื่น (`:916-930`)
+4. รูปภาพ: เฉพาะช่องที่ผู้ใช้เปลี่ยน (`dirty`) ลบแล้วใส่ที่ `images` รหัสภาพ `CONTRACT<รหัส>` ตามลำดับช่อง ช่องรูปที่ไม่ได้เปลี่ยนจะไม่ถูกแตะ (`:919-934`)
 5. บันทึกประวัติ `masterLogSql` ของเมนู `menu_ar_detail`
 จอนี้ **ไม่มี** การตรวจเลขผู้เสียภาษี 13 หลัก/ความซ้ำ หรือเลขที่สาขา 5 หลัก ที่ 6001 มี (ค้นไม่พบในโค้ด `CustomerDetailScreen.tsx`)
 
-## การลบ (`:960-1060`)
+## การลบ (`:970-1090`)
 ห้ามลบถ้ารหัสถูกใช้ใน `ic_trans`, `ic_trans_detail`, `ap_ar_trans`, `ap_ar_trans_detail`, `cb_trans` ("มีการใช้งานรหัสดังกล่าวในเอกสารขาย/ลูกหนี้/การเงินแล้ว ไม่สามารถลบได้") ผ่านแล้วถามยืนยัน `ต้องการลบลูกหนี้ [รหัส] จริงหรือไม่` แล้วลบรูปสัญญา, ผู้ติดต่อ, แคชเชียร์, สินค้าตามลูกหนี้, รายละเอียด, สมาชิก `ar_dealer`, ลูกหนี้ และบันทึกประวัติการลบ ดู [[tbl-ar-dealer]], [[tbl-ic-trans]]
 
 ## รูปภาพ
@@ -55,7 +55,7 @@ sources: ["frontend/account/master/CustomerDetailScreen.tsx:109", "frontend/acco
 - การ์ดมิติลูกหนี้ไม่ปรากฏในรุ่นที่ไม่ใช่ Pro (`editionCaps.hasAdvancedProFeatures`)
 
 ## ที่มาในโค้ด
-- `frontend/account/master/CustomerDetailScreen.tsx:109` ตัวจอ; `:119-135` ประกอบชื่อ; `:248-256` รายการ; `:296-400` โหลดข้อมูล/ตารางย่อย; `:634-935` บันทึก; `:725` แปลงเลขเป็น SQL; `:960-1060` ลบ; `:1094-1110` คีย์ลัด; `:1128-1180` อัปโหลดรูป; `:1360-1383` แถบข้ามไปยังส่วน; `:2423-2580` สินเชื่อ; `:3484-3550` พิกัด/รูป
+- `frontend/account/master/CustomerDetailScreen.tsx:109` ตัวจอ; `:124-140` ประกอบชื่อ; `:238-256` รายการ; `:294-400` โหลดข้อมูล/ตารางย่อย; `:496-592` เพิ่มใหม่; `:635-965` บันทึก; `:729` แปลงเลขเป็น SQL; `:970-1090` ลบ; `:1095-1110` คีย์ลัด; `:1136-1180` อัปโหลดรูป; `:1362-1383` แถบข้ามไปยังส่วน; `:2420-2616` สินเชื่อ; `:3444-3550` พิกัด/รูป
 - `frontend/src/config/schemas/arCustomerDetail.ts:21-413`
 - `frontend/account/tabs/screenRegistry.tsx:569-574`
 - ดูเพิ่ม: [[scr-supplier]] · [[fe-master-screens]] · [[screens-overview]]

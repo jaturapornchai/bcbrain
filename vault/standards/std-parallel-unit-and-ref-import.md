@@ -2,7 +2,7 @@
 title: "หน่วยนับขนาน Serial และการดึงเอกสารอ้างอิง (Parallel Unit, Serial, Ref Document Import)"
 tags: [standards, inventory, parallel-unit, serial, ref-import, go, frontend]
 aliases: ["unit_type 2 3", "qty_2", "unit_code_2", "ic_opposite_unit", "refImportSpecs", "refRemainSpecs", "TransRefImport", "ดึงเอกสารอ้างอิง", "ยอดค้างรับ ค้างส่ง", "lineExtraGates", "use_compare_unit", "Serial Number", "ic_serial"]
-sources: ["docs/kms/KMS_INVENTORY_COSTING_SERIAL_PARALLEL_UNIT.md", ".agents/skills/inventory-costing-and-parallel-unit/SKILL.md", "backend/internal/application/process/trans_ref_import.go:24", "backend/internal/application/process/trans_ref_import_remain.go:18", "backend/internal/application/process/trans_lines_check.go:191", "backend/internal/application/process/trans_line_extra.go", "backend/internal/application/process/item_master.go:257", "backend/internal/application/process/doc_cancel_item.go:98"]
+sources: ["docs/kms/KMS_INVENTORY_COSTING_SERIAL_PARALLEL_UNIT.md", ".agents/skills/inventory-costing-and-parallel-unit/SKILL.md", "backend/internal/application/process/trans_ref_import.go:24-39", "backend/internal/application/process/trans_ref_import_remain.go:18", "backend/internal/application/process/trans_lines_check.go:191-210", "backend/internal/application/process/trans_line_extra.go:11", "backend/internal/application/process/trans_line_extra.go:16", "backend/internal/application/process/trans_line_extra.go:19", "backend/internal/application/process/item_master.go:257", "backend/internal/application/process/item_master.go:593", "backend/internal/application/process/stock_beginning.go:439-446", "backend/internal/application/process/trans.go:1094-1126", "backend/internal/application/process/doc_approve_item.go:59", "backend/internal/application/process/doc_cancel_item.go:98", "backend/internal/application/process/doc_cancel_item.go:162", "backend/internal/application/process/stock_tools.go:219", "backend/internal/application/process/stock_tools.go:280", "backend/internal/application/process/stock_tools.go:354", "backend/internal/application/process/parallel_unit_test.go", "frontend/account/transaction/TransItemGrid.tsx:771", "frontend/account/transaction/TransItemGrid.tsx:787", "frontend/account/transaction/StockBeginningBalanceScreen.tsx"]
 ---
 
 # หน่วยนับขนาน Serial และการดึงเอกสารอ้างอิง
@@ -20,15 +20,15 @@ sources: ["docs/kms/KMS_INVENTORY_COSTING_SERIAL_PARALLEL_UNIT.md", ".agents/ski
 
 ## กฎ/วิธีทำ
 1. **ทะเบียนสินค้า**: ถ้า `unit_type IN (2,3)` ต้องมีอย่างน้อย 1 แถวใน `ic_opposite_unit` ไม่เช่นนั้นบันทึกไม่ผ่าน ("สินค้าประเภทหน่วยนับขนาน กรุณาเพิ่มข้อมูล...") — `item_master.go:257` และ `:593`, มี test ที่ `parallel_unit_test.go`
-2. **บันทึกเอกสารทุกเมนู** (`trans_lines_check.go:191-210`, ตรวจแล้ว): สินค้าที่ `unit_type IN (2,3)` ต้องมี `unit_code_2` (ถ้าว่างเติมจาก `ic_opposite_unit` อัตโนมัติ), `qty_2` ห้ามติดลบ (ยกเว้นเอกสารปรับสต็อก), และถ้า `qty != 0` ต้อง `qty_2 != 0`; หน้าจอยกมา (`stock_beginning.go` ราว :408-440) มีกติกาเดียวกัน
-3. **สินค้าปกติไม่มีหน่วยขนาน** ยกเว้นเอกสารที่เปิดสวิตช์ `erp_option.use_compare_unit` และเป็นชนิด 30, 34, 36, 44, 46, 48, 144 (`lineExtraGates`/`compareUnitFlags` ใน `trans_line_extra.go`) — นอกเหนือจากนั้นระบบล้าง `unit_code_2`/`qty_2`/`unit_size` ทิ้งก่อนบันทึก; `total_qty` (จำนวน Packaging) เปิดผ่าน `use_quality_control_system` เฉพาะชนิด 12, 310, 60
-4. **หน้าจอ**: แสดงช่อง `หน่วยขนาน*` และ `จำนวนขนาน*` (`data-testid="parallel-unit-code-{idx}"`, `parallel-qty2-{idx}`) เฉพาะบรรทัดที่สินค้าเป็น `unit_type 2/3` ใน `frontend/account/transaction/TransItemGrid.tsx` ห้ามรบกวนบรรทัดสินค้าปกติ
+2. **บันทึกเอกสารทุกเมนู** (`trans_lines_check.go:191-210`, ตรวจแล้ว): สินค้าที่ `unit_type IN (2,3)` ต้องมี `unit_code_2` (ถ้าว่างเติมจาก `ic_opposite_unit` อัตโนมัติ), `qty_2` ห้ามติดลบ (ยกเว้นเอกสารปรับสต็อก), และถ้า `qty != 0` ต้อง `qty_2 != 0`; หน้าจอยกมา (`stock_beginning.go:439-446`) มีกติกาเดียวกัน
+3. **สินค้าปกติไม่มีหน่วยขนาน** ยกเว้นเอกสารที่เปิดสวิตช์ `erp_option.use_compare_unit` และเป็นชนิด 30, 34, 36, 44, 46, 48, 144 (`lineExtraGates` `trans_line_extra.go:11`, `compareUnitFlags` `:16`) — นอกเหนือจากนั้นระบบล้าง `unit_code_2`/`qty_2`/`unit_size` ทิ้งก่อนบันทึก; `total_qty` (จำนวน Packaging) เปิดผ่าน `use_quality_control_system` เฉพาะชนิด 12, 310, 60 (`qcTotalQtyFlags` `:19`)
+4. **หน้าจอ**: แสดงช่อง `หน่วยขนาน*` และ `จำนวนขนาน*` (`data-testid="parallel-unit-code-{idx}"`, `parallel-qty2-{idx}`) เฉพาะบรรทัดที่สินค้าเป็น `unit_type 2/3` ใน `frontend/account/transaction/TransItemGrid.tsx:771`, `:787` ห้ามรบกวนบรรทัดสินค้าปกติ
 5. **อนุมัติ/ยกเลิกรายสินค้า**: `insertApproveLines` (`doc_approve_item.go:59`) คัดลอก `unit_code_2, qty_2, unit_size` ไปใบอนุมัติ; `insertCancelLines` (`doc_cancel_item.go:162`) คำนวณ `qty_2` ตามสัดส่วนจำนวนที่ยกเลิก (`qty_2 × จำนวนที่ยกเลิก / qty`, ปัด 4 ตำแหน่ง)
 6. **ยอดค้าง** (`lineBalances`, `doc_cancel_item.go:98`): `qty_2` คงเหลือ = `GREATEST(d.qty_2 - SUM(x.qty_2), 0)` ควบคู่กับ `qty` คงเหลือ
-7. **โอนสินค้าระหว่างคลัง**: บันทึกเป็นคู่ขา 72 (ออก, calc_flag -1) และ 70 (เข้า, +1) พร้อมคัดลอก `unit_code_2`, `qty_2`, `unit_size` ทั้งสองขา (`trans.go` ราว :1088-1127)
+7. **โอนสินค้าระหว่างคลัง**: บันทึกเป็นคู่ขา 72 (ออก, calc_flag -1) และ 70 (เข้า, +1) พร้อมคัดลอก `unit_code_2`, `qty_2`, `unit_size` ทั้งสองขา (`trans.go:1094-1126`: ทั้งสองแถวใช้ชุด `extra` เดียวกัน)
 
 ## การดึงเอกสารอ้างอิง (`POST /process/transgrid/refimport`)
-ตาราง `refImportSpecs` ใน `trans_ref_import.go:24` ใช้คีย์ `{ชนิดเอกสารปลายทาง, ชนิดเอกสารต้นทาง}` กำหนดว่าต้องหักยอดเอกสารชนิดใดออกจากยอดค้าง (คอมเมนต์ในโค้ดอ้างบรรทัดใน C# `_icTransItemGridControl`) คู่ที่ไม่อยู่ในตารางจะคงจำนวนเต็มของบรรทัดต้นทาง (ตอนบันทึกยังตรวจกันดึงเกิน)
+ตาราง `refImportSpecs` ใน `trans_ref_import.go:24` ใช้คีย์ `{ชนิดเอกสารปลายทาง, ชนิดเอกสารต้นทาง}` (บรรทัด 24-39) กำหนดว่าต้องหักยอดเอกสารชนิดใดออกจากยอดค้าง คู่ที่ไม่อยู่ในตารางจะคงจำนวนเต็มของบรรทัดต้นทาง (ตอนบันทึกยังตรวจกันดึงเกิน)
 
 | ปลายทาง ← ต้นทาง | ความหมาย |
 |---|---|
@@ -44,12 +44,13 @@ sources: ["docs/kms/KMS_INVENTORY_COSTING_SERIAL_PARALLEL_UNIT.md", ".agents/ski
 - ตัวอย่างเรียก (จาก skill): `apiPost("/api/process/transgrid/refimport", { transFlag: 12, docNo, vatType: 1, vatRate: "7", refDocs: [{ docNo, transFlag: 6, docRefType: 0 }] })`
 
 ## Serial Number และ Lot
-- KMS ระบุ `cost_type` 3 = Serial, 2 = Lot/Expire; ตาราง `ic_serial` (คงเหลือ) และ `ic_trans_serial_number` (ผูกกับเอกสาร) — โค้ดเครื่องมือ Serial อยู่ที่ `stock_tools.go` (`SerialAnalyze`, `SerialScan`, `SerialCountSave`) เอกสารแหล่งนี้ไม่มีกติกาเชิงลึกกว่านี้ จึงไม่ขยายความเพิ่ม
+- ตาราง `ic_serial` (คงเหลือ) และ `ic_trans_serial_number` (ผูกกับเอกสาร) — โค้ดเครื่องมือ Serial อยู่ที่ `stock_tools.go` (`SerialAnalyze` `:219`, `SerialScan` `:280`, `SerialCountSave` `:354`) เอกสารแหล่งนี้ไม่มีกติกาเชิงลึกกว่านี้ จึงไม่ขยายความเพิ่ม
+- `cost_type`: KMS ระบุ 2 = Lot/Expire, 3 = Serial แต่รายงานทะเบียนสินค้าในโค้ดแสดง 2 = LOT กำหนดเอง, 3 = FEFO (ดู [[std-inventory-costing-rules]]) — ให้ยึดโค้ด
 
 ## ข้อควรระวัง: เอกสารกับโค้ดไม่ตรงกัน (ตรวจแล้ว)
 - **ตารางใน KMS §4 ใช้เลขชนิดเอกสารต่างจากโค้ด** (เช่น KMS ระบุ PO = 10, SO = 32) ขณะที่ `refImportSpecs` และ skill ใช้ PO = 6, SO = 36 ให้ยึดโค้ด/skill และห้ามคัดเลขจากตาราง KMS มาใช้
 - ไฟล์ที่ KMS/skill อ้างแต่ไม่พบแล้ว: `inventory_save.go`, `ic_trans_validation.go`, `so_po_save.go`, `ic_trans_save.go` (ตรรกะย้ายไป `item_master.go`, `trans_lines_check.go`, `trans.go`), `frontend/src/components/**` (ของจริงอยู่ `frontend/account/transaction/` และ `frontend/account/master/ItemScreen.tsx`)
-- `frontend/account/StockBeginningBalanceScreen.tsx` ใน skill: ของจริงอยู่ที่ `frontend/account/transaction/StockBeginningBalanceScreen.tsx`
+- skill วาง `StockBeginningBalanceScreen.tsx` ไว้ตรงใต้ `frontend/account/` แต่ของจริงอยู่ที่ `frontend/account/transaction/StockBeginningBalanceScreen.tsx`
 
 ## ที่มา
 - `docs/kms/KMS_INVENTORY_COSTING_SERIAL_PARALLEL_UNIT.md` §1, §3, §4

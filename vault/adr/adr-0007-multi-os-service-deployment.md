@@ -2,7 +2,7 @@
 title: "ADR-0007 binary เดียวรันเป็น Windows Service / macOS LaunchDaemon / container"
 tags: [backend, adr, deployment, windows-service]
 aliases: ["ADR 0007", "kardianos service", "service install", "LaunchDaemon", "Windows Service"]
-sources: ["backend/docs/adr/0007-multi-os-service-deployment.md:7", "backend/cmd/api/main.go:111", "backend/cmd/api/main.go:150", "backend/internal/platform/config/config.go:65", "backend/internal/platform/config/config.go:80"]
+sources: ["backend/docs/adr/0007-multi-os-service-deployment.md:7", "backend/cmd/api/main.go:111", "backend/cmd/api/main.go:151", "backend/internal/platform/config/config.go:64", "backend/internal/platform/config/config.go:80"]
 ---
 
 # ADR-0007 binary เดียว หลายรูปแบบการรัน
@@ -13,7 +13,7 @@ sources: ["backend/docs/adr/0007-multi-os-service-deployment.md:7", "backend/cmd
 
 1. `main()` เรียก `runServiceCommand` เมื่อมี subcommand `service ...` ไม่งั้นรันเซิร์ฟเวอร์ตามปกติ (`main.go:132-189`).
 2. ตัวเลือกบริการ: Windows `StartType: automatic` + `OnFailure: restart`; macOS `UserService: false` (LaunchDaemon ระบบ), `RunAtLoad: true`, `KeepAlive: true` (`main.go:116-127`).
-3. ปัญหา working dir ของ service (Windows = `System32`, macOS = `/`) แก้โดย `config` หาไฟล์ `.env`, `CONFIG_DIR`, `LOG_FILE` เทียบกับ **โฟลเดอร์ของ exe ก่อน** แล้วค่อย fallback เป็นเทียบ CWD (`config.go:65-110`).
+3. ปัญหา working dir ของ service (Windows = `System32`, macOS = `/`) แก้โดย `config` หาไฟล์ `.env`, `CONFIG_DIR`, `LOG_FILE` เทียบกับ **โฟลเดอร์ของ exe ก่อน** แล้วค่อย fallback เป็นเทียบ CWD (`config.go:64-110`).
 4. Windows: `service install` เพิ่มกฎ firewall inbound ให้ `HTTP_PORT` เอง (`cmd/api/firewall_windows.go:10-27`); macOS ไม่มี (`firewall_other.go`).
 
 ## ตัวเลือกที่ไม่เลือก
@@ -30,8 +30,8 @@ sources: ["backend/docs/adr/0007-multi-os-service-deployment.md:7", "backend/cmd
 ## ที่มาในโค้ด
 
 - `backend/cmd/api/main.go:111` — `newService` (ตัวเลือกต่อ OS).
-- `backend/cmd/api/main.go:150` — `runServiceCommand`.
-- `backend/internal/platform/config/config.go:65` — `executableDir`; `:80` — `resolvePath`.
+- `backend/cmd/api/main.go:151` — `runServiceCommand`.
+- `backend/internal/platform/config/config.go:64` — `executableDir`; `:80` — `resolvePath`.
 - `backend/docs/adr/0007-multi-os-service-deployment.md:20` — ผลที่ตามมาเรื่องที่วางไฟล์.
 
 ## ดูเพิ่ม

@@ -2,7 +2,7 @@
 title: "เส้นทางงานธุรกิจ — ภาพรวม (Business Flows Overview)"
 tags: [flows, moc]
 aliases: ["flows", "เส้นทางงาน", "end-to-end flow", "วงจรธุรกิจ"]
-sources: ["backend/internal/application/process/trans.go:267", "backend/internal/application/process/trans.go:593", "backend/internal/application/process/docs.go:119", "backend/internal/application/process/service.go:1775", "frontend/account/transaction/UniversalTransScreen.tsx:2576"]
+sources: ["backend/internal/application/process/trans.go:267", "backend/internal/application/process/trans.go:593", "backend/internal/application/process/docs.go:119", "backend/internal/application/process/service.go:1786", "frontend/account/transaction/UniversalTransScreen.tsx:2583"]
 ---
 # เส้นทางงานธุรกิจ — ภาพรวม (Business Flows Overview)
 
@@ -25,11 +25,11 @@ flowchart LR
   SD --> GL19["GL เฉพาะ 19/239"]
 ```
 
-- จอเอกสารแยกปลายทางตามชนิด: `ic_trans` ไป `/process/trans/save`, ที่เหลือไป `/process/doc/save` (`frontend/account/transaction/UniversalTransScreen.tsx:2576`)
+- จอเอกสารแยกปลายทางตามชนิด: `ic_trans` ไป `/process/trans/save`, ที่เหลือไป `/process/doc/save` (`frontend/account/transaction/UniversalTransScreen.tsx:2583`)
 - ข้อมูลดิบกับข้อมูล derive แยกกัน: บันทึก/แก้/ลบ/ยกเลิกทุกครั้งคำนวณสต็อก GL และเช็คใหม่จากข้อมูลดิบ (`backend/internal/application/process/trans.go:593`) ดู [[acc-transaction-save-flow]]
 - ยอดค้างเจ้าหนี้/ลูกหนี้ไม่ถูกเก็บ คำนวณสดจากเอกสารหนี้ลบยอดชำระ (`backend/internal/application/process/docs.go:599-628`)
-- `inquiry_type` แยกเงินสด/เงินเชื่อ: 1/3 = เงินสด, 0/2 = เงินเชื่อ สำหรับซื้อ 12 และขาย 44 (`backend/internal/application/process/service.go:1976`, `:2001`)
-- GL มาตรฐานอยู่ที่ `buildStandardGLLines` (`backend/internal/application/process/service.go:1775`) ดู [[acc-gl-posting-standard]] และ [[acc-gl-template-engine]]
+- `inquiry_type` แยกเงินสด/เงินเชื่อ: 1/3 = เงินสด, 0/2 = เงินเชื่อ สำหรับซื้อ 12 และขาย 44 (`backend/internal/application/process/service.go:1988`, `:2012`)
+- GL มาตรฐานอยู่ที่ `buildStandardGLLines` (`backend/internal/application/process/service.go:1786`) ดู [[acc-gl-posting-standard]] และ [[acc-gl-template-engine]]
 
 ## รายการ flow
 
@@ -52,7 +52,7 @@ flowchart LR
 - ฟังก์ชันปิดงวดที่เปลี่ยนสถานะงวดอัตโนมัติ (ต้องแก้ `erp_account_period.status` เอง)
 - การสร้าง ภ.พ.30, ปิดภาษี/ยื่นภาษี
 - ภ.ง.ด.1 และรายงาน 50 ทวิ ฝั่ง backend
-- e-Tax ส่งจริง (adapter เป็น mock)
+- e-Tax ส่งจริง (ตัวเชื่อมสร้างรหัสประทับเวลาเองในโค้ด ดู [[flow-tax-vat-wht-reports]])
 - wizard ตั้งค่าบริษัทใหม่
 - บรรทัดต้นทุนขายในสูตร GL มาตรฐานของขาย 44
 
@@ -60,22 +60,22 @@ flowchart LR
 
 | เรื่อง | รายละเอียด | path:line |
 |---|---|---|
-| เงินสดย่อย 300 | เมนูชื่อ "คืน/ลด วงเงินสดย่อย" แต่ GL ลง Dr เงินสดย่อย และคอมเมนต์เรียก withdraw | `frontend/account/tabs/transMenuMap.ts:1802`, `backend/internal/application/process/service.go:2207` |
+| เงินสดย่อย 300 | เมนูชื่อ "คืน/ลด วงเงินสดย่อย" แต่ GL ลง Dr เงินสดย่อย และคอมเมนต์เรียก withdraw | `frontend/account/tabs/transMenuMap.ts:1799`, `backend/internal/application/process/service.go:2218` |
 | flag 1999 | ใช้ทั้งปิดปี (`GLClose`), `flagJournalVat` และ `journalFlags` | `backend/internal/application/process/workflow.go:818`, `backend/internal/application/process/journaltax.go:17`, `backend/internal/application/process/period.go:131` |
-| เช็คจ่าย 453 | เงื่อนไข 453 ในสาขา else ไม่มีวันทำงาน | `backend/internal/application/process/service.go:2313-2321` |
-| wallet 463 | GL เหมือน 462 (Dr ลูกหนี้ / Cr ธนาคาร) แต่สถานะเหมือน 461 ขึ้นเงิน | `backend/internal/application/process/service.go:2329-2345`, `backend/internal/application/process/cheque.go:27` |
-| ปรับเพิ่ม 66 | GL ใช้ยอดหัวเอกสาร แต่สต็อกใช้ qty × ต้นทุนเฉลี่ย (ช่องว่างที่รู้แล้ว) | `backend/internal/application/process/service.go:2153-2155` |
-| ค่าเสื่อม 1801 / ปิดงวด / RebuildGL | ไม่ตรวจงวดปิดตอนบันทึก | `backend/internal/application/process/fa_depreciation.go:793`, `backend/internal/application/process/workflow.go:817`, `backend/internal/application/process/service.go:1585-1598` |
+| เช็คจ่าย 453 | 453 เข้าเงื่อนไขแรก (452/453) ก่อน เงื่อนไข 453 ในสาขา else จึงไม่มีวันทำงาน | `backend/internal/application/process/service.go:2324-2332` |
+| wallet 463 | GL เหมือน 462 (Dr ลูกหนี้ / Cr ธนาคาร) แต่สถานะเหมือน 461 ขึ้นเงิน | `backend/internal/application/process/service.go:2340-2358`, `backend/internal/application/process/cheque.go:27` |
+| ปรับเพิ่ม 66 | GL ใช้ยอดหัวเอกสาร แต่สต็อกใช้ qty × ต้นทุนเฉลี่ย (ช่องว่างที่รู้แล้ว) | `backend/internal/application/process/service.go:2164-2166` |
+| ค่าเสื่อม 1801 / ปิดงวด / RebuildGL | ไม่ตรวจงวดปิดตอนบันทึก | `backend/internal/application/process/fa_depreciation.go:793`, `backend/internal/application/process/workflow.go:893-894`, `backend/internal/application/process/service.go:1597-1603` |
 | seed ฐานใหม่ | ไม่สนใจ error | `backend/internal/adapter/inbound/http/admin/workspace_google.go` |
-| รายงาน VAT มาตรฐาน | ไม่ตัดใบยกเลิกและไม่ใช้ `vat_calc` | `backend/internal/application/process/report_menu_gl_fa.go:1092` |
+| รายงาน VAT มาตรฐาน | ไม่ตัดใบยกเลิกและไม่ใช้ `vat_calc` | `backend/internal/application/process/report_menu_gl_fa.go:1125` |
 
 ## ที่มาในโค้ด
 
 - `backend/internal/application/process/trans.go:267`, `:382`, `:593` — บันทึก/ลบ/derive
 - `backend/internal/application/process/docs.go:119`, `:166`, `:599-628` — เอกสารหนี้และยอดค้าง
-- `backend/internal/application/process/trans_validate.go:43` — ด่านตรวจก่อนบันทึก
-- `backend/internal/application/process/service.go:1297`, `:1731`, `:1775` — RebuildGL, ธง GL, GL มาตรฐาน
+- `backend/internal/application/process/trans_validate.go:42` — ด่านตรวจก่อนบันทึก
+- `backend/internal/application/process/service.go:1308`, `:1742`, `:1786` — RebuildGL, ธง GL, GL มาตรฐาน
 - `backend/internal/application/process/doc_cancel.go:49`, `:585` — ยกเลิกและกลับรายการ
 - `backend/internal/adapter/inbound/http/router.go:168-205` — route `/api/v1/process/*`
-- `frontend/account/transaction/UniversalTransScreen.tsx:2576` — `handleSave`
+- `frontend/account/transaction/UniversalTransScreen.tsx:2583` — `handleSave`
 - `frontend/account/tabs/transMenuMap.ts` — แผนที่เมนู → trans_flag

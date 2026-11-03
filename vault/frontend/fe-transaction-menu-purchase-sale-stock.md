@@ -13,12 +13,12 @@ sources: ["frontend/account/tabs/transMenuMap.ts:1", "frontend/account/tabs/tran
 ## ทำงานอย่างไร
 
 **วิธีอ่านตาราง**: แต่ละแถวคือเมนูหนึ่งใน `TRANS_MENU_MAP` (ไฟล์ `frontend/account/tabs/transMenuMap.ts` คอลัมน์ "บรรทัด" คือบรรทัดที่นิยามเมนู)
-- `trans_flag` = รหัสชนิดเอกสาร ค่าต่อเมนูอ่านจากโค้ดโดยตรง; ความหมายของรหัสแต่ละตัวมาจาก `_global.cs` ของ BCERP เดิมที่คอมเมนต์ในไฟล์อ้างถึง (ไม่ได้อ่านซ้ำที่นี่).
+- `trans_flag` = รหัสชนิดเอกสาร ค่าต่อเมนูอ่านจากโค้ดโดยตรง.
 - โหมด: บันทึก (`doc`) = หน้าจอบันทึกเอกสาร; ยกเลิก (`cancel`) และอนุมัติ (`approve`) = หน้าจอ `UniversalCancelConfirmScreen`.
 - "ต้นทาง N" = `origFlag` ของเอกสารที่ถูกยกเลิก/อนุมัติ; "flags [..]" = `transFlags` ที่รายการเอกสารรวมแสดง (เมื่อมากกว่าหนึ่งค่า); "อ้างอิงเอกสาร [..]" = `hasRefDoc` + `refTransFlags` คือจอที่ดึงรายการจากเอกสารอื่น; "โอนคลัง" = `isTransfer`.
 - `trans_type` ของหมวดตามหัวคอมเมนู: จัดซื้อ = 1 (บรรทัด 54), ขาย = 2 (541), สินค้าคงคลัง = 3 (922).
 
-**ตัวเรียก backend ตามชนิด/โหมด** (จาก `UniversalTransScreen.tsx:2652-2905`, `UniversalCancelConfirmScreen.tsx:469` และ `query-client.ts`)
+**ตัวเรียก backend ตามชนิด/โหมด** (จาก `UniversalTransScreen.tsx:2656-2828,2901-2914`, `UniversalCancelConfirmScreen.tsx:469`, `query-client.ts:377,683,801-821` และ `doc-no.ts:21`)
 | โหมด | ตาราง `kind` | endpoint |
 |---|---|---|
 | บันทึก | `ic_trans` | `POST /api/process/trans/save` |
@@ -154,7 +154,7 @@ sources: ["frontend/account/tabs/transMenuMap.ts:1", "frontend/account/tabs/tran
 
 **ข้อควรระวัง**
 - รายการเมนูในโน้ตนี้อ่านจาก `transMenuMap.ts` ณ ขณะสร้างโน้ต; ถ้าเพิ่ม/ย้ายเมนู ต้องแก้ทั้ง `transMenuMap.ts` และ `transLayouts.ts` ([[fe-transaction-screens]]) และตรวจ `editionConfig` ว่ารุ่นไหนเห็นเมนูนี้ ([[fe-screen-registry-menu]]).
-- ชื่อเมนูที่ผู้ใช้เห็นอาจต่างจากคอลัมน์ "ชื่อเมนู" เพราะ `getMenuTextByName` ดึงข้อความจากผังเมนูก่อน (`UniversalTransScreen.tsx:442`).
+- ชื่อเมนูที่ผู้ใช้เห็นอาจต่างจากคอลัมน์ "ชื่อเมนู" เพราะ `getMenuTextByName` ดึงข้อความจากผังเมนูก่อน (`UniversalTransScreen.tsx:443`).
 
 ## ที่มาในโค้ด
 - `frontend/account/tabs/transMenuMap.ts:1-35` - ชนิด `TransScreenMode`, `TransKind`, `TransMenuConfig`
@@ -163,7 +163,8 @@ sources: ["frontend/account/tabs/transMenuMap.ts:1", "frontend/account/tabs/tran
 - `frontend/account/tabs/transMenuMap.ts:541-921` - หมวดขาย (SO) 25 เมนู
 - `frontend/account/tabs/transMenuMap.ts:922-1206` - หมวดสินค้าคงคลัง (IC) 19 เมนู
 - `frontend/account/tabs/transMenuMap.ts:2466` - `getTransMenuConfig`
-- `frontend/account/transaction/UniversalTransScreen.tsx:402-505` - ใช้ config นี้
+- `frontend/account/transaction/UniversalTransScreen.tsx:410-486` - อ่าน config นี้เป็น `effective` แล้วแยกโหมดยกเลิก/อนุมัติ (`UniversalCancelConfirmScreen`) ออกจากโหมดบันทึก (`UniversalTransDocScreen`)
+- `frontend/account/transaction/UniversalTransScreen.tsx:2656-2828,2901-2914`, `frontend/src/lib/query-client.ts:377,683,801-821`, `frontend/src/lib/doc-no.ts:21` - ตัวเรียก backend ในตารางด้านบน
 
 ## ดูเพิ่ม
 [[frontend-overview]] · [[fe-transaction-screens]] · [[fe-transaction-menu-debt-cashbank]] · [[fe-screen-registry-menu]] · [[process-overview]] · [[accounting-overview]]

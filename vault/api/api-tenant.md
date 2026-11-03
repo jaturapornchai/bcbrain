@@ -2,7 +2,7 @@
 title: "API ลงทะเบียนผู้ให้บริการ /admin/providers และกุญแจผู้ดูแล (Tenant registration + AdminAuth)"
 tags: [api, tenant, admin]
 aliases: ["/admin/providers","X-Admin-Api-Key","AdminAuth","tenantHandler.Create","tenantHandler.List"]
-sources: ["backend/internal/adapter/inbound/http/router.go:114","backend/internal/adapter/inbound/http/tenant/handler.go:66","backend/internal/adapter/inbound/http/tenant/handler.go:104","backend/internal/adapter/inbound/http/middleware/adminauth.go:18","backend/internal/application/tenant/service.go:28","frontend/src/lib/api-server.ts:60"]
+sources: ["backend/internal/adapter/inbound/http/router.go:114","backend/internal/adapter/inbound/http/tenant/handler.go:66","backend/internal/adapter/inbound/http/tenant/handler.go:104","backend/internal/adapter/inbound/http/middleware/adminauth.go:18","backend/internal/application/tenant/service.go:28","frontend/src/lib/api-server.ts:74"]
 ---
 
 # API /admin/providers และ AdminAuth
@@ -44,7 +44,7 @@ timeout รวม 60 วินาทีของ router (router.go:64).
 ## ผู้เรียกฝั่งหน้าเว็บ
 
 Next ไม่มี route ที่ส่งตรงไป `/admin/providers` ของ Go: หน้าจอผู้ดูแลเรียก `GET|POST|PATCH|DELETE /api/admin/providers` (Next) ซึ่ง proxy ไป `/api/v1/admin/providers` (ชุด admin console, `src/app/api/admin/providers/route.ts:27,40,76,108`) แทน — ดู [[api-admin-console]].
-กุญแจแนบอัตโนมัติโดย `fetchServiceWithAuthRetry` เมื่อ endpoint มีคำว่า `/admin` (`src/lib/api-server.ts:388`); `getAdminApiKey` (api-server.ts:60) ใน production ต้องมี env ไม่งั้นตอบ 503 `NO_ADMIN_API_KEY`.
+กุญแจแนบอัตโนมัติโดย `fetchServiceWithAuthRetry` เมื่อ endpoint มีคำว่า `/admin` (`src/lib/api-server.ts:402`); `getAdminApiKey` (api-server.ts:74) ใน production ต้องมี env ไม่งั้นตอบ 503 `NO_ADMIN_API_KEY`.
 
 ## ที่มาในโค้ด
 
@@ -52,4 +52,4 @@ Next ไม่มี route ที่ส่งตรงไป `/admin/providers` 
 - `backend/internal/adapter/inbound/http/tenant/handler.go:26-120`
 - `backend/internal/adapter/inbound/http/middleware/adminauth.go:10-28`
 - `backend/internal/application/tenant/service.go:28`
-- `frontend/src/lib/api-server.ts:60,388`; `frontend/src/app/api/admin/providers/route.ts:27-108`
+- `frontend/src/lib/api-server.ts:74,402`; `frontend/src/app/api/admin/providers/route.ts:27-108`

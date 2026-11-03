@@ -7,7 +7,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:134","backend/interna
 
 # Process action กลุ่มเอกสาร/ธุรกรรม
 
-action ทั้งหมดอยู่ใต้ `/process/*` และ `/api/v1/process/*` ([[api-process-run]] — สิทธิ์ ขนาดบอดี้ envelope `{"ok":true,"data":...}` ใช้เหมือนกัน). provider/ฐาน/ผู้ใช้มาจาก token ไม่ใช่บอดี้. ค่าเงิน/จำนวนใน JSON เป็น **สตริงทศนิยม** (`^-?\d{1,15}(\.\d+)?$`, trans.go:28) ตามกฎ ACCOUNTING NUMBER. ความหมายธุรกิจดู [[proc-dispatcher]], [[proc-doc-cancel-approve]], [[proc-doc-flow-numbering]], [[proc-grid-calc]], [[proc-lookup-filters]].
+action ทั้งหมดอยู่ใต้ `/process/*` และ `/api/v1/process/*` ([[api-process-run]] — สิทธิ์ ขนาดบอดี้ envelope `{"ok":true,"data":...}` ใช้เหมือนกัน). provider/ฐาน/ผู้ใช้มาจาก token ไม่ใช่บอดี้. ค่าเงิน/จำนวนใน JSON เป็น **สตริงทศนิยม** (`^-?\d{1,15}(\.\d+)?$`, trans.go:29) ตามกฎ ACCOUNTING NUMBER. ความหมายธุรกิจดู [[proc-dispatcher]], [[proc-doc-cancel-approve]], [[proc-doc-flow-numbering]], [[proc-grid-calc]], [[proc-lookup-filters]].
 
 ## trans/* — เอกสารสินค้า (ic_trans)
 
@@ -21,7 +21,7 @@ action ทั้งหมดอยู่ใต้ `/process/*` และ `/api/v
 รายละเอียด `trans/save`:
 
 - แกนบังคับ: `docNo` และ `transFlag` ต้องมี (ขาด = 400 "กรุณาระบุเลขที่เอกสารและประเภทเอกสาร", trans.go:385); `isNew:true` ใช้สิทธิ์ Add ไม่งั้น Edit ([[api-process-run]])
-- `lines[]` (`TransLine`, trans.go:32): `itemCode`, `unitCode`, `whCode`, `shelfCode`, `qty`, `price`, `discount` (คำส่วนลด เช่น `"5%"`), `discountAmount`, `sumAmount`, `taxType`, `serials[]`, `lotNumber1`, `refDocNo` ฯลฯ — ตัวเลขเป็นสตริง
+- `lines[]` (`TransLine`, trans.go:33): `itemCode`, `unitCode`, `whCode`, `shelfCode`, `qty`, `price`, `discount` (คำส่วนลด เช่น `"5%"`), `discountAmount`, `sumAmount`, `taxType`, `serials[]`, `lotNumber1`, `refDocNo` ฯลฯ — ตัวเลขเป็นสตริง
 - ขั้นตอนฝั่ง service (trans.go:267-298): หาสาขา -> เงื่อนไขเงินสด/ชำระ (`cashSaleTerms`, `payBillTerms`) -> lot อัตโนมัติ -> normalize แถวสินค้า (VAT, FX) -> สร้าง args -> `checkAndSaveTransTx` (ตรวจหน้าจอ/เลขภาษี/สินค้าค้าง/อ้างอิง แล้วบันทึกพร้อม rebuild)
 - ผลลัพธ์ `data`: `{docNo, stock:{itemsProcessed,rowsUpdated}, gl:{docsProcessed,journalsCreated,linesCreated,warnings[]}, transferInRows?, chequeStatuses?}` (`TransResult`, trans.go:257)
 
@@ -38,12 +38,12 @@ POST /api/v1/process/trans/save      Authorization: Bearer <token>
 |---|---|---|---|---|
 | `doc/save` | บันทึกเอกสาร 1 ใบที่ไม่ใช่ ic_trans (`kind` = `ap_ar_trans` หรือ `gl_journal`; `cb_chq_list` ดูอย่างเดียว) บันทึกซ้ำได้ผลเดิม (idempotent) | `kind`, `isNew`, `docNo`, `docDate`, `transFlag`, `custCode`, `lines[]`, `bills[]`, `pay`, `glLines[]` (`accountCode`,`debit`,`credit`), `vatBuy`, `vatSale`, `whtIn`, `whtOut` | ap_ar_trans(+_detail), gl_journal(+_detail), cb_trans(+_detail), cb_chq_list, gl_journal_vat_buy/sale, gl_wht_list(+_detail) | handler.go:170 -> docs.go:119 |
 | `doc/delete` | ลบเอกสารชนิดเดียวกัน แล้วคืนสถานะที่เกี่ยวข้อง | `kind`, `docNo`, `transFlag` | ตารางเดียวกับ doc/save | handler.go:181 -> docs.go:166 |
-| `doc/cancel` | สร้างเอกสารยกเลิกแยกใบ (หรือ `undo:true` = ลบ) แล้ว derive `last_status` ของต้นฉบับ + rebuild สต็อก GL เช็ค | `flag`, `origFlag`, `docRef`, `docDate`, `remark`, `undo`, `cancelType` (1 ทั้งใบ / 2 รายสินค้า), `lines[]`, `cancelDocNo` | ic_trans, ic_trans_detail, ap_ar_trans, cb_trans_detail, gl_journal | doc_cancel_handler.go:12 -> doc_cancel.go:120 |
+| `doc/cancel` | สร้างเอกสารยกเลิกแยกใบ (หรือ `undo:true` = ลบ) แล้ว derive `last_status` ของเอกสารต้นทาง + rebuild สต็อก GL เช็ค | `flag`, `origFlag`, `docRef`, `docDate`, `remark`, `undo`, `cancelType` (1 ทั้งใบ / 2 รายสินค้า), `lines[]`, `cancelDocNo` | ic_trans, ic_trans_detail, ap_ar_trans, cb_trans_detail, gl_journal | doc_cancel_handler.go:12 -> doc_cancel.go:120 |
 | `doc/approve` | สร้าง/ลบเอกสารอนุมัติ (`notApprove:true` = ไม่อนุมัติ) แล้ว derive `approve_status`; ไม่ขยับสต็อก/GL | `flag`, `origFlag`, `docRef`, `undo`, `notApprove`, `approveLines[]` (PR) | ic_trans, ic_trans_detail, ap_ar_trans | doc_cancel_handler.go:17 -> doc_cancel.go:205 |
 | `doc/bills` | รายการเอกสารหนี้ค้างของคู่ค้าสำหรับกริดวางบิล/รับ-จ่ายชำระ | `transFlag`, `custCode`, `docDate`, `docNo` | ap_ar_trans_detail, erp_option | bills_handler.go:12 -> docs.go:628 |
 | `doc/flow` | สร้างกราฟ Document Flow ต้นทาง-ปลายทางแบบหลายต่อหลายของเอกสาร | `docNo`, `transFlag`, `kind` | ic_trans(+_detail), ap_ar_trans(+_detail), cb_trans_detail, cb_chq_list, gl_journal(+_detail) | bills_handler.go:27 -> doc_flow_graph.go:269 |
 
-หมายเหตุ: `doc/cancel` รับ flag ยกเลิกเฉพาะที่ผูกกับต้นฉบับใน `cancelOrigFlags` (doc_cancel.go:49) เช่น 3->2, 7->6, 31->30; `doc/*` ใช้ขีดบอดี้ 16 MB เหมือน `trans/*`.
+หมายเหตุ: `doc/cancel` รับ flag ยกเลิกเฉพาะที่ผูกกับเอกสารต้นทางใน `cancelOrigFlags` (doc_cancel.go:49) เช่น 3->2, 7->6, 31->30; `doc/*` ใช้ขีดบอดี้ 16 MB เหมือน `trans/*`.
 
 ## lookup/* — ตัวกรองรายการค้นหา (สร้าง WHERE ฝั่งเซิร์ฟเวอร์)
 
@@ -67,7 +67,7 @@ POST /api/v1/process/trans/save      Authorization: Bearer <token>
 
 ## transgrid/* — คำนวณกริดรายการสินค้า (ไม่เขียนข้อมูล)
 
-ทุก action ใช้สิทธิ์ Read, ขีดบอดี้ 1 MB, คืนผลคำนวณให้หน้าจอแสดง (พอร์ตจาก C# `_icTransControl`).
+ทุก action ใช้สิทธิ์ Read, ขีดบอดี้ 1 MB, คืนผลคำนวณให้หน้าจอแสดง.
 
 | action | หน้าที่ | input สำคัญ | ตาราง | path:line |
 |---|---|---|---|---|
@@ -98,6 +98,6 @@ POST /api/v1/process/trans/save      Authorization: Bearer <token>
 
 - `backend/internal/adapter/inbound/http/router.go:134-153`
 - `backend/internal/adapter/inbound/http/process/handler.go:149-221`; `bills_handler.go:12,27`; `deposit_handler.go:12`; `party_handler.go:12`; `doc_cancel_handler.go:12,17`; `lookup_handler.go:13`; `lookup_trans_handler.go:13-40`; `cheque_handler.go:15,30`; `tax_handler.go:12`; `transgrid_handler.go:20-75`
-- `backend/internal/application/process/trans.go:28,32,101,257,267,382,756`; `docs.go:35,119,166,628`; `doc_cancel.go:23,120,205`; `doc_flow_graph.go:269`; `trans_deposit.go:203`; `trans_party.go:75`; `lookup_party.go:46`; `lookup_trans.go:92,119`; `perm_wh_shelf.go:118`; `perm_wh_shelf_rest.go:25`; `cheque.go:266,329`; `trans_tax.go:252`; `trans_grid.go:129,730`; `grid_shortcut.go:46`; `price_info.go:66`; `fx.go:91`; `trans_ref_import_lines.go:107`
+- `backend/internal/application/process/trans.go:29,33,101,257,267,382,756`; `docs.go:35,119,166,628`; `doc_cancel.go:23,120,205`; `doc_flow_graph.go:269`; `trans_deposit.go:203`; `trans_party.go:75`; `lookup_party.go:46`; `lookup_trans.go:92,119`; `perm_wh_shelf.go:118`; `perm_wh_shelf_rest.go:25`; `cheque.go:266,329`; `trans_tax.go:252`; `trans_grid.go:129,730`; `grid_shortcut.go:46`; `price_info.go:66`; `fx.go:91`; `trans_ref_import_lines.go:107`
 - `backend/internal/adapter/inbound/http/process/permission.go:25-52,54-128`
 - `frontend/src/lib/query-client.ts:377-820`

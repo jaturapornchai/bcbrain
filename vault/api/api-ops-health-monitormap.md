@@ -21,7 +21,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:62","backend/internal
 
 ## 2. Go: /api/v1/monitormap/tile — แผ่นแผนที่พร้อมแคช
 
-ลงทะเบียน router.go:352-358.
+ลงทะเบียน router.go:352-358 (GET `/tile` ไม่มี middleware; POST `/tile` ครอบด้วย `Auth` ที่ :356).
 
 ### GET /api/v1/monitormap/tile
 
@@ -35,7 +35,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:62","backend/internal
 | `x`, `y` | 0..2^z-1 | นอกช่วง = 400 `tile out of range` |
 
 - Response: ไบต์ภาพแผ่นแผนที่ + header `Content-Type`, `X-Tile-Cache` ∈ `HIT-BACKEND-RAM`, `HIT-BACKEND-DISK`, `HIT-BACKEND-PG`, `HIT-INFLIGHT`, `MISS-SAVED-BACKEND`, `FALLBACK`; `X-Tile-Key` (`layer:z:x:y`); `Cache-Control: public, max-age=31536000, immutable` (ถ้า `FALLBACK` เป็นภาพโปร่งใส 1x1 พร้อม `no-store, must-revalidate`) (handler.go:420-).
-- การระบุฐานผ่าน query string แบบเดิมถูกปิดแล้ว. ตารางแคชคือ `monitormap_tile_cache` (`ensureTileTable` handler.go:127).
+- GET เส้นนี้ไม่มี `Auth` (แผนที่โหลดโดยไม่มี Bearer): ถ้าไม่มี claims ของ session ระบบใช้ฐาน `bcdemo` ของ provider `bcdemo` เป็นค่ากลางเสมอ และ **ไม่รับ** `?db=`/`?provider=` จากผู้เรียก (`resolveClaims` handler.go:114-124). ตารางแคชคือ `monitormap_tile_cache` ในฐานนั้น (`ensureTileTable` handler.go:127).
 - ต้นทางภาพคือบริการแผนที่ภายนอก (ไม่ระบุโฮสต์ในโน้ตนี้); แคช RAM สูงสุด 1,500 แผ่น (:105), ดึงต้นทางพร้อมกันสูงสุด 24 (:107), HTTP client timeout 12 วินาที (:109), โฟลเดอร์แคชดิสก์จาก env `BC_TILE_CACHE_DIR` (:86).
 
 ```
@@ -45,12 +45,12 @@ GET /api/v1/monitormap/tile?layer=sat&z=10&x=800&y=450
 ### POST /api/v1/monitormap/tile (ต้อง Bearer)
 
 - `PrewarmTiles` (handler.go:508): ไม่มี claims = 401 `authentication required`.
-- สร้างงานดึงแผ่นล่วงหน้า (Thailand ระดับ z6-8 + เมืองหลัก 8 แห่ง z9-13, 3 layer) จำนวนหลายร้อยแผ่น รันเบื้องหลังด้วย worker 12 ตัว (handler.go:579) ครั้งละ 1 งาน (single-flight), timeout 10 นาที (`prewarmJobTimeout` :70).
+- สร้างงานดึงแผ่นล่วงหน้า (ประเทศไทยระดับ z6-8 + จุดเมืองหลัก 8 จุด z9-13, 3 layer = `sat`,`trans`,`places`; handler.go:521-571) จำนวนหลายร้อยแผ่น รันเบื้องหลังด้วย worker 12 ตัว (handler.go:579) ครั้งละ 1 งาน (single-flight ด้วย `CompareAndSwap` :573; ถ้ามีงานค้างอยู่ตอบ `alreadyRunning:true`, `queuedTiles:0`), timeout 10 นาที (`prewarmJobTimeout` :70).
 - Response 200: `{ok, mode, queuedTiles, alreadyRunning, diskCachedTiles, diskCacheMB, pgCachedTiles}`.
 
 ## 3. Next-only routes
 
-ทุกเส้นด้านล่างอยู่ใน `frontend/src/app/api/...` และ **ไม่มีเส้นทางเทียบใน Go** (หรือเป็น orchestrator ที่เรียก Go หลายเส้น). รูปแบบ response ของ Next: สำเร็จ `{ok:true,data}` / ล้มเหลว `{ok:false,error,code}` ตาม `api-server.ts:34-51` (บางเส้นใช้ `{success,...}` ของตัวเอง).
+ทุกเส้นด้านล่างอยู่ใน `frontend/src/app/api/...` และ **ไม่มีเส้นทางเทียบใน Go** (หรือเป็น orchestrator ที่เรียก Go หลายเส้น). รูปแบบ response ของ Next: สำเร็จ `{ok:true,data}` / ล้มเหลว `{ok:false,error,code}` ตาม `api-server.ts:34,63` (บางเส้นใช้ `{success,...}` ของตัวเอง).
 
 ### 3.1 /api/monitormap (route.ts, 468 บรรทัด)
 

@@ -14,7 +14,7 @@ sources: ["backend/internal/platform/docno/docno.go:23", "backend/internal/platf
 ### `docno` — เลขที่เอกสารตามเวลา (`docno/docno.go`)
 - `Stamp(layout)` (`:23`) = เวลาปัจจุบันตาม layout + มิลลิวินาที 3 หลัก + `-` + แท็กสุ่ม 4 ฐานสิบหกตัวพิมพ์ใหญ่ (จาก `crypto/rand`), เช่น layout `150405` → `153045123-9F2C`.
 - เหตุผลที่เขียนไว้ในแพ็กเกจ: `time.Now().Format("150405")` ซ้ำกันทุกคำขอในวินาทีเดียว ทำให้สองออเดอร์ได้ `order_no`/`trip_no`/`move_doc_no` เดียวกัน (`docno.go:1-9`).
-- ใช้ใน handler ของ `autocare`, `etax`, `market`, `procure`, `tms`, `wms` (เช่น `docno.Stamp("0405")` ที่ `autocare/handler.go:997`). **เป็นเลขของโมดูล dashboard ไม่ใช่เลขเอกสารบัญชี** — เลขเอกสารหลัก (`ic_trans` ฯลฯ) มาจากรูปแบบ `doc_format` ในชั้น `process` ([[process-overview]]).
+- ใช้ใน handler ของ `autocare`, `etax`, `market`, `procure`, `tms`, `wms` (เช่น `docno.Stamp("0405")` ที่ `autocare/handler.go:999`). **เป็นเลขของโมดูล dashboard ไม่ใช่เลขเอกสารบัญชี** — เลขเอกสารหลัก (`ic_trans` ฯลฯ) มาจากรูปแบบ `doc_format` ในชั้น `process` ([[process-overview]]).
 
 ### `sqllit` — literal ของ PostgreSQL (`sqllit/sqllit.go`)
 - มีไว้ให้ handler ที่ส่งหลายคำสั่งเข้า `ExecBatchUseCase` (ทำใน transaction เดียว — [[be-query-gateway]]).

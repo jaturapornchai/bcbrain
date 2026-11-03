@@ -2,7 +2,7 @@
 title: "แท็บรับ/จ่ายชำระ (เงินสด โอน เช็ค บัตร PromptPay ภาษีหัก) เก็บและลงบัญชีอย่างไร ทำไมขึ้น \"ยอดการจ่ายเงินไม่สมบูรณ์\""
 tags: [faq, payment, cash-bank, cheque, gl, wht]
 aliases: ["แท็บชำระเงิน", "ช่องทางชำระ", "ยอดการจ่ายเงินไม่สมบูรณ์", "pay tab tenders", "cb_trans", "cb_trans_detail doc_type", "payTenders", "PromptPay", "total_tax_at_pay", "เงินทอน"]
-sources: ["backend/internal/application/process/pay_check.go:36", "backend/internal/application/process/pay_check.go:57", "backend/internal/application/process/pay_check.go:142", "backend/internal/application/process/pay_check.go:263", "backend/internal/application/process/trans.go:1331", "backend/internal/application/process/trans.go:1338", "backend/internal/application/process/service.go:1860", "backend/internal/application/process/pay_other.go:60"]
+sources: ["backend/internal/application/process/pay_check.go:36", "backend/internal/application/process/pay_check.go:57", "backend/internal/application/process/pay_check.go:142", "backend/internal/application/process/pay_check.go:263", "backend/internal/application/process/trans.go:1331", "backend/internal/application/process/trans.go:1338", "backend/internal/application/process/service.go:1871", "backend/internal/application/process/pay_other.go:60"]
 ---
 # แท็บรับ/จ่ายชำระ (เงินสด โอน เช็ค บัตร PromptPay ภาษีหัก) เก็บและลงบัญชีอย่างไร ทำไมขึ้น "ยอดการจ่ายเงินไม่สมบูรณ์"
 
@@ -66,5 +66,5 @@ sources: ["backend/internal/application/process/pay_check.go:36", "backend/inter
 - `backend/internal/application/process/pay_check.go:142` `checkPayTotal` (ข้อความ `:151`); `:263` `payExceedsBalance`
 - `backend/internal/application/process/pay_other.go:43` `payCashFlags`; `:60` `parsePayOther`
 - `backend/internal/application/process/trans.go:1331` `payReceiveFlags`; `:1338` `payStmts`
-- `backend/internal/application/process/service.go:1860` `payTenders` GL; `:1861` เช็คจ่าย 2112; `:1865` เช็ครับ 1122
-- `backend/internal/application/process/service.go:2329` บัตร 461/462/463
+- `backend/internal/application/process/service.go:1871` `payTenders` GL; `:1872` เช็คจ่าย 2112; `:1876` เช็ครับ 1122
+- `backend/internal/application/process/service.go:2340` บัตร 461/462/463

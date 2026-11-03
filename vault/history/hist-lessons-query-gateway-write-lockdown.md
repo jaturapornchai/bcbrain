@@ -1,57 +1,44 @@
 ---
 title: "บทเรียนการล็อกการเขียนผ่าน query gateway (Query Gateway Write Lockdown)"
-tags: [history, query-gateway, security, lockdown]
-aliases: ["query/exec lockdown", "moneyTablePattern", "ErrMoneyTableViaExec", "ValidateClientInsert"]
-sources: ["git:239b0997", "git:923fae86", "git:3ef39d32", "git:04903202", "git:a47413ec", "backend/internal/domain/query/write_policy.go:77", "backend/internal/adapter/inbound/http/blob/handler.go:98"]
+tags: [history, lesson, query-gateway, security, lockdown]
+aliases: ["query/exec lockdown", "moneyTablePattern", "ErrMoneyTableViaExec", "ValidateClientInsert", "legacyClientWritable", "blob insert policy"]
+sources: ["backend/internal/domain/query/write_policy.go:10", "backend/internal/domain/query/write_policy.go:24", "backend/internal/domain/query/write_policy.go:64", "backend/internal/domain/query/write_policy.go:77", "backend/internal/domain/query/write_policy_legacy.go:5", "backend/internal/domain/query/query.go:63", "backend/internal/application/query/service.go:105", "backend/internal/application/query/service.go:146", "backend/internal/adapter/inbound/http/query/handler.go:245", "backend/internal/adapter/inbound/http/query/handler.go:299", "backend/internal/adapter/inbound/http/blob/handler.go:91", "backend/internal/domain/query/write_policy_test.go:8", "backend/test/blob_integration_test.go:151", "frontend/src/app/api/process/barcode/[action]/route.ts:10", "AGENTS.md:51"]
 ---
 
-## ภาพรวม
-ในยุค ADR-0006 session ของผู้เช่าทุกคนส่ง `INSERT/UPDATE/DELETE` ถึงตารางธุรกิจใดก็ได้ผ่าน `/query/exec` จึงข้ามกฎ Go (rule 10) การล็อกทำเป็นขั้น 2026-10-21 .. 2026-10-24 และแต่ละขั้นมีทางลัดที่พบทีหลัง
+# การล็อกการเขียนผ่าน query gateway
 
-## อาการ
-- **Q1 (239b0997):** หน้าจอหรือคำขอทำมือเขียน `ic_trans`, `gl_journal`, `ic_inventory.balance_qty` ได้ตรง ไม่ผ่านการคำนวณ/ลงบัญชี/transaction ของ Go
-- **Q2 (239b0997, 3ef39d32):** level ต่ำเขียนตารางธุรกิจได้ทุกตาราง และ `erp_user_datalist_config` เก็บ SQL ที่ไปรันในเบราว์เซอร์ผู้ใช้คนอื่น
-- **Q3 (04903202):** route Next `process/barcode/[action]` มีทางสำรองยิง `DELETE/INSERT/UPDATE ic_inventory_barcode` ผ่าน `/query/execBatch` เองเมื่อ backend ตอบ 404
-- **Q4 (a47413ec):** `/blob/insert` รับชื่อตาราง+คอลัมน์จากผู้ใช้โดยไม่ผ่านกฎเดียวกับ `/query/exec` (ข้อความ commit)
-- **Q5 (239b0997):** SQL ที่ตัวตรวจอ่านเป้าหมายไม่ออก
+`/query/exec` และ `/query/execBatch` รับ `INSERT/UPDATE/DELETE` จาก browser ได้ ถ้าไม่มีนโยบายระดับตาราง ผู้ใช้ทุกระดับจะเขียนตารางเอกสาร/สต็อก/GL ตรงๆ ข้ามกฎบัญชี ข้ามการคำนวณ และข้าม transaction ของ Go (ขัดกฎข้อ 10 ใน `AGENTS.md:51` "Backend คุมกฎทั้งหมด")
 
-## สาเหตุ (root cause)
-- Q1/Q2: นโยบายเดิมคุมแค่ "เป็น DML หรือไม่" ไม่คุม "ตารางไหน ใครเขียน" มีเพียง `ValidateUserLevel` กับตารางระบบ 3 กลุ่ม
-- Q3: ทางสำรองฝั่ง Next เขียนตรงผ่าน gateway เป็นประตูหลังที่ Go ไม่เห็น (ผิด rule 9/10)
-- Q4: ประตูเขียนมีสองบาน กฎล็อกอยู่บานเดียว
-- Q5: ไวยากรณ์ที่ตัวตรวจอ่านไม่ได้ต้อง "ปฏิเสธ" ไม่ใช่ "ปล่อย"
+## อะไรพังได้
+- **เขียนตารางเงินตรง:** หน้าจอหรือคำขอทำมือแก้ `ic_trans`, `gl_journal`, คอลัมน์ยอดคงเหลือของ `ic_inventory` โดยไม่ผ่านการคำนวณ/ลงบัญชี
+- **ผู้ใช้ระดับต่ำเขียนตารางระบบ:** เช่นตารางผู้ใช้ ตารางฐานข้อมูล `erp_option`
+- **ประตูเขียนบานที่สองหลุดนโยบาย:** `/blob/insert` รับชื่อตาราง+คอลัมน์จาก client ถ้าไม่ผ่านกฎเดียวกับ `/query/exec` ก็ insert เข้าตาราง GL ได้
+- **SQL ที่ตัวตรวจอ่านเป้าหมายไม่ออก:** ถ้า "ปล่อย" แทน "ปฏิเสธ" ก็เป็นช่องลัด (เช่น identifier แบบ `U&"..."`, statement ที่หาตารางเป้าหมายไม่เจอ)
+- **ทางลัดฝั่ง proxy:** route ของ Next ที่ยิง DML เองเมื่อ backend ตอบ 404 เป็นประตูหลังที่ Go มองไม่เห็น
 
-## วิธีแก้
-- **Q1:** handler เบราว์เซอร์ตั้ง `ClientRequest=true` แล้ว service เรียก `ValidateClientPolicy(level)`; ตารางเงิน/สต็อก/GL ปฏิเสธทุกคน (403 `ErrMoneyTableViaExec`) และย้ายหน้าจอที่เขียนตารางเหล่านี้ไป `/api/process` ในคอมมิตเดียวกัน (stock_beginning, tax_amend, point_doc, doc_no_next)
-- **Q2:** หลัก "ratchet": ย้ายหน้าจอไป Go แล้วถอดตารางพร้อมเพิ่มเคสเทสต์ (3ef39d32 ถอด datalist config ไปเซฟผ่าน `/process/master/datalistsave`)
-- **Q3:** ลบ fallback ทิ้ง route เหลือ proxy 49 บรรทัด
-- **Q4:** เพิ่ม `ValidateClientInsert(table, columns, level)` ใช้ตารางและ regex คอลัมน์ชุดเดียวกัน พร้อมเทสต์ level 1 ได้ 403
-- **Q5:** รูปแบบที่ตัวตรวจอ่านเป้าหมายไม่ออกถูกปฏิเสธหรือจำกัดเฉพาะ admin
+## โค้ดป้องกันไว้อย่างไร
+| ด่าน | ที่อยู่ | ทำอะไร |
+|---|---|---|
+| ตั้งธงว่าคำขอมาจาก browser | `backend/internal/adapter/inbound/http/query/handler.go:245,299` | `ClientRequest: true` ทั้ง `Exec` และ `ExecBatch` |
+| ตรวจนโยบายเมื่อเป็นคำขอ client | `backend/internal/application/query/service.go:105,146` | เรียก `ValidateClientPolicy(level)` กับทุก statement ก่อนรัน (caller ภายในของ Go ไม่ผ่านด่านนี้) |
+| ตารางเงิน/สต็อก/GL | `backend/internal/domain/query/write_policy.go:24` `moneyTablePattern` | ปฏิเสธทุกระดับด้วย `ErrMoneyTableViaExec`; `ic_inventory` ห้ามแตะคอลัมน์ยอดคงเหลือ/ต้นทุน (`inventoryBalanceColumns`) |
+| ตารางอื่น | `write_policy.go:77-102` `ValidateClientPolicy` | ระดับ < 9 เขียนได้เฉพาะตารางใน allow-list `legacyClientWritable` (`write_policy_legacy.go:9`) มิฉะนั้น `ErrAdminOnlyWrite` |
+| อ่านเป้าหมายไม่ได้ = ปฏิเสธ | `write_policy.go:86-93` | `U&"..."` และ statement ที่ `writeTargets` หาตารางไม่ได้ → ปฏิเสธ |
+| ตารางระบบ | `backend/internal/domain/query/query.go:63` `protectedSystemTablePattern` | `bc_user_list`, `bc_database_list*`, `erp_option` ต้องระดับ ≥ 9 |
+| `/blob/insert` กฎเดียวกัน | `backend/internal/adapter/inbound/http/blob/handler.go:91-100` ← `write_policy.go:64` `ValidateClientInsert` | ใช้ตารางและรูปแบบคอลัมน์ชุดเดียวกับ `/query/exec` |
+| ไม่มีทางลัดฝั่ง Next | `frontend/src/app/api/process/barcode/[action]/route.ts:10-49` | เหลือเป็น proxy ไป Go อย่างเดียว ไม่มีการยิง DML เอง |
+| เทสต์ | `write_policy_test.go:8` `TestValidateClientPolicy` (รวมเคส `erp_user_datalist_config` ที่ระดับ 1 ถูกปฏิเสธ `:32`), `:65` `TestMoneyTablePattern`; `backend/test/blob_integration_test.go:151` (ระดับ 1 insert `gl_journal_detail`/`bc_user_list` ได้ 403) | |
 
-## commit ที่เกี่ยวข้อง
-- `239b0997` — write_policy + allow-list + ย้ายการเขียนหน้าจอไป Go (2026-10-21)
-- `923fae86` — เปลี่ยนเลข ADR เป็น 0011 (0006 ซ้ำ); checkout POS ใช้ลูกค้าเริ่มต้นของ posconfig เพราะ `CASH` ไม่ใช่ลูกค้า
-- `3ef39d32` — ถอด `erp_user_datalist_config` ออกจาก allow-list
-- `04903202` — ถอด barcode SQL fallback ของ Next (2026-10-22)
-- `a47413ec` — กฎเดียวกันที่ `/blob/insert` (2026-10-24)
-
-## โค้ดปัจจุบันที่ป้องกัน
-- `backend/internal/domain/query/write_policy.go:24` `moneyTablePattern`, `:64` `ValidateClientInsert`, `:77` `ValidateClientPolicy`
-- `backend/internal/domain/query/query.go:63` `protectedSystemTablePattern`
-- `application/query/service.go:105,146` เรียก policy เมื่อ `ClientRequest`; `adapter/inbound/http/query/handler.go:245,299` ตั้งค่า true; `blob/handler.go:98`
-- เทสต์: `write_policy_test.go:8,51,65`; `backend/test/blob_integration_test.go:151`
-
-## บทเรียน / กฎที่ได้
-1. ทุกประตูเขียน (exec, execBatch, blob insert, fallback ของ Next) ต้องผ่านฟังก์ชันตรวจเดียว
-2. อ่านเป้าหมายไม่ได้ = ปฏิเสธ แล้วเพิ่มเทสต์ทุกรูปแบบที่หลุด
-3. ข้อมูลที่ผู้ใช้เก็บแล้วไปรันที่อื่น (SQL ใน datalist config) ห้ามอยู่ใน allow-list
-4. ย้ายหน้าจอไป Go ทุกครั้ง ถอดตารางจาก allow-list และเพิ่มเคสใน `TestValidateClientPolicy`
-5. fallback ฝั่ง proxy ที่เขียนข้อมูลเองคือช่องโหว่ ให้ error ตรง ๆ
-
-## ดูเพิ่ม
-[[adr-0011-query-exec-write-lockdown]] · [[adr-0006-query-exec-dml-only-guardrails]] · [[adr-0010-blob-insert-storage]] · [[hist-lessons-permission-rights]] · [[hist-lessons-atomic-transactions-swallowed-errors]] · [[std-security-authz-and-web-vulns]] · [[history-overview]]
+## กฎที่ต้องจำ
+1. ทุกประตูเขียนจาก browser (`/query/exec`, `/query/execBatch`, `/blob/insert`, proxy ของ Next) ต้องผ่านฟังก์ชันตรวจชุดเดียวกัน
+2. อ่านเป้าหมายไม่ออก = ปฏิเสธ แล้วเพิ่มเคสในเทสต์
+3. ย้ายหน้าจอไปเขียนผ่าน `/api/process` เมื่อไหร่ ให้ถอดตารางนั้นออกจาก `legacyClientWritable` (comment ที่ `write_policy_legacy.go:5-8` บอกชัด: "Remove a name the day its screen moves to Go") และเพิ่มเคสใน `TestValidateClientPolicy`
+4. ข้อมูลที่ผู้ใช้เก็บแล้วไปรันที่อื่น (เช่น SQL ใน config ของรายการ) ห้ามอยู่ใน allow-list — เคส `erp_user_datalist_config` ถูกล็อกแล้ว
+5. fallback ฝั่ง proxy ที่เขียนข้อมูลเองคือช่องโหว่ ให้ตอบ error ตรงๆ
 
 ## ที่มาในโค้ด
-- git:239b0997, git:923fae86, git:3ef39d32, git:04903202, git:a47413ec
-- backend/docs/adr/0011-query-exec-write-lockdown.md
-- backend/internal/domain/query/write_policy.go:24, :64, :77
+- `backend/internal/domain/query/write_policy.go:10-102` นโยบายทั้งชุด
+- `backend/internal/domain/query/write_policy_legacy.go:5-43` allow-list ที่เหลือ
+- `backend/internal/application/query/service.go:105,146`, `backend/internal/adapter/inbound/http/query/handler.go:245,299`, `backend/internal/adapter/inbound/http/blob/handler.go:91-100`
+- เอกสารเหตุผล: `backend/docs/adr/0011-query-exec-write-lockdown.md`
+- ดูเพิ่ม: [[adr-0011-query-exec-write-lockdown]] · [[adr-0006-query-exec-dml-only-guardrails]] · [[adr-0010-blob-insert-storage]] · [[be-query-write-policy]] · [[std-security-authz-and-web-vulns]] · [[hist-lessons-permission-rights]] · [[hist-lessons-atomic-transactions-swallowed-errors]]

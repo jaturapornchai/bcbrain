@@ -29,7 +29,7 @@ sources: ["backend/internal/application/process/doc_cancel.go:23", "backend/inte
 1. ล็อกเอกสารและสินค้า (`lockTransDoc`, `lockStockItems`) และตรวจงวดบัญชี (`checkCancelPeriod`); `ic_trans` ตรวจ `refuseLockedRecord` ก่อน
 2. อ่าน `last_status` ของเอกสารเดิม; ถ้า `status == 1` และไม่ใช่ undo -> "เอกสาร ... ถูกยกเลิกแล้ว"
 3. ไม่ใช่ undo: ถ้า `cancelType = 2` ตรวจยอดคงเหลือรายบรรทัด (`checkItemCancel`) มิฉะนั้นตรวจว่าไม่ถูกเอกสารอื่นอ้างอิง (`refuseIfReferenced`); แล้ว `insertStatusDoc` (เขียนเฉพาะ header; คอมเมนต์ `ponytail` อธิบายว่าไม่คัดลอกบรรทัดเพราะ flag 55-73 เป็น flag ที่ขยับสต็อก จะกลับสต็อกซ้ำสอง) และ `insertCancelLines` ถ้ายกเลิกรายสินค้า
-4. undo: `deleteStatusDocs` ลบเอกสารยกเลิก (ระบุ `cancelDocNo` = ลบใบนั้นใบเดียว, ว่าง = ลบทุกใบของ `docRef`); ถ้าไม่ระบุ `cancelDocNo` แล้วสถานะหลังคำนวณยังเป็นยกเลิก (ถูกยกเลิกด้วยวิธีเดิมของ C#) ตอบ "คืนสถานะจากหน้านี้ไม่ได้" (`doc_cancel.go:185`)
+4. undo: `deleteStatusDocs` ลบเอกสารยกเลิก (ระบุ `cancelDocNo` = ลบใบนั้นใบเดียว, ว่าง = ลบทุกใบของ `docRef`); ถ้าไม่ระบุ `cancelDocNo` แล้วสถานะหลังคำนวณยังเป็นยกเลิก (แปลว่าเอกสารถูกยกเลิกด้วย `is_cancel = 1` ที่หัวเอกสาร ไม่ใช่ด้วยเอกสารยกเลิก) ตอบ "เอกสาร... ถูกยกเลิกแบบเดิม คืนสถานะจากหน้านี้ไม่ได้" (`doc_cancel.go:185`)
 5. `deriveLastStatus` คำนวณ `last_status` ใหม่ -> `docFlowTx` ([[proc-doc-flow-numbering]]) -> `rebuildTransDerived` คำนวณสต็อก/GL/สถานะเช็คของเอกสารเดิมใหม่ -> `writeProcessLog` (action `cancel` หรือ `restore`)
 
 ### ขั้นตอนอนุมัติ (`approveDocTx`)

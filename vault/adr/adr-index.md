@@ -2,12 +2,12 @@
 title: "สารบัญ ADR ของ backend (Architecture Decision Records)"
 tags: [backend, adr, index]
 aliases: ["ADR index", "adr-index", "decision records backend", "สารบัญ ADR"]
-sources: ["backend/docs/adr/0001-provider-config-json-files-not-database.md:1", "backend/docs/adr/0011-query-exec-write-lockdown.md:1"]
+sources: ["backend/docs/adr/0001-provider-config-json-files-not-database.md:2", "backend/docs/adr/0006-query-exec-no-new-permission-model.md:2", "backend/docs/adr/0011-query-exec-write-lockdown.md:2-3", "backend/docs/adr/0011-query-exec-write-lockdown.md:13", "backend/deployments/k8s/deployment.yaml:11"]
 ---
 
 # สารบัญ ADR ของ backend
 
-ADR ทั้ง 11 ฉบับอยู่ที่ `backend/docs/adr/` (ไฟล์ต้นฉบับภาษาอังกฤษ). ตารางนี้เทียบ **สถานะตามเอกสาร** กับ **สถานะตามโค้ดจริง** — ถ้าขัดกันให้ยึดโค้ด. กลับไปที่ภาพรวม: [[backend-overview]].
+ADR ทั้ง 11 ฉบับ (`0001`–`0011`) อยู่ที่ `backend/docs/adr/` เป็นภาษาอังกฤษ. ตารางนี้แสดง **สถานะตามเอกสาร** คู่กับ **สถานะตามโค้ดจริง** (ตรวจ 2026-11-03) — ถ้าขัดกันให้ยึดโค้ด. กลับไปที่ภาพรวม: [[backend-overview]].
 
 ## ทำงานอย่างไร (วิธีใช้)
 
@@ -36,13 +36,16 @@ ADR ทั้ง 11 ฉบับอยู่ที่ `backend/docs/adr/` (ไ�
 - กลุ่ม Query Gateway: 0005 → 0006 → 0008 → 0009 → 0011 (ลำดับพัฒนาการ) สรุปรวมที่ [[be-query-gateway]] และ [[be-query-write-policy]].
 - กลุ่ม Tenant/Identity: 0001, 0002, 0003, 0004 สรุปรวมที่ [[be-multi-tenant]], [[be-provider-registry]], [[be-identity-login-flow]], [[be-jwt-session-tokens]].
 - กลุ่ม Deployment: 0007 → [[be-service-lifecycle]], [[be-deployment]].
-- ADR ใหม่ทุกฉบับควรเพิ่มแถวในตารางนี้และระบุสถานะเทียบโค้ด.
+- ADR ใหม่ทุกฉบับควรเพิ่มแถวในตารางนี้และระบุสถานะตามโค้ดจริง.
+- ADR 0001, 0003, 0005 อ้าง `docs/PLAN.md` ซึ่งไม่มีอยู่ในโฟลเดอร์ `docs/` ปัจจุบัน — ให้ใช้ตัวโค้ดและโน้ตนี้แทน.
 
 ## ที่มาในโค้ด
 
-- `backend/docs/adr/0001-provider-config-json-files-not-database.md:1` — ADR ฉบับแรก (front-matter `status`).
-- `backend/docs/adr/0011-query-exec-write-lockdown.md:1` — ฉบับล่าสุด (`supersedes: 0006`).
-- ไฟล์ ADR อื่นอยู่โฟลเดอร์เดียวกัน (`0002`–`0010`), บรรทัด 1-3 คือสถานะ.
+- `backend/docs/adr/0001-provider-config-json-files-not-database.md:2` — ADR ฉบับแรก (front-matter `status`).
+- `backend/docs/adr/0006-query-exec-no-new-permission-model.md:2` — `status: superseded by 0011-...`.
+- `backend/docs/adr/0011-query-exec-write-lockdown.md:2-3` — ฉบับล่าสุด (`supersedes: 0006-...`), ส่วน Decision เริ่มที่ `:13`.
+- ไฟล์ ADR อื่นอยู่โฟลเดอร์เดียวกัน (`0002`–`0005`, `0007`–`0010`), บรรทัด 1-3 คือสถานะ.
+- `backend/deployments/k8s/deployment.yaml:11` — `replicas: 2` ที่ขัดกับข้อสมมติของ ADR 0001.
 
 ## ดูเพิ่ม
 

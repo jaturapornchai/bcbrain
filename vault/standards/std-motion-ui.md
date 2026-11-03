@@ -2,14 +2,14 @@
 title: "UI พรีเมียมและคลาส Motion กลาง (Premium UI, bc-anim, Design Tokens)"
 tags: [standards, ui, motion, css, frontend]
 aliases: ["bc-anim-fade", "bc-anim-rise", "bc-anim-pop", "bc-stagger", "bc-kpi-row", "bc-lift", "bc-skeleton", "bc-aurora", "bc-gold-text", "bc-glass", "design tokens", "--bc-ease-out", "Button Modal กลาง", "animate-in fade-in-0 zoom-in-95"]
-sources: ["docs/kms/KMS_PREMIUM_UI_MOTION_STANDARD.md", ".agents/skills/premium-ui-motion-system/SKILL.md", "AGENTS.md", "frontend/src/app/globals.css", "frontend/shared/ui/Button.tsx", "frontend/shared/ui/Modal.tsx", "frontend/shared/layout/SystemPortalScreen.tsx", "frontend/shared/layout/WorkspaceWelcome.tsx"]
+sources: ["docs/kms/KMS_PREMIUM_UI_MOTION_STANDARD.md", ".agents/skills/premium-ui-motion-system/SKILL.md", "AGENTS.md:35-38", "AGENTS.md:44", "AGENTS.md:60", "frontend/src/app/globals.css:1644", "frontend/src/app/globals.css:1651", "frontend/src/app/globals.css:2014-2022", "frontend/src/app/globals.css:2064", "frontend/src/app/globals.css:2141", "frontend/src/app/globals.css:2210", "frontend/shared/ui/Button.tsx:28", "frontend/shared/ui/Modal.tsx:83", "frontend/account/transaction/ItemGridContextMenu.tsx", "frontend/shared/layout/SystemPortalScreen.tsx", "frontend/shared/layout/WorkspaceWelcome.tsx"]
 ---
 
 # UI พรีเมียมและคลาส Motion กลาง
 
-ทุกหน้าจอใช้ภาษาการออกแบบเดียวกันจาก `frontend/src/app/globals.css` (§9–§14): ใช้คลาส Motion กลางและคอมโพเนนต์ `<Button>` / `<Modal>` กลาง ห้ามเขียน `@keyframes` หรือ `style={{ animation }}` เองใน `.tsx` (กฎข้อ 19) กฎความปลอดภัยของ animation ดู [[std-motion-animation-rules]]
+ทุกหน้าจอใช้ภาษาการออกแบบเดียวกันจาก `frontend/src/app/globals.css` (§9–§14): ใช้คลาส Motion กลางและคอมโพเนนต์ `<Button>` / `<Modal>` กลาง ห้ามเขียน `@keyframes` หรือ `style={{ animation }}` เองใน `.tsx` (`AGENTS.md:60`) กฎความปลอดภัยของ animation ดู [[std-motion-animation-rules]]
 
-## Design Tokens (`:root`, globals.css §9)
+## Design Tokens (`:root`, globals.css §9 เริ่ม `:1644`, tokens `:1651`)
 | Token | ค่า | ใช้กับ |
 |---|---|---|
 | `--bc-ease-out` | `cubic-bezier(0.16, 1, 0.3, 1)` | element เข้าทั่วไป |
@@ -36,7 +36,8 @@ sources: ["docs/kms/KMS_PREMIUM_UI_MOTION_STANDARD.md", ".agents/skills/premium-
 
 ## คอมโพเนนต์ที่เป็นพรีเมียมแล้ว (ใช้ต่อได้เลย)
 - `<Button>` (`shared/ui/Button.tsx`): `primary`/`accent` ไล่เฉด+เงา, `ghost`/`secondary`/`danger` เงาบาง, กดยุบ `scale(0.97)`, มี focus ring — API เดิม (`variant`, `size`, `loading`) และเป็นมาตรฐาน Toolbar ([[std-screen-header-toolbar-theme]])
-- `<Modal>` (`shared/ui/Modal.tsx`): backdrop `bg-slate-950/45` + blur, กล่องเด้งเข้า (`bc-modal-dialog`), แถบสีแบรนด์ด้านบน, Esc ปิดเฉพาะชั้นบนสุด
+- `<Modal>` (`shared/ui/Modal.tsx`): backdrop `bg-slate-950/45` (`Modal.tsx:83`) + blur, กล่องเด้งเข้า (`bc-modal-dialog`), แถบสีแบรนด์ด้านบน, Esc ปิดเฉพาะชั้นบนสุด
+- หน้าต่างที่เขียนเอง (`fixed inset-0` + พื้นหลัง `bg-black/..`, `bg-slate-900/..` หรือ `bg-slate-950/..` ที่ยังไม่มี `animate-in`) ได้ motion เด้งเข้าแบบ `<Modal>` อัตโนมัติจาก CSS (`globals.css:2014-2022`) เช่น `BcLookupModal`, `GlobalReportPrintModal`, `BcCalculatorDialog` — หน้าต่างใหม่ใช้พื้นหลัง 3 แบบนี้หรือใส่ `animate-in` เอง ห้ามเขียน keyframes แยก
 - Header / MenuBar / แถบแท็บ MDI: dropdown เด้งเข้า (`[data-bc-dropdown] > div`), แท็บใหม่เด้งเข้า + แถบสีแบรนด์ 2px บนแท็บที่เปิดอยู่ (CSS ล้วน)
 - `WorkspaceWelcome` แสดงเมื่อยังไม่เปิดหน้าจอใดใน MDI
 
@@ -58,7 +59,7 @@ sources: ["docs/kms/KMS_PREMIUM_UI_MOTION_STANDARD.md", ".agents/skills/premium-
 ```
 
 ## ข้อจำกัด
-- ห้ามเปลี่ยน Layout/ตำแหน่งช่องกรอกของหน้าจอที่ถอดแบบจาก BC เพื่อความสวย (Motion ทำได้ระดับสี เงา เส้นขอบ และ animation)
+- ห้ามเปลี่ยน Layout/ตำแหน่งช่องกรอกของหน้าจอมาตรฐานเพื่อความสวย (`AGENTS.md:35-38`, `:44`) — Motion ทำได้ระดับสี เงา เส้นขอบ และ animation
 - ห้ามภาพเคลื่อนไหวที่มีตัวเลขธุรกิจสมมติ — ภาพประกอบใน Login/หน้าต้อนรับเป็นกราฟตกแต่งที่ไม่มีตัวเลข
 
 ## ที่มา

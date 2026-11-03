@@ -7,7 +7,7 @@ sources: ["backend/internal/application/process/lookup_party.go:33", "backend/in
 
 # ตัวกรองหน้าค้นหา (Lookup filters: party / ref-doc / warehouse / held items)
 
-หน้าจอเอกสาร (trans screen) มีช่องค้นหาลูกค้า/เจ้าหนี้, เอกสารอ้างอิง, คลัง/ที่เก็บ หน้าเว็บ **ไม่ตัดสินเงื่อนไขกรองเอง** แต่เรียก backend ขอเงื่อนไขกรอง เพราะกฎขึ้นกับ `erp_option`, `erp_company_profile` และแถว `erp_user` ของผู้ที่ล็อกอิน ทั้งหมดพอร์ตมาจาก C# (อ้างชื่อคลาสในคอมเมนต์ของโค้ด)
+หน้าจอเอกสาร (trans screen) มีช่องค้นหาลูกค้า/เจ้าหนี้, เอกสารอ้างอิง, คลัง/ที่เก็บ หน้าเว็บ **ไม่ตัดสินเงื่อนไขกรองเอง** แต่เรียก backend ขอเงื่อนไขกรอง เพราะกฎขึ้นกับ `erp_option`, `erp_company_profile` และแถว `erp_user` ของผู้ที่ล็อกอิน
 
 ## ทำงานอย่างไร
 
@@ -33,7 +33,7 @@ sources: ["backend/internal/application/process/lookup_party.go:33", "backend/in
   - 6: `doc_success=0` และ (ไม่ใช่ flag 4 หรือ `not_approve_1=0`)
   - 12, 44, 56, 72, 144, 310, 315: `doc_success=0`
   - 87 (ตั้งหนี้อื่น): `used_status=0`
-  - flag ใน `refCustFlags`: `cust_code='<ลูกค้า>'` แม้ลูกค้าว่าง (ตามคอมเมนต์ C# จึงไม่แสดงเอกสารเลยแทนที่จะแสดงของทุกคน)
+  - flag ใน `refCustFlags`: `cust_code='<ลูกค้า>'` แม้ลูกค้าว่าง จึงไม่แสดงเอกสารเลยแทนที่จะแสดงของทุกคน (`lookup_trans.go:51-53`, `:150`)
   - flag ใน `refVatFlags`: `vat_type = <vatType ของหัวเอกสาร>` (311, 315 และจอรายรับ/รายจ่ายเงินสด 252/254/262/264 ไม่เติม)
   - 44/144: ถ้าเปิด `doc_ref_reservation_approve` ใบจอง (flag 34) ต้อง `approve_status=1`; ถ้าเปิด `doc_ref_salesorder_approve` ใบสั่งขาย (flag 36) ต้อง `approve_status=1`
   - 12/310: ถ้าเปิด `ref_po_approve` ใบสั่งซื้อ (flag 6) ต้อง `approve_status=1`
@@ -56,7 +56,7 @@ sources: ["backend/internal/application/process/lookup_party.go:33", "backend/in
 
 ## จุดที่ต้องระวัง
 - มีประเด็นด้านความปลอดภัยที่ทีมพัฒนาต้องตรวจ (ไม่เผยแพร่รายละเอียดบนเว็บสาธารณะ)
-- กฎ `refCustFlags` ทำให้เลือกเอกสารอ้างอิงก่อนเลือกคู่ค้าแล้วไม่พบเอกสาร ตามที่ C# ทำ ไม่ใช่บั๊ก
+- กฎ `refCustFlags` ทำให้เลือกเอกสารอ้างอิงก่อนเลือกคู่ค้าแล้วไม่พบเอกสาร เป็นพฤติกรรมที่ตั้งใจ ไม่ใช่บั๊ก: ต้องเลือกลูกค้า/เจ้าหนี้ที่หัวเอกสารก่อน
 - `defaultBranch` ว่างได้ถ้าสาขาที่ล็อกอินไม่อยู่ใน `erp_branch_list` (คอมเมนต์ `ponytail` ในโค้ด); ตอนบันทึกจะแจ้งเหตุผล
 
 ## ที่มาในโค้ด

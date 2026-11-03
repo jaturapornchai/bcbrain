@@ -2,7 +2,7 @@
 title: "หัวเอกสารหัก ณ ที่จ่าย (gl_wht_list)"
 tags: [tables, gl]
 aliases: ["gl_wht_list", "ภาษีหัก ณ ที่จ่าย", "ภาษีถูกหัก ณ ที่จ่าย", "หนังสือรับรองการหักภาษี", "ภ.ง.ด.3", "ภ.ง.ด.53", "WHT header"]
-sources: ["backend/internal/application/process/journaltax.go:241", "backend/internal/application/process/journaltax.go:260", "backend/internal/application/process/trans_tax.go:48", "backend/internal/application/process/trans_tax.go:148", "backend/internal/application/process/fa_sale.go:666", "backend/internal/application/process/pay_check.go:52", "backend/internal/application/process/report_menu_gl_fa.go:1137", "backend/internal/application/process/report_menu_gl_fa.go:1729", "backend/internal/application/process/report_menu_so_po.go:714", "backend/internal/application/process/service.go:1875"]
+sources: ["backend/internal/application/process/journaltax.go:241", "backend/internal/application/process/journaltax.go:260", "backend/internal/application/process/trans_tax.go:48", "backend/internal/application/process/trans_tax.go:148", "backend/internal/application/process/fa_sale.go:666", "backend/internal/application/process/pay_check.go:70", "backend/internal/application/process/report_menu_gl_fa.go:1140", "backend/internal/application/process/report_menu_gl_fa.go:1732", "backend/internal/application/process/report_menu_so_po.go:714", "backend/internal/application/process/service.go:1886", "scripts/sql/02_data_schema.sql:4728"]
 ---
 
 # หัวเอกสารหัก ณ ที่จ่าย (`gl_wht_list`)
@@ -11,19 +11,25 @@ sources: ["backend/internal/application/process/journaltax.go:241", "backend/int
 
 ## คอลัมน์สำคัญ
 
+โครงสร้างตารางมาจาก DDL `scripts/sql/02_data_schema.sql:4728-4751` (CREATE TABLE :4728-4748, ดัชนี :4749-4751) ชนิดข้อมูลที่ DDL กำหนด: `amount`, `tax_value` เป็น numeric (ไม่ระบุความยาวและทศนิยม การปัดอยู่ที่โค้ด), `doc_no`, `tax_doc_no` เป็น varchar(25), `cust_code` varchar(35), `card_number`, `tax_number` varchar(50), `cust_name` varchar(255), `cust_address` varchar(1000), `status`, `trans_flag`, `cust_tax_type` เป็น smallint, `line_number` เป็น integer, `doc_date`, `due_date` เป็น date, `roworder` เป็น serial NOT NULL ไม่มี PRIMARY KEY/UNIQUE ใน DDL มีดัชนีธรรมดาสามตัวคือ (`doc_no`, `trans_flag`), (`doc_date`, `trans_flag`) และ (`cust_code`)
+
 | คอลัมน์ | ความหมาย | ใช้ที่ไหน |
 |---|---|---|
-| `doc_no`, `doc_date` | เอกสารเจ้าของใบหัก | `journaltax.go:241` |
+| `doc_no`, `doc_date` | เอกสารเจ้าของใบหัก | `journaltax.go:247` |
 | `trans_flag` | ชนิดเอกสารเจ้าของ แยกทิศภาษี (ดูตารางด้านล่าง) | ลบ/อ่านทุกที่ |
 | `tax_doc_no` | เลขที่เอกสารหัก ณ ที่จ่าย ห้ามซ้ำทั้งระบบ (คีย์เชื่อมกับตารางลูก) | `journaltax.go:108`, `journaltax.go:304` |
-| `due_date` | วันที่หัก ณ ที่จ่าย (ถ้าว่างใช้วันที่เอกสาร) รายงานกรองตามวันนี้ | `journaltax.go:260`, `report_menu_gl_fa.go:1159` |
-| `amount` | ผลรวมฐานภาษีของทุกบรรทัดลูก | `journaltax.go:291-296` |
-| `tax_value` | ผลรวมภาษีที่หักของทุกบรรทัดลูก | `journaltax.go:291-296`, `pay_check.go:70` |
+| `due_date` | วันที่หัก ณ ที่จ่าย (ถ้าว่างใช้วันที่เอกสาร) รายงานกรองตามวันนี้ | `journaltax.go:281`, `report_menu_gl_fa.go:1162` |
+| `amount` | ผลรวมฐานภาษีของทุกบรรทัดลูก | `journaltax.go:285-296` |
+| `tax_value` | ผลรวมภาษีที่หักของทุกบรรทัดลูก | `journaltax.go:285-296`, `pay_check.go:70` |
 | `cust_code` | รหัสเจ้าหนี้/ลูกหนี้ (ถ้าแถวไม่ระบุ ใช้ของเอกสาร) | `trans_tax.go:148-152` |
-| `cust_name`, `cust_address` | ชื่อ/ที่อยู่ ดึงจาก `ap_supplier` หรือ `ar_customer` ตอนบันทึก | `journaltax.go:241-256` |
-| `cust_tax_type` | ประเภทผู้ถูกหัก คัดลอกจาก `ap_status`/`ar_status` ของทะเบียน ใช้แยก ภ.ง.ด.3 (0) / ภ.ง.ด.53 (1) | `journaltax.go:241-256`, `report_menu_gl_fa.go:1729-1730` |
-| `card_number` | เลขบัตรประชาชน จาก `*_detail.card_id` | `journaltax.go:241-256` |
-| `tax_number` | เลขประจำตัวผู้เสียภาษี จาก `*_detail.tax_id` | `journaltax.go:241-256` |
+| `cust_name`, `cust_address` | ชื่อ/ที่อยู่ ดึงจาก `ap_supplier` หรือ `ar_customer` ตอนบันทึก | `journaltax.go:246-253` |
+| `cust_tax_type` | ประเภทผู้ถูกหัก คัดลอกจาก `ap_status`/`ar_status` ของทะเบียน ใช้แยก ภ.ง.ด.3 (0) / ภ.ง.ด.53 (1) | `journaltax.go:246-253`, `report_menu_gl_fa.go:1162`, `report_menu_gl_fa.go:1732-1733` |
+| `card_number` | เลขบัตรประชาชน จาก `*_detail.card_id` | `journaltax.go:246-253` |
+| `tax_number` | เลขประจำตัวผู้เสียภาษี จาก `*_detail.tax_id` | `journaltax.go:246-253` |
+| `status` | smallint ค่าเริ่มต้น 0 มีใน DDL แต่ INSERT หัวและรายงานของโค้ด Go ไม่ได้ใช้คอลัมน์นี้ (ไม่ทราบความหมายแน่ชัด) | `journaltax.go:241` |
+| `line_number` | integer ค่าเริ่มต้น 0 มีใน DDL แต่ INSERT หัวไม่ได้ใส่ค่า (ลำดับบรรทัดใช้ที่ตารางลูก [[tbl-gl-wht-list-detail]]) ความหมายของคอลัมน์ในหัวไม่ทราบแน่ชัด | `journaltax.go:241` |
+| `ignore_sync`, `is_lock_record` | integer ค่าเริ่มต้น 0 มีใน DDL แต่โค้ด Go ไม่ได้ใช้กับตารางนี้ (ไม่ทราบความหมายแน่ชัด) | - |
+| `roworder`, `create_date_time_now` | serial NOT NULL / timestamp NOT NULL ค่าเริ่มต้น `now()` (เวลาที่แถวถูกสร้าง) INSERT ของโค้ดไม่ได้ระบุสองคอลัมน์นี้ | `journaltax.go:241` |
 
 ### ทิศภาษีตาม `trans_flag`
 
@@ -38,22 +44,23 @@ sources: ["backend/internal/application/process/journaltax.go:241", "backend/int
 - ลูก: [[tbl-gl-wht-list-detail]] เชื่อมด้วย `doc_no` + `trans_flag` (+ `tax_doc_no`)
 - เจ้าของ: [[tbl-ic-trans]], [[tbl-as-trans]] (1802), [[tbl-ap-ar-trans]] (19/239), หรือ JV ทำมือ ([[tbl-gl-journal]])
 - ทะเบียนคู่ค้า: [[tbl-ap-supplier]], [[tbl-ar-customer]]
-- เอกสารรับ/จ่ายเงิน: `total_tax_at_pay` ของ [[tbl-cb-trans]] คือ Σ `gl_wht_list.tax_value` ของเอกสาร (`pay_check.go:52-70`)
+- เอกสารรับ/จ่ายเงิน: `total_tax_at_pay` ของ [[tbl-cb-trans]] คือ Σ `gl_wht_list.tax_value` ของเอกสาร (`pay_check.go:70-78`)
 
 ## ใครเขียน (writers)
-- ทุกทางเข้าผ่าน `journalWhtStmts` `journaltax.go:260` และ `whtInsert` `journaltax.go:241`: แท็บ WHT ของ JV `journaltax.go:82`, ของเอกสาร `docWhtStmts` `trans_tax.go:148`, ของขายสินทรัพย์ `saveAssetSaleWht` `fa_sale.go:666`
-- ข้อมูล WHT เป็นข้อมูลที่ผู้ใช้คีย์เสมอ ไม่มีการคำนวณให้ใหม่ ("raw")
+- ทุกทางเข้าผ่าน `journalWhtStmts` `journaltax.go:260` และ `whtInsert` `journaltax.go:241`: แท็บ WHT ของ JV `journalTaxStmts` `journaltax.go:82`, ของเอกสาร `docWhtStmts` `trans_tax.go:148`, ของขายสินทรัพย์ `saveAssetSaleWht` `fa_sale.go:666`
+- ข้อมูล WHT เป็นข้อมูลที่ผู้ใช้คีย์เสมอ ไม่มีการคำนวณให้ใหม่ ("raw") ถ้าไม่ส่งแท็บมาจะคงแถวเดิมไว้ (`trans_tax.go:59`)
 
 ## ใครลบและใครอ่าน
 - ลบ: ก่อน insert ใหม่ในแท็บเดียวกัน `trans_tax.go:162-163`; ลบ JV `journaltax.go:94-95`, `journaltax.go:132-133`; ลบตามเอกสาร `trans_tax.go:202-203`; แถวกำพร้า `trans_tax.go:245-246`; ลบเอกสารขายสินทรัพย์ `fa_sale.go:488-490`
-- อ่าน: รายงาน ภ.ง.ด.3 / ภ.ง.ด.53 / ภาษีถูกหัก `report_menu_gl_fa.go:1137` และลงทะเบียนเมนู `:1729-1731`; รวมยอดหักของเอกสาร `pay_check.go:70`, `service.go:1875`; คอลัมน์ "ภาษีหัก ณ ที่จ่าย" รายงานใบสั่งขาย 44 `report_menu_so_po.go:714`
+- อ่าน: รายงาน ภ.ง.ด.3 / ภ.ง.ด.53 / ภาษีถูกหัก `report_menu_gl_fa.go:1140` และลงทะเบียนเมนู `report_menu_gl_fa.go:1732-1735`; รวมยอดหักของเอกสาร `pay_check.go:70`, `service.go:1886`; คอลัมน์ "ภาษีหัก ณ ที่จ่าย" รายงานใบสั่งขาย 44 `report_menu_so_po.go:714`
 
 ## ข้อควรระวัง
-- `tax_doc_no` ซ้ำไม่ได้แม้ต่างเอกสาร ถ้าซ้ำระบบแจ้ง "เลขที่เอกสารหัก ณ ที่จ่าย ซ้ำ" (`journaltax.go:108`, `journaltax.go:304`)
-- แถวที่ไม่ระบุ `tax_doc_no` แต่มีรายการลูกหรือรหัสคู่ค้า ระบบปฏิเสธ (ฝั่ง C# เดิมข้ามเงียบ ๆ) `journaltax.go:270-276`
-- ใบหักของเอกสารยกเลิก **ยังอยู่** รายงานแสดงสถานะ "ยกเลิก" และยอดเป็น 0 โดยดู `last_status` ของเอกสารต้นทาง (19/239 → `ap_ar_trans`, 1501/1502 → ไม่ยกเลิก, อื่น ๆ → `ic_trans`) `report_menu_gl_fa.go:1156-1157`
-- การอัปเดตเลขที่เอกสารตอนแก้เลขเอกสารขายสินทรัพย์ย้ายใบหักตาม `doc_no`/`doc_date` ใหม่ (`fa_sale.go:666-680`)
-- เงินและอัตราเก็บ NUMERIC (ยอด 2 ตำแหน่ง อัตรา 4 ตำแหน่ง) ([[acc-rounding-decimal]])
+- `tax_doc_no` ซ้ำไม่ได้แม้ต่างเอกสาร ถ้าซ้ำในรอบบันทึกเดียวกันระบบแจ้ง "เลขที่เอกสาร … ซ้ำ" (`journaltax.go:108`, `journaltax.go:277-279`) ถ้าซ้ำกับเอกสารอื่นในฐานข้อมูลแจ้ง "เลขที่เอกสารหัก ณ ที่จ่าย … ซ้ำกับเอกสารอื่น" (`journaltax.go:304`, `journaltax.go:317`)
+- แถวที่ไม่ระบุ `tax_doc_no` แต่มีรายการลูกหรือรหัสคู่ค้า ระบบปฏิเสธด้วยข้อความ "กรุณาระบุเลขที่เอกสารหัก ณ ที่จ่าย" (`journaltax.go:270-276`)
+- ใบหักของเอกสารยกเลิก **ยังอยู่** รายงานแสดงสถานะ "ยกเลิก" และยอดเป็น 0 โดยดู `last_status` ของเอกสารต้นทาง (19/239 → `ap_ar_trans`, 1501/1502 → ไม่ยกเลิก, อื่น ๆ → `ic_trans`) `report_menu_gl_fa.go:1154-1157`, `report_menu_gl_fa.go:1160`
+- การอัปเดตเลขที่เอกสารตอนแก้เลขเอกสารขายสินทรัพย์ย้ายใบหักตาม `doc_no`/`doc_date` ใหม่ (`fa_sale.go:667-676`)
+- DDL ไม่มี PRIMARY KEY/UNIQUE บนตารางนี้ การห้าม `tax_doc_no` ซ้ำข้ามเอกสารพึ่ง constraint ชื่อ `gl_wht_list_gl_wht_list_doc_no` ที่โค้ดแปลงข้อผิดพลาด 23505 เป็นข้อความ (`journaltax.go:303-304`) ซึ่งไม่พบในคำสั่งสร้างใด ๆ ของ `scripts/sql` (ยังไม่ได้ตรวจ DB จริงว่ามี constraint นี้หรือไม่) ส่วนการซ้ำในรอบบันทึกเดียวกันโค้ดตรวจเองได้ (`journaltax.go:277-279`)
+- เงินและอัตราเก็บ NUMERIC (DDL ไม่ระบุทศนิยม โค้ดปัดยอด 2 ตำแหน่ง อัตรา 4 ตำแหน่งก่อนบันทึก `journaltax.go:285-296`) ([[acc-rounding-decimal]])
 
 ## ที่มาในโค้ด
 - `backend/internal/application/process/journaltax.go:241` `whtInsert`
@@ -62,11 +69,13 @@ sources: ["backend/internal/application/process/journaltax.go:241", "backend/int
 - `backend/internal/application/process/trans_tax.go:48` `transWhtParty`
 - `backend/internal/application/process/trans_tax.go:148` `docWhtStmts`
 - `backend/internal/application/process/fa_sale.go:666` `saveAssetSaleWht`
-- `backend/internal/application/process/pay_check.go:52` total_tax_at_pay
-- `backend/internal/application/process/report_menu_gl_fa.go:1137` รายงาน WHT
-- `backend/internal/application/process/report_menu_gl_fa.go:1729` ลงทะเบียนเมนูรายงาน
+- `backend/internal/application/process/pay_check.go:70` total_tax_at_pay
+- `backend/internal/application/process/report_menu_gl_fa.go:1140` รายงาน WHT
+- `backend/internal/application/process/report_menu_gl_fa.go:1732` ลงทะเบียนเมนูรายงาน
 - `backend/internal/application/process/report_menu_so_po.go:714` ยอดหักในรายงานใบสั่งขาย
-- `backend/internal/application/process/service.go:1875` รวม tax_value
+- `backend/internal/application/process/service.go:1886` รวม tax_value
+- `scripts/sql/02_data_schema.sql:4728-4751` DDL ตาราง `gl_wht_list` (CREATE TABLE :4728-4748, ดัชนี :4749-4751)
+- `backend/internal/application/process/journaltax.go:303` ชื่อ constraint ที่โค้ดรอรับ (`uniqueFieldTH`)
 
 ## ดูเพิ่ม
 - [[tbl-group-gl]]

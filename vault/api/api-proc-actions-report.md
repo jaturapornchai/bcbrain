@@ -2,7 +2,7 @@
 title: "API รายงาน (Process report actions: report/run, report/pdf, ai-report-*)"
 tags: [api, process, report]
 aliases: ["/api/v1/process/report/run","/api/v1/process/report/pdf","/process/report/run","/process/report/pdf","report/run","report/pdf","ai-report-sql","ai-report-analyze","/api/process/report/run","/api/process/report/pdf"]
-sources: ["backend/internal/adapter/inbound/http/router.go:165","backend/internal/adapter/inbound/http/router.go:206","backend/internal/adapter/inbound/http/process/handler.go:223","backend/internal/adapter/inbound/http/process/handler.go:270","backend/internal/adapter/inbound/http/process/permission.go:60","backend/internal/application/process/report.go:26","backend/internal/application/process/report.go:246","backend/internal/application/process/report_pdf.go:111","backend/internal/application/process/ai_copilot.go:259","backend/internal/application/process/ai_copilot.go:341","frontend/src/app/api/process/report/run/route.ts:27","frontend/src/app/api/process/report/pdf/route.ts:30","frontend/src/lib/query-client.ts:1020"]
+sources: ["backend/internal/adapter/inbound/http/router.go:165","backend/internal/adapter/inbound/http/router.go:206","backend/internal/adapter/inbound/http/process/handler.go:223","backend/internal/adapter/inbound/http/process/handler.go:270","backend/internal/adapter/inbound/http/process/permission.go:60","backend/internal/application/process/report.go:26","backend/internal/application/process/report.go:246","backend/internal/application/process/report_pdf.go:111","backend/internal/application/process/ai_copilot.go:259","backend/internal/application/process/ai_copilot.go:341","frontend/src/app/api/process/report/run/route.ts:12","frontend/src/app/api/process/report/pdf/route.ts:28","frontend/src/lib/query-client.ts:1020"]
 ---
 
 # API รายงาน (report/run, report/pdf, ai-report-*)
@@ -23,7 +23,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:165","backend/interna
 ## report/run
 
 - **เมธอด + path**: `POST /api/v1/process/report/run` และ `POST /process/report/run` (ติดตั้งทั้งสอง prefix, router.go:165,206)
-- **Auth**: `Authorization: Bearer <token>`; สิทธิ์ขั้นต่ำ `Read` (permission.go:25); ถ้าบอดี้มี `customSql` ไม่ว่าง ต้องเป็น Admin (permission.go:60-66)
+- **Auth**: `Authorization: Bearer <token>`; สิทธิ์ขั้นต่ำ `Read` (permission.go:25); ถ้าบอดี้มี `customSql` ไม่ว่าง ต้องเป็น Admin (permission.go:60-67)
 - **ขนาดบอดี้**: 16 MB (`maxJSONBody`, handler.go:231); รันรายงานมี timeout 45 วินาทีใน service (report.go:253)
 - **Request**:
 
@@ -42,12 +42,12 @@ sources: ["backend/internal/adapter/inbound/http/router.go:165","backend/interna
 }
 ```
 
-- **ฟิลด์ที่ service รับ** (report.go:26-100): ชื่อ snake_case ที่ใช้แทนกันได้ คือ `report_code`/`reportCode` (แทน menuKey), `doc_date_from`/`doc_date_to` (แทน dateFrom/dateTo), `doc_no_from`/`doc_no_to` (แทน fromCode/toCode) — `normalizeRunReportInput` รวมเข้าชื่อหลัก. วันที่ว่างใช้ค่าเริ่มต้น "ย้อนหลัง 1 ปี ถึงวันนี้" (report.go:271-272). ถ้า `menuKey` ไม่อยู่ใน `menuReports` และไม่ใช่ menu ของตัวออกแบบ จะลองรันแบบ legacy ตาม `mode`; ไม่เจอ = 400 "ไม่พบรายงาน <menuKey>" (report.go:288-296)
-- **Custom SQL / เทมเพลต**: `customSql` รัน SQL อ่านอย่างเดียวแทนคิวรีมาตรฐาน — รายงานที่โชว์ต้นทุนสินค้า (`costGuarded`) หรือที่ล็อกตามคลัง/ชั้นของผู้ใช้ (`permGuarded`) จะปฏิเสธ Custom SQL (report.go:120-121); `templateAction` = `save` | `delete` | `set_default` พร้อม `templateId`/`templateName`/`templateDesc`/`templateIsDefault` เขียนตาราง `erp_report_template` ก่อนรันรายงาน (report.go:260). รายละเอียดเชิงแนวคิด: [[proc-report-custom-sql-template]], [[proc-report-registry-conditions]]
+- **ฟิลด์ที่ service รับ** (report.go:26-100): ชื่อที่ใช้แทนกันได้ คือ `report_code`/`reportCode` (แทน menuKey), `doc_date_from`/`doc_date_to` (แทน dateFrom/dateTo), `doc_no_from`/`doc_no_to` (แทน fromCode/toCode) — `normalizeRunReportInput` (report.go:225-244) รวมเข้าชื่อหลัก และแปลง `menuKey` ที่เป็น alias ผ่าน `reportCodeAliases` (report.go:209). วันที่ว่างใช้ค่าเริ่มต้น "ย้อนหลัง 1 ปี ถึงวันนี้" (report.go:271-272). ถ้า `menuKey` ไม่อยู่ใน `menuReports` (report_menu.go:32) และไม่ใช่ menu ของตัวออกแบบ (`fast_report_designer`, `menu_form_edit`, `menu_import_formdesign` — report.go:395-403) จะเข้า `runLegacyReport` ซึ่งรับเฉพาะ `mode = sql_utility` (report.go:427-432); mode อื่น = 400 "ไม่พบรายงาน <menuKey>" (report.go:289-296)
+- **Custom SQL / เทมเพลต**: `customSql` รัน SQL อ่านอย่างเดียวแทนคิวรีมาตรฐาน (report.go:328-343) — `customSQLRefusal` (report.go:380-388) ปฏิเสธด้วย 403 เมื่อรายงานโชว์ต้นทุนสินค้า (`costGuarded`) และผู้ใช้ไม่มีสิทธิ์ดูต้นทุน (`itemCostHidden`, report_options.go:124) หรือเมื่อรายงานล็อกตามคลัง/ชั้นของผู้ใช้ (`permGuarded`) (ธง guard ที่ report.go:120-121); รายงาน legacy ที่ผู้ใช้ไม่มีสิทธิ์ดูต้นทุนจะถูกตัดคอลัมน์ต้นทุนออก หรือถูกปฏิเสธทั้งรายงานถ้าไม่ได้ระบุคอลัมน์ต้นทุน (report.go:308-314); `templateAction` = `save` | `delete` | `set_default` พร้อม `templateId`/`templateName`/`templateDesc`/`templateIsDefault` เขียนตาราง `erp_report_template` ก่อนรันรายงาน (report.go:260). รายละเอียดเชิงแนวคิด: [[proc-report-custom-sql-template]], [[proc-report-registry-conditions]]
 - **Response 200**: `{"ok":true,"data":{...}}` โดย `data` คือ `RunReportResult` (report.go:102-): `menuKey`, `yearType`, `reportTypeCode`, `reportCategory`, `subtitle`, `conditionText`, `usesDateRange`, `codeRangeLabel`, `orderByOptions[]`, `conditions[]`, `supportsDetail`, `viewDetailActive`, `columns[]`, `allColumns[]`, `rows[]`, `totals{}` (ค่าเงินเป็น string ทศนิยม), `hierarchyLevels[]`, `groupNodes[]`, `summaryCards[]`, `defaultSql`, `executedSql`, `executionMs`, `templates[]`, `savedTemplateId`. โครงลำดับชั้นกลุ่ม: [[proc-report-hierarchy-pdf]]
-- **Errors**: ไม่มี token = 401; สิทธิ์ไม่พอ = 403 (ข้อความไทยจาก `deniedMessages`); บอดี้ JSON เสีย = 400 "invalid request body"; ไม่พบรายงาน / คิวรีรันไม่ได้ = 400 (report.go:295); error อื่น = 500 "internal server error"
+- **Errors**: ไม่มี token = 401; สิทธิ์ไม่พอ = 403 (ข้อความไทยจาก `deniedMessages`); ไม่มีสิทธิ์ดูต้นทุนสินค้า / ใช้ Custom SQL กับรายงานที่จำกัดสิทธิ์ไม่ได้ = 403 (report.go:311,383,385); บอดี้ JSON เสีย = 400 "invalid request body"; ไม่พบรายงาน / คิวรีรันไม่ได้ = 400 (report.go:295); error อื่น = 500 "internal server error"
 - **เพดานเวลา**: 60 วินาทีของ router + 45 วินาทีของ service
-- **ผู้เรียกฝั่งหน้าเว็บ**: `runBackendReport()` (query-client.ts:1020) → Next `POST /api/process/report/run` (route.ts:151) ซึ่งแปลง alias ของ menuKey (route.ts:12-30) แล้วเติม `total_vat_amount`/`total_base_amount` ในผลลัพธ์จาก `totals`; Next ยังมี `GET` ที่รับ query string (`menuKey`, `dateFrom`, `dateTo`, `fromCode`, `toCode`, ที่เหลือเข้า `options`) แล้วแปลงเป็น POST (route.ts:81-150). หน้าจอที่ใช้: `account/report/UniversalReportScreen.tsx:407,490`, `FastReportDesignerScreen.tsx:1094,1198,1309,1365`, `FormDesignerScreen.tsx:991,1764` — ภาพรวมที่ [[fe-report-screens]]
+- **ผู้เรียกฝั่งหน้าเว็บ**: `runBackendReport()` (query-client.ts:1020) → Next `POST /api/process/report/run` (route.ts:151) ซึ่งแปลง alias ของ menuKey (`REPORT_KEY_ALIASES` route.ts:12-29) แล้วเติม `total_vat_amount`/`total_base_amount` ในผลลัพธ์จาก `totals`; Next ยังมี `GET` ที่รับ query string (`menuKey`, `dateFrom`, `dateTo`, `fromCode`, `toCode`, ที่เหลือเข้า `options`) แล้วแปลงเป็น POST (route.ts:81-150). หน้าจอที่ใช้: `account/report/UniversalReportScreen.tsx:407,490`, `FastReportDesignerScreen.tsx:1094,1198,1309,1365`, `FormDesignerScreen.tsx:991,1764` — ภาพรวมที่ [[fe-report-screens]]
 
 ## report/pdf
 
@@ -56,7 +56,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:165","backend/interna
 - **Request**: `RunReportInput` ชุดเดียวกับ report/run เพิ่มตัวเลือกการพิมพ์ — `paperSize` (A4/A3/Letter/Legal/A5/Continuous), `orientation` (auto/portrait/landscape), `fontSizePt` (6.5-13.0 ค่าเริ่มต้น 8.5), `colorMode`, `printTheme`, `density`, `gridStyle`, `showZebra`/`showRowNumber`/`showCompanyHeader` (ค่าเริ่มต้น true), `showSignatureBlock` (ค่าเริ่มต้น false), `signatureLabels[]`, `footerNote`, `customTitle`, `customSubtitle`, `reportLang` (`en` แปลค่าในแถวผ่านพจนานุกรมสองภาษา) (report.go:47-65, report_pdf.go:111-135)
 - **Response 200**: ไบต์ไฟล์ PDF ไม่ห่อ JSON — `Content-Type: application/pdf`, `Content-Disposition: inline; filename="<menuKey>_<yyyyMMdd_HHmm>.pdf"` (`bc_report` ถ้าไม่มี menuKey), `Cache-Control: no-store` (handler.go:308-310, report_pdf.go:141-146)
 - **Errors**: เหมือน report/run (เป็น JSON `{"error":{"message"}}`); เรนเดอร์ไม่สำเร็จ = 500
-- **ผู้เรียกฝั่งหน้าเว็บ**: `fetchBackendReportPdf()` (query-client.ts:1033) → Next `POST /api/process/report/pdf` (route.ts:28) ซึ่งแปลง alias ของ menuKey, เติม `title` จากชื่อเมนูถ้าไม่ได้ส่งมา, ส่งไบต์ PDF ต่อเป็น stream; ถ้าล้มเหลวคืน `fail(message, status)`. ใช้จาก `account/report/GlobalReportPrintModal.tsx:2330`
+- **ผู้เรียกฝั่งหน้าเว็บ**: `fetchBackendReportPdf()` (query-client.ts:1029) → Next `POST /api/process/report/pdf` (route.ts:28) ซึ่งแปลง alias ของ menuKey, เติม `title` จากชื่อเมนูถ้าไม่ได้ส่งมา, ส่งไบต์ PDF ต่อเป็น stream; ถ้าล้มเหลวคืน `fail(message, status)`. ใช้จาก `account/report/GlobalReportPrintModal.tsx:2331`
 
 ตัวอย่าง (ค่าสมมติ):
 
@@ -74,7 +74,7 @@ POST /api/v1/process/report/pdf     (Authorization: Bearer <token>)
 - **การทำงาน**: ไม่ได้เรียก LLM ภายนอก — `compileThaiPromptToSQL` (ai_copilot.go:91) แปลงข้อความเป็น SQL ด้วยกฎคำสำคัญ, `validateReadOnlySelectSQL` บังคับ SELECT/WITH เท่านั้น แล้วรันใน transaction `ReadOnly` ที่ rollback ทุกครั้ง (ai_copilot.go:269-285) เพื่อนับแถวและอ่านชื่อคอลัมน์
 - **Response 200**: `{"ok":true,"data":{"prompt","title","explanation","sql","suggestedGroupBy","previewRowCount","columns":[...]}}` (ai_copilot.go:59-67). `sql` ที่ได้ใช้ต่อเป็น `customSql` ของ report/run
 - **Errors**: `prompt` ว่าง = 400 (ข้อความไทยให้ระบุคำสั่ง); SQL ที่สร้างไม่ผ่านกฎ read-only = 400; รันไม่ได้ = 400 "คำสั่ง SQL ที่สร้างไม่สามารถรันได้"
-- **ผู้เรียกฝั่งหน้าเว็บ**: `GlobalReportPrintModal.tsx:1235` ผ่าน Next `/api/process/workflow/[action]` (ACTIONS whitelist มี `ai-report-sql`, route.ts:26)
+- **ผู้เรียกฝั่งหน้าเว็บ**: `GlobalReportPrintModal.tsx:1236` ผ่าน Next `/api/process/workflow/[action]` (ACTIONS whitelist มี `ai-report-sql`, route.ts:26)
 
 ## workflow/ai-report-analyze
 
@@ -87,11 +87,11 @@ POST /api/v1/process/report/pdf     (Authorization: Bearer <token>)
 
 - `backend/internal/adapter/inbound/http/router.go:165-166,206-207` (route ทั้งสอง prefix)
 - `backend/internal/adapter/inbound/http/process/handler.go:223-266` (RunReport), `270-313` (RenderReportPDF)
-- `backend/internal/adapter/inbound/http/process/permission.go:25,60-66` (Read / customSql = Admin)
+- `backend/internal/adapter/inbound/http/process/permission.go:25,60-67` (Read / customSql = Admin)
 - `backend/internal/adapter/inbound/http/process/workflow_handler.go:18-30,124-138` (ai-report-sql/analyze)
-- `backend/internal/application/process/report.go:26-100,102-,246-376,390-431`
+- `backend/internal/application/process/report.go:26-100,102-,209,225-244,246-376,378-432`; `report_options.go:124`; `report_menu.go:32`
 - `backend/internal/application/process/report_pdf.go:111-147`
 - `backend/internal/application/process/ai_copilot.go:48,59-67,91,259-307,314-338,341-423`
-- `frontend/src/app/api/process/report/run/route.ts:12-30,32-80,81-150,151-160`; `frontend/src/app/api/process/report/pdf/route.ts:12-26,28-90`
-- `frontend/src/lib/query-client.ts:1017-1066` (runBackendReport, fetchBackendReportPdf)
-- `frontend/account/report/UniversalReportScreen.tsx:238,407,490`; `GlobalReportPrintModal.tsx:1235,2330`
+- `frontend/src/app/api/process/report/run/route.ts:12-29,32-80,81-150,151-160`; `frontend/src/app/api/process/report/pdf/route.ts:12-26,28-90`
+- `frontend/src/lib/query-client.ts:1020,1029` (runBackendReport, fetchBackendReportPdf)
+- `frontend/account/report/UniversalReportScreen.tsx:238,407,490`; `GlobalReportPrintModal.tsx:1236,2331`

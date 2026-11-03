@@ -2,7 +2,7 @@
 title: "บัตรเครดิต: ขึ้นเงิน/ยกเลิก (Credit Card Pass/Cancel)"
 tags: [doctypes, cash-bank]
 aliases: ["trans_flag 461", "trans_flag 462", "บันทึกขึ้นเงินบัตรเครดิต", "บันทึกยกเลิกบัตรเครดิต", "CRD", "CRN", "menu_cb_credit_card_pass", "menu_cb_credit_card_cancel"]
-sources: ["frontend/account/tabs/transMenuMap.ts:2338", "frontend/account/tabs/transMenuMap.ts:2353", "frontend/account/transaction/transLayouts.ts:148", "frontend/account/transaction/transLayouts.ts:149", "backend/internal/application/process/service.go:2329", "backend/internal/application/process/trans_tax.go:37", "backend/internal/application/process/cheque.go:16", "backend/internal/application/process/cheque.go:220", "backend/internal/application/process/trans.go:1543"]
+sources: ["frontend/account/tabs/transMenuMap.ts:2338", "frontend/account/tabs/transMenuMap.ts:2353", "frontend/account/transaction/transLayouts.ts:148", "frontend/account/transaction/transLayouts.ts:149", "backend/internal/application/process/service.go:2340", "backend/internal/application/process/service.go:2342", "backend/internal/application/process/service.go:1877", "backend/internal/application/process/trans_tax.go:39", "backend/internal/application/process/cheque.go:25", "backend/internal/application/process/cheque.go:53", "backend/internal/application/process/cheque.go:257", "backend/internal/application/process/trans.go:1543"]
 ---
 
 # บัตรเครดิต: ขึ้นเงิน (461) / ยกเลิก (462)
@@ -18,38 +18,38 @@ sources: ["frontend/account/tabs/transMenuMap.ts:2338", "frontend/account/tabs/t
 ## ฟิลด์/แท็บบนหน้าจอ
 - 461: passBook แท็บ gl (transLayouts.ts:148)
 - 462: ไม่มีช่องพิเศษ แท็บ gl (transLayouts.ts:149)
-- เลือกได้เฉพาะรายการที่สถานะ 0 (`chequeCandidateWhere` cheque.go:220)
+- เลือกได้เฉพาะรายการที่สถานะ 0 (`chequeCandidateWhere` cheque.go:257-258)
 
 ## ผลต่อสต็อก
 ไม่มี
 
 ## ผลต่อภาษี (VAT/WHT)
-- 461 มีภาษีซื้อ vat_calc +1 (trans_tax.go:37)
+- 461 มีภาษีซื้อ vat_calc +1 (`transVatTabs` trans_tax.go:39)
 - 462 ไม่มี
 
 ## การลงบัญชี
-ใช้ standard GL (service.go:2329)
+ใช้ standard GL `case 461, 462, 463` (service.go:2340-2358) ยอดบัตรที่รับในแท็บชำระฝั่งรับเงินลง Dr ลูกหนี้ (service.go:1877) ใบ 461 จึง Cr ลูกหนี้เพื่อล้างยอดนั้น
 | flag | Dr | Cr |
 |---|---|---|
-| 461 (มี vat > 0 และ base > 0) | ธนาคาร = base และภาษีซื้อ = vat | ลูกหนี้ = ยอดรวม |
+| 461 (มี vat > 0 และ base > 0, service.go:2342) | ธนาคาร = base และภาษีซื้อ = vat | ลูกหนี้ = ยอดรวม |
 | 461 (กรณีอื่น) | ธนาคาร ยอดรวม | ลูกหนี้ ยอดรวม |
 | 462 | ลูกหนี้ | ธนาคาร |
 
 ## เอกสารต้นทาง-ปลายทาง
 - ต้นทาง: แท็บชำระของใบขายหรือใบรับเงินที่รับเป็นบัตร
-- สถานะ chq_type 3 (cheque.go:16): 461→1, 462→2
+- สถานะ chq_type 3 (cheque.go:25, SQL :53): 461→1, 462→2
 
 ## ยกเลิก/แก้ไข
 - ไม่มีคู่ยกเลิกใน `cancelOrigFlags` (doc_cancel.go:49)
 
 ## ข้อควรระวัง
-- case นี้ไม่มีบรรทัดค่าธรรมเนียมบัตรแยก (ไม่พบในโค้ด) ในกรณีที่มี VAT ฝั่ง Dr คือ base + vat และฝั่ง Cr คือยอดรวม
+- ในโค้ด case 461 ไม่มีบรรทัดค่าธรรมเนียมบัตรแยก (service.go:2340-2358) ในกรณีที่มี VAT ฝั่ง Dr คือ base + vat และฝั่ง Cr คือยอดรวม
 
 ## ที่มาในโค้ด
 - `frontend/account/tabs/transMenuMap.ts:2338` / `:2353` เมนู
 - `frontend/account/transaction/transLayouts.ts:148` / `:149` FLAG_SPEC
-- `backend/internal/application/process/service.go:2329` GL
-- `backend/internal/application/process/cheque.go:16` สถานะ
+- `backend/internal/application/process/service.go:2340-2358` GL
+- `backend/internal/application/process/cheque.go:25` / `:53` สถานะ / `:257` รายการที่เลือกได้
 
 ## ดูเพิ่ม
 - [[doc-wallet-pass]] · [[doc-cheque-register]] · [[acc-payment-tab]] · [[doctypes-overview]]

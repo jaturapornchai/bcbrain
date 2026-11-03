@@ -2,7 +2,7 @@
 title: "ฝากเงิน/ถอนเงิน/โอนเงินระหว่างธนาคาร และเงินสดย่อย ลงบัญชีอย่างไร"
 tags: [faq, cash-bank, petty-cash, transfer, gl]
 aliases: ["ฝากเงินธนาคาร", "ถอนเงิน", "โอนเงินระหว่างบัญชี", "เงินสดย่อย", "bank transfer", "petty cash", "trans_flag 401", "trans_flag 402", "trans_flag 422", "trans_flag 300"]
-sources: ["backend/internal/application/process/service.go:2064", "backend/internal/application/process/service.go:2207", "backend/internal/application/process/service.go:2221", "backend/internal/application/process/gl_template.go:195", "backend/internal/application/process/trans.go:1018", "backend/internal/application/process/cheque.go:101", "frontend/account/tabs/transMenuMap.ts:1798"]
+sources: ["backend/internal/application/process/service.go:2075", "backend/internal/application/process/service.go:2218", "backend/internal/application/process/service.go:2232", "backend/internal/application/process/gl_template.go:195", "backend/internal/application/process/trans.go:1018", "backend/internal/application/process/cheque.go:101", "frontend/account/tabs/transMenuMap.ts:1798"]
 ---
 # ฝากเงิน/ถอนเงิน/โอนเงินระหว่างธนาคาร และเงินสดย่อย ลงบัญชีอย่างไร
 
@@ -31,7 +31,7 @@ sources: ["backend/internal/application/process/service.go:2064", "backend/inter
 - ช่องทางเงินแยกตาม `cb_trans` ([[faq-payment-tab-tenders]])
 
 ## ข้อควรระวัง
-- ทิศทางของ 300/301 ไม่ตรงกันในโค้ด: ชื่อเมนู 300 คือ "คืน/ลด" แต่ GL ลง Dr เงินสดย่อย, `payReceiveFlags` นับ 300 เป็นฝั่งรับเงิน (`trans.go:1332`) ขณะที่ `payOtherPayFlags` นับ 300 เป็นฝั่งจ่าย และ 301 เป็นฝั่งรับ (`pay_other.go:35-38`) ควรให้ผู้ดูแลยืนยันกับ C#
+- ทิศทางของ 300/301 ไม่ตรงกันในโค้ด: ชื่อเมนู 300 คือ "คืน/ลด" แต่ GL ลง Dr เงินสดย่อย, `payReceiveFlags` นับ 300 เป็นฝั่งรับเงิน (`trans.go:1332`) ขณะที่ `payOtherPayFlags` นับ 300 เป็นฝั่งจ่าย และ 301 เป็นฝั่งรับ (`pay_other.go:35-38`) ควรให้ผู้ดูแลยืนยันทิศทางที่ต้องการก่อนใช้
 - GL เส้นมาตรฐานของ 422 ไม่มีบรรทัดค่าธรรมเนียม ลง Dr/Cr ด้วยยอดเดียวกัน การลงค่าธรรมเนียม ไม่ชัดจากโค้ดเส้นมาตรฐาน
 - 422 อ่านสมุดจากแถวแรกเท่านั้น
 - ถ้ารหัสเอกสารมีรูปแบบ GL ระบบใช้รูปแบบแทน (คอมเมนต์ระบุว่ารูปแบบ TM ลงแถว 420 ด้วย) ([[faq-gl-template-doc-format]])
@@ -44,9 +44,9 @@ sources: ["backend/internal/application/process/service.go:2064", "backend/inter
 - [[faq-other-income-expense-gl]]
 
 ## ที่มาในโค้ด
-- `backend/internal/application/process/service.go:2064` GL 401/402
-- `backend/internal/application/process/service.go:2207` GL 300/301 (`:2215-2218` Dr/Cr)
-- `backend/internal/application/process/service.go:2221` GL 422
+- `backend/internal/application/process/service.go:2075` GL 401/402
+- `backend/internal/application/process/service.go:2218` GL 300/301 (`:2226-2230` Dr/Cr)
+- `backend/internal/application/process/service.go:2232` GL 422
 - `backend/internal/application/process/gl_template.go:195` `glSQLPassBook`; `:202` `glSQLPetty`
 - `backend/internal/application/process/trans.go:1018` ตรวจ 422 (สมุดโอนเข้า, ค่าธรรมเนียม); `:604` เรียก `SyncTransferPair`
 - `backend/internal/application/process/cheque.go:101` `SyncTransferPair` แถวคู่ 420

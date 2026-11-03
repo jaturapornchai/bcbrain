@@ -2,7 +2,7 @@
 title: "หลายสกุลเงินและกำไรขาดทุนจากอัตราแลกเปลี่ยน (Multi-Currency & FX Gain/Loss)"
 tags: [accounting, fx, multi-currency, exchange-rate, gl]
 aliases: ["หลายสกุลเงิน", "อัตราแลกเปลี่ยน", "exchange_rate", "สกุลเงินต่างประเทศ", "กำไรจากอัตราแลกเปลี่ยน", "ขาดทุนจากอัตราแลกเปลี่ยน", "lost_profit_exchange_amount", "multi_currency", "home_currency"]
-sources: ["backend/internal/application/process/fx.go:18", "backend/internal/application/process/fx.go:37", "backend/internal/application/process/fx.go:43", "backend/internal/application/process/fx.go:63", "backend/internal/application/process/fx.go:129", "backend/internal/application/process/fx.go:145", "backend/internal/application/process/fx.go:150", "backend/internal/application/process/fx.go:179", "backend/internal/application/process/fx.go:223", "backend/internal/application/process/fx.go:252", "backend/internal/application/process/fx.go:267", "backend/internal/application/process/fx.go:311", "backend/internal/application/process/service.go:2159"]
+sources: ["backend/internal/application/process/fx.go:18", "backend/internal/application/process/fx.go:37", "backend/internal/application/process/fx.go:43", "backend/internal/application/process/fx.go:63", "backend/internal/application/process/fx.go:129", "backend/internal/application/process/fx.go:145", "backend/internal/application/process/fx.go:150", "backend/internal/application/process/fx.go:179", "backend/internal/application/process/fx.go:223", "backend/internal/application/process/fx.go:252", "backend/internal/application/process/fx.go:267", "backend/internal/application/process/fx.go:311", "backend/internal/application/process/docs.go:338", "backend/internal/application/process/service.go:1766", "backend/internal/application/process/service.go:2170", "backend/internal/application/process/service.go:2188"]
 ---
 
 # หลายสกุลเงินและกำไรขาดทุนจากอัตราแลกเปลี่ยน
@@ -12,7 +12,7 @@ sources: ["backend/internal/application/process/fx.go:18", "backend/internal/app
 ## ทำงานอย่างไร
 
 ### เอกสารที่รองรับ (`fxTopFlags` fx.go:18)
-- 2, 3, 4, 6, 7, 8, 12, 14, 16, 30-39, 44, 46, 48, 52, 87, 89, 91, 99, 101, 103, 144, 250-264, 310, 311, 315-317
+- 2, 3, 4, 6, 7, 8, 12, 14, 16, 30, 31, 32, 34, 36, 37, 38, 39, 44, 46, 48, 52, 87, 89, 91, 99, 101, 103, 144, 250, 252, 254, 260, 262, 264, 310, 311, 315, 316, 317
 - `transFx` (:43): ไม่ใช่ flag ในรายการหรือปิด multi-currency = ไม่มี fx; สกุลท้องถิ่นอ่านจาก `erp_option.home_currency` (:37)
 - `checkFxMode` (:63): หน้าจอที่เปิดไว้กับค่าตั้งบริษัทไม่ตรงกัน = error "การตั้งค่าหลายสกุลเงินเปลี่ยนไป กรุณาเปิดเอกสารใหม่..."
 
@@ -23,28 +23,28 @@ sources: ["backend/internal/application/process/fx.go:18", "backend/internal/app
 
 ### ยอดหัวเอกสาร (`headerTotals` :150)
 1. คิด vatCalc รอบแรกด้วยยอดสกุลเอกสาร
-2. แปลงผลรวมยอดมีภาษี / ยกเว้นภาษี และส่วนลด เป็นสกุลท้องถิ่นด้วย x rate แล้วปัด
-3. คิด vatCalc รอบสองด้วยยอดสกุลท้องถิ่น ผลลัพธ์รอบสองเป็นยอดหลัก; ยอดสกุลเอกสารเก็บใน `total_value_2`, `total_discount_2`, `total_amount_2`
+2. ถ้าอัตรา ≠ 1: แปลงผลรวมยอดมีภาษี / ยกเว้นภาษี และส่วนลด เป็นสกุลท้องถิ่นด้วย x rate แล้วปัด จากนั้นคิด vatCalc รอบสองด้วยยอดสกุลท้องถิ่น (อัตรา = 1 ใช้ผลรอบแรกเลย)
+3. ผลลัพธ์สกุลท้องถิ่นเป็นยอดหลัก; ยอดสกุลเอกสารเก็บใน `total_value_2`, `total_discount_2`, `total_amount_2`
 - `discount_word` = ส่วนลดสกุลท้องถิ่น ว่างเมื่อเป็น 0
-- บรรทัด (`local` :179): price = price_2 x rate, sum_amount = sum_amount_2 x rate ไม่ปัดและไม่คิดใหม่ (ตาม C#)
+- บรรทัด (`local` :179): price = price_2 x rate, sum_amount = sum_amount_2 x rate ไม่ปัดและไม่คิดใหม่
 - สูตร vatCalc ดู [[acc-transcalc-totals]]
 
 ### ชำระหนี้หลายสกุล 19 / 239 (`billFxFlags` :223)
-- `refreshFxBills` (:311): server แทนที่คอลัมน์หนี้ทุกช่อง (อัตราเดิม ยอดคงเหลือ) ด้วยค่าจากเอกสารหนี้ ไม่เชื่อค่าจาก client
-- `fxBill` (:267): ผู้ใช้คีย์แค่ `sum_pay_money_2` และ `exchange_rate`; อัตราต้อง > 0
+- `refreshFxBills` (:311): server แทนที่คอลัมน์หนี้ทุกช่อง (อัตราเดิม ยอดหนี้ ยอดคงเหลือ สกุลเงิน) ด้วยค่าจากเอกสารหนี้ ไม่เชื่อค่าจาก client
+- `fxBill` (:267): ผู้ใช้คีย์แค่ `sum_pay_money_2` และ `exchange_rate`; อัตราและอัตราเดิมต้อง > 0
 - `fxBillPay` (:252): ยอดท้องถิ่น pay = round(pay2 x rate), ตามอัตราเดิม old = round(pay2 x rate_old), ผลต่าง lost = old - pay; ถ้าจ่ายครบยอดสกุลต่างประเทศ บวกเศษ (ยอดคงเหลือท้องถิ่น - old) เข้า lost เพื่อปิดหนี้พอดี
-- ผลต่างรวมเก็บที่ `ap_ar_trans.lost_profit_exchange_amount`
+- ผลต่างเก็บรายบรรทัดที่ `ap_ar_trans_detail.lost_profit_exchange_amount` และผลรวมที่ `ap_ar_trans.lost_profit_exchange_amount` พร้อม `total_net_value_2` = ยอดชำระ + lost (docs.go:338)
 
-### GL (service.go:2159)
-- ลูกหนี้/เจ้าหนี้ลงด้วย ยอดชำระ + lost (ปัด 2)
-- 239 ที่ lost > 0 (รับได้น้อยกว่า) หรือ 19 ที่ lost < 0 (จ่ายมากกว่า): Dr ขาดทุน 511030
-- กรณีอื่นที่ lost ไม่เป็น 0: Cr กำไร 420040
-- รหัสบัญชีผ่าน `resolveChartAccount` ไม่มีในผังบัญชีไปบัญชีพัก
+### GL (service.go:2170)
+- ลูกหนี้/เจ้าหนี้ลงด้วย ยอดชำระ + lost (lost ปัด HALF_UP 2): 239 Dr เงินที่รับ / Cr ลูกหนี้; 19 Dr เจ้าหนี้ / Cr เงินที่จ่าย
+- 239 ที่ lost > 0 (รับได้น้อยกว่า) หรือ 19 ที่ lost < 0 (จ่ายมากกว่า): Dr ขาดทุน 511030 ด้วย |lost| (:2188)
+- กรณีอื่นที่ lost ไม่เป็น 0: Cr กำไร 420040 ด้วย |lost|
+- รหัสบัญชีผ่าน `resolveChartAccount` (service.go:1766) ไม่พบในผังบัญชี ใช้รหัสนั้นตรงๆ
 
 ## จุดเสี่ยง
 - บรรทัดสินค้าเก็บ price / sum_amount ท้องถิ่นแบบไม่ปัด (อาจมีทศนิยมมากกว่า scale ของบริษัท) ขณะที่ยอดหัวปัดแล้ว ผลรวมบรรทัดจึงอาจไม่เท่ายอดหัว
-- รหัสบัญชีกำไร/ขาดทุนจากอัตราแลกเปลี่ยน hardcode 420040 / 511030 ใน standard GL
-- ไม่พบการปรับมูลค่าลูกหนี้/เจ้าหนี้คงค้างสิ้นงวด (revaluation) ในไฟล์กลุ่มนี้
+- รหัสบัญชีกำไร/ขาดทุนจากอัตราแลกเปลี่ยนเป็นรหัสคงที่ 420040 / 511030 ใน standard GL
+- ไม่พบการปรับมูลค่าลูกหนี้/เจ้าหนี้คงค้างสิ้นงวด (revaluation) ในโค้ด backend
 
 ## ที่มาในโค้ด
 - `backend/internal/application/process/fx.go:18` fxTopFlags
@@ -54,7 +54,8 @@ sources: ["backend/internal/application/process/fx.go:18", "backend/internal/app
 - `backend/internal/application/process/fx.go:179` local
 - `backend/internal/application/process/fx.go:252` fxBillPay
 - `backend/internal/application/process/fx.go:311` refreshFxBills
-- `backend/internal/application/process/service.go:2159` GL 19/239 และผลต่างอัตราแลกเปลี่ยน
+- `backend/internal/application/process/docs.go:338` เก็บ lost รวมที่หัวเอกสาร
+- `backend/internal/application/process/service.go:2170` GL 19/239 และผลต่างอัตราแลกเปลี่ยน
 
 ## ดูเพิ่ม
 - [[acc-payment-tab]]

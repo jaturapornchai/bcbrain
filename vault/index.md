@@ -2,7 +2,7 @@
 title: "สมอง BC — หน้าแรก (Map of Content)"
 tags: [index, moc]
 aliases: ["สารบัญ", "เริ่มที่นี่", "start here"]
-sources: ["AGENTS.md", "backend/README.md", "frontend/account/"]
+sources: ["AGENTS.md", "backend/README.md", "frontend/account/", "frontend/shared/layout/SystemPortalScreen.tsx:91"]
 ---
 # สมอง BC — เริ่มที่นี่
 
@@ -24,8 +24,9 @@ sources: ["AGENTS.md", "backend/README.md", "frontend/account/"]
 | API & Process actions | [[api-overview]] | endpoint HTTP และ action ของ process engine ทุกตัว |
 | หน้าจอทีละจอ | [[screens-overview]] | เมนู → หน้าจอ → ช่องข้อมูล, คีย์ลัด, popup |
 | คำศัพท์ไทย ↔ โค้ด | [[glossary-overview]] | คำที่คนบัญชีพูด → identifier/ตาราง/คอลัมน์ในโค้ด |
-| ประวัติ & บทเรียน | [[history-overview]] | ไทม์ไลน์จาก git, บั๊กที่เคยเจอและวิธีกัน, งานค้าง |
+| ประวัติ & บทเรียน | [[history-overview]] | บทเรียนที่โค้ดปัจจุบันกันไว้แล้ว, ข้อจำกัดที่ยังค้าง |
 | ถาม-ตอบ | [[faq-overview]] | คำถามที่พบบ่อยพร้อมคำตอบอ้างอิงโน้ต |
+| ระบบงานในชุด BC | [[systems-overview]] | POS, AutoCare, e-Tax, Procure, WMS, TMS, Market, Dashboard, CRM, LINE OA, AI, MonitorMap, WorkMonitor, FraudWarning, UAT/tests/scripts/video |
 
 ## วิธีใช้
 - คน: เปิดโฟลเดอร์ `vault/` ด้วย Obsidian ได้ทันที หรืออ่านบนเว็บ `https://brain.bcsmethai.com/n`
@@ -33,4 +34,4 @@ sources: ["AGENTS.md", "backend/README.md", "frontend/account/"]
 - โน้ตเป็น "ภาพถ่าย" ของโค้ด ณ วันที่สกัด — ถ้าขัดกับโค้ดปัจจุบัน ให้เชื่อโค้ด
 
 ## ขอบเขต
-สกัดเฉพาะ `backend/`, `frontend/account/` + route ของ BC Ai Account, `docs/kms/`, `.agents/skills/` ตามกฎขอบเขตของ repo ระบบอื่น (pos, wms, tms, crm ฯลฯ) ยังไม่รวม
+สกัดจากโฟลเดอร์ `d:\bcaiaccount` ทั้งหมดเป็นแหล่งเดียว: ระบบบัญชีหลัก (`backend/`, `frontend/account/`, `docs/kms/`, `.agents/skills/`) และทุกระบบในชุด (`frontend/<ระบบ>/`, `frontend/src/app/<ระบบ>`, `backend/internal/adapter/inbound/http/<ระบบ>`) รวมถึง `uat/`, `tests/`, `scripts/`, `video-*` — ไม่อ้างโค้ดหรือโปรแกรมภายนอก repo นี้

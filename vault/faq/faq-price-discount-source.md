@@ -2,7 +2,7 @@
 title: "ราคาขาย/ส่วนลดที่ขึ้นอัตโนมัติในเอกสาร ดึงมาจากไหน"
 tags: [faq, price, discount, sale, purchase]
 aliases: ["ราคาขายดึงจากไหน", "ส่วนลดอัตโนมัติ", "price lookup", "ic_inventory_price", "ic_inventory_discount", "ic_inventory_purchase_price", "ราคาตามลูกค้า", "price_level", "get_last_price_type", "findSalePrice"]
-sources: ["backend/internal/application/process/price_engine.go:49", "backend/internal/application/process/price_engine.go:67", "backend/internal/application/process/price_engine.go:79", "backend/internal/application/process/price_engine.go:103", "backend/internal/application/process/price_engine.go:237", "backend/internal/application/process/trans_grid.go:96", "backend/internal/application/process/trans_grid.go:490", "backend/internal/application/process/price_center.go:18"]
+sources: ["backend/internal/application/process/price_engine.go:49", "backend/internal/application/process/price_engine.go:67", "backend/internal/application/process/price_engine.go:79", "backend/internal/application/process/price_engine.go:103", "backend/internal/application/process/price_engine.go:237", "backend/internal/application/process/trans_grid.go:96", "backend/internal/application/process/trans_grid.go:490", "backend/internal/application/process/price_center.go:21", "backend/internal/application/process/trans_grid.go:461", "backend/internal/application/process/trans_grid.go:529"]
 ---
 # ราคาขาย/ส่วนลดที่ขึ้นอัตโนมัติในเอกสาร ดึงมาจากไหน
 
@@ -30,9 +30,10 @@ sources: ["backend/internal/application/process/price_engine.go:49", "backend/in
 **Price center:** ถ้าเปิด `erp_option.use_price_center` ราคาขายทั้งหมดจะมาจากบริการรายการราคาภายนอกแทนตารางในฐานข้อมูล
 
 ## ข้อควรระวัง
-- ราคาซื้อหาโดยใช้ "วันนี้" ไม่ใช่วันที่เอกสาร (ตาม C# เดิม) ราคาที่ตั้งเป็นช่วงวันที่จึงอาจไม่ตรงกับเอกสารที่ลงวันที่ย้อนหลัง
+- ราคาซื้อหาโดยใช้ "วันนี้" ไม่ใช่วันที่เอกสาร (`trans_grid.go:529` ส่ง `g.today` ให้ `findPurchasePrice`) ราคาที่ตั้งเป็นช่วงวันที่จึงอาจไม่ตรงกับเอกสารที่ลงวันที่ย้อนหลัง
 - ราคาเฉลี่ยแบบ `get_last_price_type` 2 เป็นค่าเฉลี่ยธรรมดาของราคาต่อหน่วยทุกบรรทัด ไม่ได้ถ่วงน้ำหนักด้วยจำนวน
-- ราคาสำหรับ POS (`_findPricePOS`) ยังไม่ได้พอร์ต (คอมเมนต์ใน `price_center.go`)
+- ราคา price center ของสาขา POS (บาร์โค้ด/สมาชิก) ยังไม่มีโค้ดรองรับ เพราะยังไม่มี POS ฝั่งเว็บเรียกใช้ (คอมเมนต์ `price_center.go:21-24`)
+- การหาราคาใช้รหัสหน่วยของบรรทัดตรง ๆ: เงื่อนไข `priceCond` มี `unit_code = $2` (`price_engine.go:49-50`) หน่วยมาจากบรรทัด (`trans_grid.go:461-463`) และ `price_engine.go` ไม่อ้าง `ic_unit_use` จึงไม่มีการแปลงหน่วยในขั้นหาราคา ถ้าไม่มีแถวราคาของหน่วยที่เลือก ขั้นนั้นจะไม่ได้ราคา
 
 ## ดูเพิ่ม
 - [[proc-price-engine]]
@@ -49,4 +50,5 @@ sources: ["backend/internal/application/process/price_engine.go:49", "backend/in
 - `backend/internal/application/process/price_engine.go:237` `findPurchasePrice` ใช้วันที่วันนี้
 - `backend/internal/application/process/trans_grid.go:96` `salePriceFlags` / `purchasePriceFlags`
 - `backend/internal/application/process/trans_grid.go:490` หาราคาเมื่อแก้จำนวนและไม่มีเอกสารอ้างอิง
-- `backend/internal/application/process/price_center.go:18` `use_price_center` และ POS ที่ยังไม่พอร์ต
+- `backend/internal/application/process/price_center.go:21` ราคา price center ของสาขา POS ที่ยังไม่มีโค้ด
+- `backend/internal/application/process/trans_grid.go:461` `priceQuery` ส่งรหัสหน่วยของบรรทัด; `:529` ราคาซื้อใช้ `g.today`

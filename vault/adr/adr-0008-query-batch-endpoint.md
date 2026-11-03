@@ -1,13 +1,13 @@
 ---
 title: "ADR-0008 /query/batch รัน SELECT หลายตัวในคำขอเดียว"
 tags: [backend, adr, query-gateway]
-aliases: ["ADR 0008", "query batch", "_queryListGetData", "MaxBatchStatements"]
-sources: ["backend/docs/adr/0008-query-batch-endpoint.md:7", "backend/internal/domain/query/query.go:73", "backend/internal/domain/query/query.go:428", "backend/internal/adapter/outbound/dynamicsql/gateway.go:137"]
+aliases: ["ADR 0008", "query batch", "MaxBatchStatements"]
+sources: ["backend/docs/adr/0008-query-batch-endpoint.md:7", "backend/internal/domain/query/query.go:73", "backend/internal/domain/query/query.go:428", "backend/internal/adapter/outbound/dynamicsql/gateway.go:129"]
 ---
 
 # ADR-0008 `/query/batch` (อ่านหลาย statement)
 
-สถานะ: **accepted** (ตรงกับโค้ด) ยกเลิกการเลื่อนจาก [[adr-0005-query-gateway-read-only-first]]. เหตุผล: client เดิมยังเรียก `_queryListGetData` และต้องมีปลายทางย้าย (`backend/docs/adr/0008-query-batch-endpoint.md:7`).
+สถานะ: **accepted** (ตรงกับโค้ด) ยกเลิกการเลื่อนจาก [[adr-0005-query-gateway-read-only-first]]. เหตุผล: ยังมี client ที่ต้องรันหลาย SELECT ในคำขอเดียว และไม่มีทางถอยไปใช้ชั้นเข้ากันได้ (`backend/docs/adr/0008-query-batch-endpoint.md:7`).
 
 ## ทำงานอย่างไร
 
@@ -18,7 +18,7 @@ sources: ["backend/docs/adr/0008-query-batch-endpoint.md:7", "backend/internal/d
 
 ## ตัวเลือกที่ไม่เลือก
 
-- คง XML wire เดิมของ `_queryListGetData`: ไม่ต้องเพราะทุก route อื่นย้ายเป็น JSON แล้ว.
+- รูปแบบ XML (เอกสารแท็ก `<query>`): ไม่เลือก เพราะทุก route อื่นของ Query Gateway เป็น JSON แล้ว (`...0008...md:11`).
 - คืนผลบางส่วน + รายการ error ต่อ statement: ไม่มี route อื่นใช้รูปแบบนั้น.
 - ไม่จำกัดจำนวน: ทำให้พื้นที่ enforcement โตไม่จำกัด.
 
@@ -31,7 +31,7 @@ sources: ["backend/docs/adr/0008-query-batch-endpoint.md:7", "backend/internal/d
 
 - `backend/internal/domain/query/query.go:73` — `MaxBatchStatements`.
 - `backend/internal/domain/query/query.go:428` — `NewBatchStatements`.
-- `backend/internal/adapter/outbound/dynamicsql/gateway.go:137` — `QueryBatch` เริ่ม tx read-only RepeatableRead.
+- `backend/internal/adapter/outbound/dynamicsql/gateway.go:129` — `QueryBatch` เริ่ม tx read-only RepeatableRead (`:137-139`).
 - `backend/docs/adr/0008-query-batch-endpoint.md:17` — ผลที่ตามมา.
 
 ## ดูเพิ่ม

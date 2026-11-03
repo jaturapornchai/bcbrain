@@ -1,53 +1,47 @@
 ---
-title: "บั๊กตาราง/เลย์เอาต์ที่เคยถอยหลัง (Grid & Layout UX Regressions)"
-tags: [history, grid, layout, ux]
-aliases: ["scrollbar ซ้อน", "Section Cards แทน sub-tab", "resizer floor", "stale load seq"]
-sources: ["git:70912a0a", "git:5e33f5c2", "git:77780f6e", "git:ab037624", "git:b9502e64", "git:33cf6477", "git:c33a8b55", "frontend/account/report/UniversalReportScreen.tsx:1003"]
+title: "บทเรียนตาราง/เลย์เอาต์ที่ถอยหลังง่าย (Grid & Layout UX Regressions)"
+tags: [history, lesson, grid, layout, ux]
+aliases: ["resizer floor", "stale load seq", "min-w-0 shrink-0", "overWide", "กระดาษฟอร์มล้น", "ลบแล้วไม่ถาม"]
+sources: ["frontend/account/report/UniversalReportScreen.tsx:960", "frontend/account/report/UniversalReportScreen.tsx:1009", "frontend/account/report/UniversalReportScreen.tsx:1041", "frontend/account/report/UniversalReportScreen.tsx:1675", "frontend/account/transaction/TransTopForm.tsx:188", "frontend/account/transaction/TransTopForm.tsx:218", "frontend/account/transaction/TransExtraTabs.tsx:198", "frontend/account/master/DocFormatScreen.tsx:312", "frontend/account/transaction/UniversalTransScreen.tsx:1210", "frontend/account/master/DealerScreen.tsx:433", "frontend/src/app/globals.css:2254", "docs/kms/KMS_TABLE_GRID_AND_WIDGET_STANDARD.md:18"]
 ---
 
-## ภาพรวม
-บั๊ก layout/ตาราง 22-26 ต.ค. 2026 หลังพอร์ตจอจาก C#: scrollbar ซ้อน, sub-tab ซ่อนข้อมูล, resizer รายงาน, หัวบิลล้นที่ 1366x768, ผลโหลดเก่าทับฟอร์มใหม่ เกิดซ้ำเพราะใช้ `flex-1 overflow-auto` ซ้อนชั้น และ flex child ไม่ใส่ `min-w-0`
+# บทเรียนตาราง/เลย์เอาต์ที่ถอยหลังง่าย
 
-## อาการ
-- **A** หลายตารางมี scrollbar แนวตั้งซ้อนกัน 1.1.1/1.1.2/POS/MasterDetail ต้องคลิก sub-tab สลับ
-- **B** รายงาน 27 คอลัมน์ ลากคอลัมน์แคบแล้วหดไม่ได้หรือกระโดด; handle ซ้อนสองชั้น (px ของ Global กับ % ของรายงาน)
-- **C** ที่ 1366x768 ช่องรูปแบบเลขที่เอกสารถูกตัด, ช่องเอกสารอ้างอิงทับรหัสพนักงานขาย; ฟอร์มพิมพ์ล้นกรอบกระดาษ
-- **D** กดเพิ่มใหม่ระหว่างรอโหลดแล้วฟอร์มถูกทับด้วยแถวแรก; DealerScreen ลบหลายรายการไม่ถามยืนยันและไม่เช็กผล; F2 ชนกันระหว่างตัวกรองรายการกับฟอร์ม; ติ๊ก DataList ค้างหลังยกเลิกลบ
+หน้าจอที่มีหลายตาราง ตัวลากคอลัมน์ และงานโหลดแบบ async พังซ้ำได้ง่ายถ้าลืมกฎเล็กๆ ของ flex/grid และลำดับงานโหลด หน้านี้รวมกับดักที่มีด่านป้องกันอยู่ในโค้ดวันนี้
 
-## สาเหตุ (root cause)
-- **A** wrapper ใน `TransExtraTabs`/`HiddenCostScreen` ตั้ง `flex-1 min-h-[..] overflow-auto` หรือ `max-h-[32vh] overflow-auto` ทุกชั้น และ `xl:grid-cols-2` ยัดหลายตารางคู่กัน
-- **B** `5e33f5c2` ตั้ง floor `min(4, startPct)` คอลัมน์ที่เริ่มแคบกว่า 4% (เช่น 3.6%) จึงมี floor = ความกว้างเดิม หดไม่ได้เลย (ตัวอย่าง 3.6% คำนวณจากสูตร; ไม่พบข้อความ "3.6%" ใน handoff/TODO)
-- **C** flex child ไม่มี `min-w-0`/`shrink-0` ช่อง readOnly `w-20` กินที่ ref-doc กับ sale-code อยู่แถว flex เดียว; กระดาษพิมพ์ไม่มี `overflow-x-hidden`
-- **D** งานโหลดที่เริ่มก่อนกดเพิ่มใหม่ไม่ถูกยกเลิก (ไม่มีเลขลำดับงาน); `BcDataList` ดัก F2 โดยไม่ดูว่า focus อยู่ในฟอร์มนอกรายการ
+## อะไรพังได้
+- **ตัวลากคอลัมน์รายงานหดไม่ได้/กระโดด**: รายงานที่มีคอลัมน์เยอะ (บางคอลัมน์แคบกว่า 4%) ถ้าตั้งเพดานล่างตายตัวที่ 4% คอลัมน์ที่เริ่มแคบอยู่แล้วจะลากเข้าไม่ได้ หรือกระโดด
+- **ตารางกว้างเกินจอถูกบีบกลับเป็น 100%**: ลากขอบคอลัมน์แล้ว normalize ผลรวมกลับ 100% ทำให้ตารางหดทั้งแผ่น
+- **ตัวลากซ้อนสองชั้น**: ตัวลากกลางแบบ px ไปทับตัวลากแบบ % ของรายงาน
+- **ช่องในหัวบิลล้น/ทับกัน** ที่จอ 1366x768: flex child ที่มี input ไม่มี `min-w-0` หรือช่องอ่านอย่างเดียวไม่มี `shrink-0`
+- **กระดาษพิมพ์ฟอร์มล้นกรอบ** เมื่อข้อความหรือตารางยาวเกินความกว้างกระดาษ
+- **ผลโหลดเก่าทับฟอร์มใหม่**: กดเพิ่มใหม่ระหว่างรอโหลดเอกสารเดิม แล้วโหลดเสร็จทีหลังเขียนทับ
+- **ลบแล้วไม่ถามหรือไม่เช็กผล**: ปุ่มลบที่ยิงคำสั่งทันทีและไม่อ่าน `res.ok`
 
-## วิธีแก้
-- **A** `70912a0a` เปลี่ยนเป็น `shrink-0` และ `space-y-3` (ตารางเรียงลงทีละอัน); `b9502e64` ให้ 1.1.1 render `sections` ทั้งหมดหน้าเดียว; `33cf6477` แปลง sub-tab เป็น Section Cards + แถบ Quick-Jump (`jumpToSection`)
-- **B** `5e33f5c2` ติด `data-resizable-managed` บน table รายงาน (คอมเมนต์ใน commit: กัน GlobalTableColumnResizer ซ้อนทับ); `77780f6e` floor = `min(4, max(1.5, 50% ของความกว้างเริ่ม))` (3.6% -> 1.8%); `6e9ae03e` เพิ่ม `computeSmartTableColumnPcts` + ปุ่ม Auto-Fit/Reset
-- **C** `ab037624` เติม `min-w-0`, `w-14 shrink-0`, จัด ref-doc/sale-code เป็น grid 2 คอลัมน์; `0dd8c834` กฎ anti-overflow ของ `[data-doc-form-paper]` + `overflow-hidden` บนกระดาษ FormDesigner
-- **D** `bd834b16` เพิ่ม confirm ก่อนลบหลายรายการ + แสดง error; `c33a8b55` เพิ่ม `loadSeq`/`docLoadSeq` ทิ้งผล stale และให้ F2 เมินเมื่อ focus อยู่ input นอก `rootRef`; `5435180b` เพิ่ม `newSeq` และล้างติ๊กเฉพาะ id ที่หายไป
+## โค้ดป้องกันไว้อย่างไร
+| ด่าน | ที่อยู่ | ทำอะไร |
+|---|---|---|
+| เพดานล่างตัวลากรายงาน | `frontend/account/report/UniversalReportScreen.tsx:1009-1013` | `min(4, max(1.5, ครึ่งหนึ่งของความกว้างเริ่ม))` คอลัมน์แคบจึงยังหดได้ (คอมเมนต์ `:1009-1011` อธิบายเหตุผล) |
+| ไม่บีบกลับ 100% เมื่อกว้างเกินจอ | `UniversalReportScreen.tsx:960` (`overWide`), `:1041` | ลากเสร็จ ถ้า `overWide` เก็บค่าเดิม ไม่เรียก `normalizeColumnOverridesWidthPct` |
+| คิด % จากกรอบเลื่อน | `UniversalReportScreen.tsx:993` | ใช้ `clientWidth` ของกรอบเลื่อน ไม่ใช่ความกว้างตารางที่ยาวเกินจอ |
+| ตารางรายงานคุมตัวลากเอง | `UniversalReportScreen.tsx:1675-1678` | ติด `data-resizable-managed` พร้อมคอมเมนต์ว่าให้ `GlobalTableColumnResizer` ไม่ซ้อนตัวลาก px ทับตัวลาก % |
+| Auto-Fit / Reset | `frontend/shared/ui/useResizableColumns.tsx:79` (`computeSmartTableColumnPcts`), `:845` (`GlobalTableColumnResizer`) | คำนวณ % จากข้อมูลจริง และตัวลากกลางสำหรับตารางทั่วไป |
+| ช่องไม่ล้นใน TransTopForm | `frontend/account/transaction/TransTopForm.tsx:188,203,218,366` | แถว flex ใส่ `min-w-0`, ช่อง readOnly รหัสสั้นเป็น `w-14 shrink-0` |
+| การ์ดแท็บเสริมไม่ซ้อนตัวเลื่อน | `frontend/account/transaction/TransExtraTabs.tsx:198,913` | การ์ดเป็น `shrink-0` ให้กรอบนอกเลื่อนทีเดียว |
+| กระดาษฟอร์มไม่ล้น | `frontend/src/app/globals.css:2254-2268` | `[data-doc-form-paper]` ใส่ `max-width:100%` และ `overflow-x:hidden` |
+| ลำดับงานโหลด (stale guard) | `frontend/account/master/DocFormatScreen.tsx:267,312-319,415`; `frontend/account/transaction/UniversalTransScreen.tsx:728,1210-1211,1902` | `loadSeq`/`docLoadSeq` เพิ่มทุกครั้งที่เริ่มโหลดหรือเริ่มเอกสารใหม่ ผลที่ไม่ใช่รอบล่าสุดถูกทิ้ง |
+| ลบต้องยืนยันและอ่านผล | `frontend/account/master/DealerScreen.tsx:433-455` | เปิด dialog ยืนยันก่อน แล้วถ้า `!res.ok` แสดง error ไม่ทำต่อ |
 
-## commit ที่เกี่ยวข้อง
-- `5e33f5c2`, `77780f6e` (22 ต.ค.) — floor/handle resizer รายงาน; `ab037624` — TransTopForm 1366x768; `b9502e64` — 1.1.1 หน้าเดียว (BCAIACC-106)
-- `bd834b16`, `c33a8b55`, `5435180b` (22 ต.ค.) — master UI: confirm ลบ, stale guard, F2, ติ๊ก
-- `33cf6477` (23 ต.ค.) — Section Cards; `6e9ae03e`, `70912a0a` (24 ต.ค.) — auto-fit, ถอด scrollbar ซ้อน; `0dd8c834` (26 ต.ค.) — กระดาษฟอร์มไม่ล้น
-
-## โค้ดปัจจุบันที่ป้องกัน
-- `frontend/account/report/UniversalReportScreen.tsx:1003` floor resizer; `:1668` `data-resizable-managed`
-- `frontend/shared/ui/useResizableColumns.tsx:79` `computeSmartTableColumnPcts`, `:836` `GlobalTableColumnResizer`
-- `frontend/account/transaction/TransTopForm.tsx:186,216,397` `min-w-0`, `w-14 shrink-0`, grid ref-doc
-- `frontend/account/transaction/TransExtraTabs.tsx:198,575,689` การ์ด `shrink-0`; `frontend/account/config/CompanyProfileForm.tsx:210`
-- `frontend/account/master/DocFormatScreen.tsx:267`, `frontend/account/transaction/UniversalTransScreen.tsx:727` ลำดับโหลด; `frontend/account/master/BcDataList.tsx:269,574` `rootRef` + ไม่รับคีย์เมื่อแท็บซ่อน
-- `frontend/src/app/globals.css:2235` กฎกระดาษฟอร์ม (หัวข้อถูกขยายเป็น "Anti-Overflow & Pure-White")
-- ตัวจัดการ F2 ใน BcDataList ถูก `b9c13081` (Button-Only) ลบแล้ว
-
-## บทเรียน / กฎที่ได้
-- ห้ามซ้อน `overflow-auto` หลายชั้น: ชั้นในใช้ `shrink-0` ให้ชั้นนอกเลื่อนเดียว; หลายตาราง = วางเรียงลง ไม่ใช่ sub-tab
-- flex/grid child ที่มี input ต้อง `min-w-0`; ช่อง readOnly รหัสสั้น `shrink-0`; ทดสอบที่ 1366x768
-- ทุก async load ในจอ master/transaction ต้องมี sequence ref และเช็กหลังทุก `await`; กดเพิ่มใหม่ต้องยกเลิกงานโหลดค้าง
-- floor ของ resizer ต้องอิงความกว้างเริ่ม; เปิดค้าง: handoff `REPORT-RESIZER-OVERLAY-b` (ลาก th 59->59px) รอ verify เทียบ C#; ลบหลายรายการต้องยืนยันและอ่าน `res.ok`
-
-## ดูเพิ่ม
-[[std-grid-autofit-reset]] · [[std-grid-row-reorder-add-row]] · [[fe-grid-component]] · [[fe-standard-master-screen]] · [[std-frontend-ux-bug-lessons]] · [[hist-lessons-hidden-tab-hotkeys-dirty-guard]] · [[hist-lessons-report-engine-parity]] · [[hist-lessons-thai-text-pdf]] · [[history-overview]]
+## กฎที่ต้องจำ
+- เพดานล่างของตัวลากต้องอิงความกว้างเริ่มของคอลัมน์ ไม่ใช่ค่าคงที่ และห้าม normalize % เมื่อตารางกว้างกว่าจอ (`docs/kms/KMS_TABLE_GRID_AND_WIDGET_STANDARD.md:18`)
+- flex/grid child ที่มี input ใส่ `min-w-0`; ช่องรหัสสั้นแบบอ่านอย่างเดียวใส่ `shrink-0`; ตรวจที่ความกว้าง 1366x768
+- ทุกงาน async ที่เขียนลงฟอร์มต้องมีเลขลำดับ (`useRef`) และเช็กหลังทุก `await`; เริ่มเอกสารใหม่ต้องทำให้งานโหลดค้างกลายเป็น stale
+- ปุ่มลบทุกจอต้องถามก่อนและตรวจ `res.ok`
 
 ## ที่มาในโค้ด
-- git: ทุก SHA ข้างต้น (ตรวจ diff แล้ว) + `b9c13081`; `docs/HANDOFF_BCCM_PARITY_2026-10-22.md` (§3, §7)
+- `frontend/account/report/UniversalReportScreen.tsx:960,993,1009-1013,1041,1675-1678`
+- `frontend/shared/ui/useResizableColumns.tsx:79,845`
+- `frontend/account/transaction/TransTopForm.tsx:188-218`, `TransExtraTabs.tsx:198`
+- `frontend/account/master/DocFormatScreen.tsx:312`, `frontend/account/transaction/UniversalTransScreen.tsx:1210`, `frontend/account/master/DealerScreen.tsx:433`
+- `frontend/src/app/globals.css:2254-2268`
+- ดูเพิ่ม: [[std-grid-autofit-reset]] · [[std-grid-row-reorder-add-row]] · [[fe-grid-component]] · [[fe-standard-master-screen]] · [[std-frontend-ux-bug-lessons]] · [[hist-lessons-hidden-tab-hotkeys-dirty-guard]] · [[hist-lessons-thai-text-pdf]] · [[history-overview]]

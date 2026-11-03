@@ -2,7 +2,7 @@
 title: "บันทึกสินค้ายกมา (ยอดยกมาสต็อก) ยังไง และลงบัญชีอะไร"
 tags: [faq, ic, stock, opening-balance, gl]
 aliases: ["สินค้ายกมา", "ยอดยกมาสินค้า", "stock opening balance", "trans_flag 54", "menu_ic_stk_balance", "StockBeginningSave", "สินค้า/วัตถุดิบ คงเหลือยกมา", "Dr สินค้าคงเหลือ Cr ทุน"]
-sources: ["frontend/account/tabs/transMenuMap.ts:924", "backend/internal/application/process/stock_beginning.go:23", "backend/internal/application/process/stock_beginning.go:40", "backend/internal/application/process/stock_beginning.go:292", "backend/internal/application/process/stock_beginning.go:307", "backend/internal/application/process/stock_beginning.go:619", "frontend/account/transaction/StockBeginningBalanceScreen.tsx:375", "backend/internal/application/process/service.go:1666"]
+sources: ["frontend/account/tabs/transMenuMap.ts:924", "backend/internal/application/process/stock_beginning.go:23", "backend/internal/application/process/stock_beginning.go:40", "backend/internal/application/process/stock_beginning.go:292", "backend/internal/application/process/stock_beginning.go:307", "backend/internal/application/process/stock_beginning.go:619", "frontend/account/transaction/StockBeginningBalanceScreen.tsx:375-399", "backend/internal/application/process/service.go:1677"]
 ---
 # บันทึกสินค้ายกมา (ยอดยกมาสต็อก) ยังไง และลงบัญชีอะไร
 
@@ -43,5 +43,5 @@ sources: ["frontend/account/tabs/transMenuMap.ts:924", "backend/internal/applica
 - `backend/internal/application/process/stock_beginning.go:292` ตรวจเดบิตเท่ากับเครดิตในแท็บ GL
 - `backend/internal/application/process/stock_beginning.go:307` `StockBeginningSave` (ไม่มีการตรวจงวด)
 - `backend/internal/application/process/stock_beginning.go:619` บันทึก `trans_direct` ตามตัวเลือกลงบัญชีโดยตรง
-- `frontend/account/transaction/StockBeginningBalanceScreen.tsx:375` สร้าง GL อัตโนมัติ Dr `1131-00` / Cr `3110-00`
-- `backend/internal/application/process/service.go:1666` เปลี่ยนรหัสบัญชี GL ของ 54 ที่ไม่มีในผังบัญชี
+- `frontend/account/transaction/StockBeginningBalanceScreen.tsx:375-399` สร้าง GL อัตโนมัติ Dr `1131-00` / Cr `3110-00`
+- `backend/internal/application/process/service.go:1677` เปลี่ยนรหัสบัญชี GL ของ 54 ที่ไม่มีในผังบัญชี

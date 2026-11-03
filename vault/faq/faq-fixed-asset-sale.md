@@ -19,8 +19,8 @@ sources: ["backend/internal/application/process/fa_sale.go:159", "backend/intern
 
 **คำนวณ (`calcAssetSale`)**
 - ราคาขายต่อแถวปัดด้วย `bcRound` ([[faq-rounding-decimal]])
-- vat_type 1 (รวมใน): ก่อน VAT = ราคา × 100 ÷ (100 + อัตรา) ปัด ToEven, VAT = ราคา − ก่อน VAT
-- vat_type 0 (แยกนอก): VAT = ราคา × อัตรา ÷ 100 ปัด ToEven
+- vat_type 1 (รวมใน): ก่อน VAT = ราคา × 100 ÷ (100 + อัตรา) ปัดครึ่งไปเลขคู่, VAT = ราคา − ก่อน VAT
+- vat_type 0 (แยกนอก): VAT = ราคา × อัตรา ÷ 100 ปัดครึ่งไปเลขคู่
 - ยอดรวมผ่าน `vatCalc` แล้วปัดยอดสุทธิและ VAT แบบ HALF_UP 2 ตำแหน่ง เพื่อให้ Dr = Cr
 - อัตรา VAT: ถ้าไม่ส่งมา ใช้ `erp_option.vat_rate` ไม่มีแถว erp_option ใช้ 7
 
@@ -64,5 +64,5 @@ sources: ["backend/internal/application/process/fa_sale.go:159", "backend/intern
 - `backend/internal/application/process/fa_sale.go:382` `AssetSale`; `:401` `assetSaleTx`
 - `backend/internal/application/process/fa_sale.go:576` INSERT `gl_journal` (trans_direct 0 `:579`)
 - `backend/internal/application/process/fa_sale.go:600` `postAssetSaleTemplate`
-- `backend/internal/application/process/service.go:1731` `glRebuildTransFlags`
+- `backend/internal/application/process/service.go:1742` `glRebuildTransFlags`
 - `backend/internal/application/process/gl_template.go:1100` `postTemplateOnly` ลง 1802 ใหม่เมื่อมีรูปแบบ GL

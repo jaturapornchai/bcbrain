@@ -2,7 +2,7 @@
 title: "บันทึกยอดยกมาลูกหนี้/เจ้าหนี้ยังไง ทำไมไม่มี GL"
 tags: [faq, ar, ap, opening-balance, gl]
 aliases: ["ลูกหนี้ยกมา", "เจ้าหนี้ยกมา", "ตั้งหนี้ยกมา", "AR opening balance", "AP opening balance", "trans_flag 93", "trans_flag 81", "headerAmountFlags", "ยอดยกมาไม่ลงบัญชี"]
-sources: ["frontend/account/tabs/transMenuMap.ts:1406", "frontend/account/tabs/transMenuMap.ts:1209", "backend/internal/application/process/trans.go:216", "backend/internal/application/process/trans.go:849", "backend/internal/application/process/trans_validate.go:71", "backend/internal/application/process/service.go:1737", "backend/internal/application/process/report_menu_ap_ar.go:384"]
+sources: ["frontend/account/tabs/transMenuMap.ts:1406", "frontend/account/tabs/transMenuMap.ts:1209", "backend/internal/application/process/trans.go:216", "backend/internal/application/process/trans.go:849", "backend/internal/application/process/trans_validate.go:71", "backend/internal/application/process/service.go:1748", "backend/internal/application/process/report_menu_ap_ar.go:384"]
 ---
 # บันทึกยอดยกมาลูกหนี้/เจ้าหนี้ยังไง ทำไมไม่มี GL
 
@@ -20,7 +20,7 @@ sources: ["frontend/account/tabs/transMenuMap.ts:1406", "frontend/account/tabs/t
 - บิลยกมาจะขึ้นให้เลือกในใบรับชำระหนี้ 239 และใบจ่ายชำระหนี้ 19 รวมถึงใบวางบิล
 
 **ทำไมไม่มี GL**
-- `glRebuildTransFlags` ไม่มี 81–85 และ 93–97 ในโค้ดเขียนไว้ว่าเอกสารยกมาไม่ลง GL ตาม C# เดิม ยอดเงินมัดจำยกมา (90xx) ก็เช่นเดียวกัน
+- `glRebuildTransFlags` ไม่มี 81–85 และ 93–97 คอมเมนต์ในโค้ดระบุว่าเอกสารยกมาไม่ลง GL (`service.go:1748`) ยอดเงินมัดจำยกมา (90xx) ก็เช่นเดียวกัน (`service.go:1750`)
 - วิธีที่สอดคล้องกับโค้ด: คีย์ยอดยกมาของบัญชีคุมลูกหนี้/เจ้าหนี้ใน GL ด้วยใบสำคัญรายวัน ([[faq-journal-voucher-jv]]) โดยใช้ยอดรวมให้ตรงกับผลรวมเอกสารยกมา
 - เมื่อรับชำระบิลยกมา ใบรับชำระ 239 จะลง GL ตามปกติ (Dr เงิน / Cr ลูกหนี้) ทำให้ยอดลูกหนี้ใน GL ลดลง ถ้าไม่ได้คีย์ JV ยอดยกมาไว้ ยอดลูกหนี้ใน GL จะติดลบ
 
@@ -43,5 +43,5 @@ sources: ["frontend/account/tabs/transMenuMap.ts:1406", "frontend/account/tabs/t
 - `backend/internal/application/process/trans.go:216` `headerAmountFlags` = 81, 83, 85, 93, 95, 97, 602, 604
 - `backend/internal/application/process/trans.go:849` บันทึกเฉพาะยอดหัวเอกสาร และยอดต้องมากกว่า 0
 - `backend/internal/application/process/trans_validate.go:71` ข้ามการตรวจหน้าจอของเอกสารสินค้า
-- `backend/internal/application/process/service.go:1737` คอมเมนต์: 81–85/93–97 ไม่ลง GL
+- `backend/internal/application/process/service.go:1748` คอมเมนต์ใน `glRebuildTransFlags`: 81–85/93–97 ไม่ลง GL; `:1750` 90xx ยกมาไม่ลง GL
 - `backend/internal/application/process/report_menu_ap_ar.go:384` ยกมานับในยอดหนี้ของรายงานสถานะ

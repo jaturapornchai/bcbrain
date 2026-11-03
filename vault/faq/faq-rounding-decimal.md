@@ -1,12 +1,12 @@
 ---
 title: "ระบบปัดเศษทศนิยมเงินอย่างไร ทำไมยอดต่างกัน 0.01"
 tags: [faq, rounding, decimal, gl, vat]
-aliases: ["ปัดเศษยังไง", "ยอดไม่ตรง 1 สตางค์", "rounding decimal", "round_type", "item_amount_decimal", "gl_no_decimal", "RoundHalfUp", "bcRound", "Math.Round ToEven", "ผลต่างจากการปัดเศษ"]
+aliases: ["ปัดเศษยังไง", "ยอดไม่ตรง 1 สตางค์", "rounding decimal", "round_type", "item_amount_decimal", "gl_no_decimal", "RoundHalfUp", "bcRound", "ปัดครึ่งเลขคู่", "ผลต่างจากการปัดเศษ"]
 sources: ["backend/internal/application/process/service.go:149", "backend/internal/application/process/grid_calc.go:132", "backend/internal/application/process/fa_sale.go:93", "backend/internal/application/process/service.go:508", "backend/internal/application/process/gl_template.go:378", "backend/internal/application/process/gl_template.go:730", "backend/internal/application/process/trans.go:1055"]
 ---
 # ระบบปัดเศษทศนิยมเงินอย่างไร ทำไมยอดต่างกัน 0.01
 
-**ตอบสั้น:** เงินทุกยอดคำนวณด้วย `big.Rat` และเก็บเป็นข้อความทศนิยม ไม่ใช้ float มีวิธีปัด 3 แบบ ใช้ต่างจุดกัน คือ ปัดครึ่งขึ้น, `_round` ของ C# ตาม `round_type` และ Math.Round แบบ ToEven ยอดต่าง 0.01 มักเกิดจากการปัดรายบรรทัดแล้วรวม เทียบกับรวมก่อนแล้วปัด
+**ตอบสั้น:** เงินทุกยอดคำนวณด้วย `big.Rat` และเก็บเป็นข้อความทศนิยม ไม่ใช้ float มีวิธีปัด 3 แบบ ใช้ต่างจุดกัน คือ ปัดครึ่งขึ้น, `bcRound` ตาม `round_type` และปัดครึ่งไปเลขคู่ (`roundHalfEven`) ยอดต่าง 0.01 มักเกิดจากการปัดรายบรรทัดแล้วรวม เทียบกับรวมก่อนแล้วปัด
 
 ## รายละเอียด
 ค่าเงินจากจอ/DB แปลงด้วย `ParseDecimalRat` / `numericToRat` แล้วจัดรูปเป็นข้อความด้วย `FormatRat` ซึ่งปัดครึ่งขึ้นที่ scale ที่ส่งมา ดู [[acc-rounding-decimal]]
@@ -22,8 +22,8 @@ sources: ["backend/internal/application/process/service.go:149", "backend/intern
 |---|---|---|
 | `RoundHalfUp` | ครึ่งขึ้น (ห่างจากศูนย์) | `FormatRat`, GL มาตรฐาน, ยอดชำระ, มัดจำ, ค่าเสื่อม |
 | `bcRound` | `round_type` = 1 คือครึ่งขึ้น (+0.000001), ค่าอื่นปัดไล่ทีละหลัก เช่น 3.7449 → 3.745 → 3.75 | ยอดในตารางสินค้า, ยอดแปลงสกุลเงิน ([[faq-fx-multi-currency]]) |
-| `roundHalfEven` | ครึ่งไปเลขคู่ (C# Math.Round) | `sum_amount_exclude_vat` (เฉพาะ vat_type 1 และ tax_type 0), GL ตามรูปแบบ, VAT ขายสินทรัพย์ |
-| `csRound` | สำเนาของ `_round` ในงาน rebuild สต็อก | `stock_rebuild.go` |
+| `roundHalfEven` | ครึ่งไปเลขคู่ | `sum_amount_exclude_vat` (เฉพาะ vat_type 1 และ tax_type 0), GL ตามรูปแบบ, VAT ขายสินทรัพย์ |
+| `csRound` | ปัดแบบเดียวกับ `bcRound` (round_type 1 = ครึ่งขึ้น +0.000001; ค่าอื่นไล่ทีละหลักจากเลขท้ายสุดที่มี) | `stock_rebuild.go` |
 
 **ผลต่างจากการปัด**
 - GL ตามรูปแบบ ([[faq-gl-template-doc-format]]): `addDiff` ยอมผลต่าง Dr−Cr ได้ไม่เกิน 0.1 ต่อแถวรายละเอียด แล้วลงบัญชีผลต่างที่กำหนดด้วย action 90 ของรูปแบบ
@@ -47,10 +47,10 @@ sources: ["backend/internal/application/process/service.go:149", "backend/intern
 ## ที่มาในโค้ด
 - `backend/internal/application/process/service.go:107` `ParseDecimalRat`
 - `backend/internal/application/process/service.go:149` `RoundHalfUp`; `:177` `FormatRat`
-- `backend/internal/application/process/service.go:508` `ValidateAndBalanceJournal`; `:1614` เรียกที่ scale 2
+- `backend/internal/application/process/service.go:508` `ValidateAndBalanceJournal`; `:1625` เรียกที่ scale 2
 - `backend/internal/application/process/grid_calc.go:99` round_type ≠ 1; `:132` `bcRound`
 - `backend/internal/application/process/fa_sale.go:93` `roundHalfEven`
-- `backend/internal/application/process/trans.go:1055` `sum_amount_exclude_vat` ToEven; `:1058` `sum_of_cost` 2 ตำแหน่ง
+- `backend/internal/application/process/trans.go:1055` `sum_amount_exclude_vat` ปัดครึ่งไปเลขคู่; `:1058` `sum_of_cost` 2 ตำแหน่ง
 - `backend/internal/application/process/gl_template.go:378` `addDiff`; `:730` `glSQLOptions` (`gl_no_decimal`)
 - `backend/internal/application/process/gl_template_rules.go:344` action 90 บัญชีผลต่าง
 - `backend/internal/application/process/stock_rebuild.go:113` `csRound`

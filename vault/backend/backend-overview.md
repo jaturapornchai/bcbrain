@@ -23,7 +23,7 @@ Backend ของ BC Ai Account เป็นเซอร์วิส Go เด�
 ### การไหลของคำขอหลัก
 - **เข้าสู่ระบบ**: `{provider, dataGroup, username, password}` → หา Provider จาก registry → ต่อฐานหลัก/ฐานบริษัทของผู้เช่านั้น → ตรวจรหัสผ่าน → ออก JWT HS256 → [[be-identity-login-flow]], [[be-jwt-session-tokens]].
 - **ผู้เช่า**: Provider Code `^[A-Z0-9]{2,20}$`; ฐานหลัก = `"bcerpmain"+lower(code)` (คำนวณจากสูตร ไม่เก็บ); ฐานบริษัท = ค่า `data_database_name` → [[be-multi-tenant]], [[be-provider-registry]].
-- **สิทธิ์**: อ่านสิทธิ์เมนูจาก `image_file` (JSON หรือ XML เดิมของ C#) แล้วบังคับด้วย `RequireRight`; admin = `superadmin` หรือ level ≥ 9 → [[be-menu-rights-permission]].
+- **สิทธิ์**: อ่านสิทธิ์เมนูจาก `image_file` (JSON หรือ XML รูปแบบเก่า) แล้วบังคับด้วย `RequireRight`; admin = `superadmin` หรือ level ≥ 9 → [[be-menu-rights-permission]].
 - **อ่าน/เขียนข้อมูลทั่วไป**: ผ่าน Query Gateway (`/query/list|exec|execBatch`) ซึ่งอ่านใน transaction read-only และจำกัดจำนวนแถว/ขนาด; ฝั่งเขียนมีนโยบายล็อกตารางเงิน/สต็อก/GL → [[be-query-gateway]], [[be-query-write-policy]].
 - **รูปภาพ**: `POST /blob/insert` รับ multipart แล้วเก็บใน MinIO พร้อมภาพย่อ ฐานข้อมูลเก็บเพียง URL → [[be-blob-insert]].
 - **ฐานข้อมูล**: `PoolManager` เปิด pool ต่อ (host, port, user, db) และรัน DDL ช่วย (`companySchemaSQL`, `platform/db/pool.go:16`) ทุกครั้งที่เปิด pool ใหม่ → [[be-db-pool-manager]].

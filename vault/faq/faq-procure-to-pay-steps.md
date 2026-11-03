@@ -2,7 +2,7 @@
 title: "งานซื้อทำตามลำดับอย่างไร ตั้งแต่ขอซื้อ สั่งซื้อ รับของ จนถึงจ่ายเงินเจ้าหนี้"
 tags: [faq, flow, purchase, ap, menu]
 aliases: ["ขั้นตอนการซื้อ", "procure to pay", "P2P", "PR PO แล้วทำอะไรต่อ", "รับของแล้วตั้งหนี้ยังไง", "ซื้อสินค้าเครดิตทำเมนูไหนบ้าง", "ทะยอยรับสินค้า flag 310", "ใบเสนอซื้อ ใบสั่งซื้อ ซื้อสินค้า ใบวางบิล จ่ายหนี้"]
-sources: ["frontend/account/tabs/transMenuMap.ts:60", "backend/internal/application/process/trans_ref_import_lines.go:52", "backend/internal/application/process/stock_rebuild.go:18", "backend/internal/application/process/service.go:1731", "backend/internal/application/process/service.go:1923", "backend/internal/application/process/docs.go:389", "backend/internal/application/process/docs.go:604"]
+sources: ["frontend/account/tabs/transMenuMap.ts:60", "backend/internal/application/process/trans_ref_import_lines.go:52", "backend/internal/application/process/stock_rebuild.go:18", "backend/internal/application/process/service.go:1742", "backend/internal/application/process/service.go:1934", "backend/internal/application/process/docs.go:389", "backend/internal/application/process/docs.go:604"]
 ---
 # งานซื้อทำตามลำดับอย่างไร ตั้งแต่ขอซื้อ สั่งซื้อ รับของ จนถึงจ่ายเงินเจ้าหนี้
 
@@ -49,5 +49,5 @@ sources: ["frontend/account/tabs/transMenuMap.ts:60", "backend/internal/applicat
 - `frontend/account/tabs/transMenuMap.ts:60` (PR 2), `:103` (PO 6), `:299` (ซื้อ 12), `:330` (310), `:361` (315), `:392` (16), `:1349` (213), `:1378` (19)
 - `backend/internal/application/process/trans_ref_import_lines.go:52-54` (`refImportSources`)
 - `backend/internal/application/process/stock_rebuild.go:18-22` (flag ที่นับสต็อก), `:27` (`stockValueOnlySQL`), `:32-40` (ฝั่งเข้า/ออกของ 12, 310, 14, 16, 311)
-- `backend/internal/application/process/service.go:1731-1745` (`glRebuildTransFlags`), `:1923` (310), `:1947` (315), `:1965` (12/14/316), `:1984` (16/317), `:2159` (19/239)
+- `backend/internal/application/process/service.go:1742-1756` (`glRebuildTransFlags`), `:1934` (310), `:1958` (315), `:1976` (12/14/316), `:1995` (16/317), `:2170` (19/239)
 - `backend/internal/application/process/docs.go:389-391` (GL หลังบันทึกเฉพาะ 19/239 ในเส้นทางเอกสารหนี้), `:604-608` (นิยามยอดค้างฝั่งเจ้าหนี้), `:628` (`OutstandingBills`)

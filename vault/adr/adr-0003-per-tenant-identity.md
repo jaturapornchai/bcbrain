@@ -2,7 +2,7 @@
 title: "ADR-0003 ข้อมูลผู้ใช้และสิทธิ์อยู่ใน DB ของแต่ละผู้เช่า ไม่ใช่ control-plane"
 tags: [backend, adr, identity, multi-tenant]
 aliases: ["ADR 0003", "per-tenant identity", "bc_user_list login", "pre-auth token"]
-sources: ["backend/docs/adr/0003-per-tenant-identity-not-control-plane.md:7", "backend/internal/adapter/outbound/identity/postgres_repository.go:42", "backend/internal/adapter/outbound/identity/postgres_repository.go:132", "backend/internal/domain/identity/identity.go:62"]
+sources: ["backend/docs/adr/0003-per-tenant-identity-not-control-plane.md:7", "backend/internal/adapter/outbound/identity/postgres_repository.go:42", "backend/internal/adapter/outbound/identity/postgres_repository.go:132", "backend/internal/domain/identity/identity.go:64"]
 ---
 
 # ADR-0003 Identity อยู่ในแต่ละผู้เช่า (per-tenant)
@@ -13,7 +13,7 @@ sources: ["backend/docs/adr/0003-per-tenant-identity-not-control-plane.md:7", "b
 
 1. ผู้ใช้ส่ง `provider` (code ผู้เช่า) + `dataGroup` + `username` + `password` (`tenantId` เป็นชื่อ claim ใน JWT ไม่ใช่ชื่อ field ตอน login) → ระบบหา user ใน `bc_user_list` ด้วย `user_code` (`postgres_repository.go:42`, SQL บรรทัด 50-53).
 2. หา "บริษัท" ที่ผู้ใช้เข้าได้จาก `bc_database_list_user_and_group` (ผูกกับ DataGroup) (`postgres_repository.go:132`, SQL บรรทัด 138-145).
-3. ถ้ามีบริษัทเดียว ออก session ทันที; ถ้าหลายบริษัท ออก pre-auth token แล้วให้เรียก `/auth/select-company` (flow ที่ ADR คงไว้ แต่เปลี่ยนชื่อ Select Tenant เป็น Select Company) — ดู [[be-identity-login-flow]].
+3. ถ้ามีบริษัทเดียว ออก session ทันที; ถ้าหลายบริษัท ออก pre-auth token แล้วให้เรียก `/auth/select-company` (`router.go:75`; flow ที่ ADR คงไว้ แต่เปลี่ยนชื่อ Select Tenant เป็น Select Company) — ดู [[be-identity-login-flow]].
 
 ## ตัวเลือกที่ไม่เลือก
 
@@ -29,7 +29,7 @@ sources: ["backend/docs/adr/0003-per-tenant-identity-not-control-plane.md:7", "b
 
 - `backend/internal/adapter/outbound/identity/postgres_repository.go:42` — `FindByCode` จาก `bc_user_list`.
 - `backend/internal/adapter/outbound/identity/postgres_repository.go:132` — รายชื่อบริษัทจาก `bc_database_list_user_and_group`.
-- `backend/internal/domain/identity/identity.go:62` — `Authenticate` รองรับ bcrypt.
+- `backend/internal/domain/identity/identity.go:64` — `Authenticate` รองรับ bcrypt.
 - `backend/docs/adr/0003-per-tenant-identity-not-control-plane.md:7` — เหตุผลการกลับทิศทางจาก PLAN.md.
 
 ## ดูเพิ่ม

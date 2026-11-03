@@ -1,55 +1,44 @@
 ---
-title: "บทเรียนบั๊กการทำงานพร้อมกันและ advisory lock (Concurrency & Advisory Locks)"
-tags: [history, concurrency, lock, deadlock]
-aliases: ["deadlock 40P01", "pg_advisory_xact_lock", "RebuildGL lock", "docno collision"]
-sources: ["git:4341ae81", "git:ac839a65", "git:4de91436", "git:5e3dbd36", "git:acba317c", "backend/internal/application/process/service.go:992", "backend/internal/application/process/service.go:1365"]
+title: "บทเรียนการทำงานพร้อมกันและ advisory lock (Concurrency & Advisory Locks)"
+tags: [history, lesson, concurrency, lock, deadlock]
+aliases: ["deadlock 40P01", "pg_advisory_xact_lock", "RebuildGL lock", "lockStockItems", "lockGLShared", "docno collision"]
+sources: ["backend/internal/application/process/service.go:998", "backend/internal/application/process/service.go:1003", "backend/internal/application/process/service.go:1331", "backend/internal/application/process/service.go:1367", "backend/internal/application/process/service.go:1381", "backend/internal/application/process/trans.go:400", "backend/internal/application/process/trans.go:474", "backend/internal/application/process/docs.go:180", "backend/internal/application/process/fa_sale.go:402", "backend/internal/application/process/pay_check.go:170", "backend/internal/application/process/hidden_cost.go:380", "backend/internal/application/process/service_test.go:58", "backend/internal/application/process/service_test.go:85", "backend/internal/platform/docno/docno.go:23", "backend/internal/adapter/inbound/http/market/handler.go:669"]
 ---
 
-## ภาพรวม
-เมื่อหลายคำขอแตะข้อมูลชุดเดียวกัน (สินค้าเดียวกัน, ช่วงวันที่ GL เดียวกัน, ตะกร้าของตัวแทนเดียวกัน) ระบบเคยได้ deadlock ดิบ, รายการบัญชีซ้ำ หรือเลขที่ชนกัน วิธีแก้หลักคือ `pg_advisory_xact_lock` ที่ล็อกตามลำดับคงที่
+# การทำงานพร้อมกันและ advisory lock
 
-## อาการ
-- **C1 สต็อกรายสินค้า (4341ae81):** รายงาน UAT r3f ใน handoff ข้อ B1: บันทึก ~10 ใบที่มีสินค้าเดียวกันพร้อมกัน ได้ HTTP 400 ข้อความ SQL ดิบ `deadlock detected` (SQLSTATE 40P01)
-- **C2 RebuildGL กับ save (ac839a65):** save ที่ลงบัญชีระหว่าง DELETE กับ INSERT ของ rebuild ช่วงวันที่ ทำให้เหลือ journal 2 ชุด
-- **C3 เลขที่เอกสารโมดูลแดชบอร์ด (4de91436):** เลขแบบเวลา `HHMMSS` ซ้ำเมื่อสองคำขอเข้าวินาทีเดียวกัน ได้ order_no/trip_no/move_doc_no ซ้ำ; checkout ของตัวแทนเดียวกันที่ retry ถูกหักเครดิตสองรอบ
-- **C4 สต็อกช่องเก็บ WMS (5e3dbd36):** ตามข้อความ commit: ต้อง rebuild ยอดช่องให้ได้ผลเดิมทุกครั้ง และเตือนเมื่อยอดติดลบ
+เมื่อหลายคำขอแตะข้อมูลชุดเดียวกัน (สินค้าเดียวกัน, ช่วงวันที่ GL เดียวกัน, ตัวแทนเดียวกัน) ถ้าไม่ล็อกให้เป็นระเบียบจะได้ deadlock ดิบ, รายการบัญชีซ้ำ หรือเลขที่ชนกัน ระบบนี้แก้ด้วย `pg_advisory_xact_lock` ที่ล็อกตามลำดับคงที่เสมอ
 
-## สาเหตุ (root cause)
-- **C1:** save ที่เปลี่ยนต้นทุนอัปเดตแถว `ic_trans_detail` ของเอกสารอื่นในสินค้าเดียวกัน สองธุรกรรมถือแถวสลับลำดับกัน (คอมเมนต์ `service.go:989`)
-- **C2:** READ COMMITTED ให้ทุกคำสั่งเห็น snapshot ของตัวเอง; ล็อกต่อเอกสารไม่พอเพราะ rebuild ช่วงต้องล็อกทุกเอกสาร (ทะลุ `max_locks_per_transaction`) จึงใช้คีย์เดียว `glRebuildLock`
-- **C3:** รูปแบบเลขอิงเวลาละเอียดแค่วินาที; ยอดเครดิตเดิมคิดจาก `credit_used + x` ซึ่ง retry นับซ้ำ
-- **C4:** ไม่มีแถว OPENING และยอดถูกครอบด้วย `GREATEST(0, ...)` (อนุมานจากคอมเมนต์ใน diff)
+## อะไรพังได้
+- **deadlock รายสินค้า:** save ที่เปลี่ยนต้นทุนต้องอัปเดตแถว `ic_trans_detail` ของเอกสารอื่นที่มีสินค้าเดียวกัน สองธุรกรรมถือแถวสลับลำดับกัน → ผู้ใช้เห็น SQL ดิบ `deadlock detected` (SQLSTATE `40P01`)
+- **GL ซ้ำ:** rebuild GL ช่วงวันที่ลบ journal ทั้งช่วงแล้วลงใหม่ ถ้ามี save ลง journal ของตัวเองคั่นกลาง (READ COMMITTED ให้แต่ละคำสั่งเห็น snapshot ของตัวเอง) จะเหลือสองชุด
+- **เลขเอกสารชน:** เลขอิงเวลาระดับวินาทีซ้ำเมื่อสองคำขอเข้าวินาทีเดียวกัน
+- **นับเครดิตซ้ำ:** checkout ของตัวแทนเดียวกันที่ retry ถูกหักเครดิตสองรอบ ถ้าคิดจาก "ยอดเดิม + ค่าใหม่"
+- **บิลเดียวกันถูกจ่ายเกิน:** สองเอกสารอ่านยอดคงเหลือของบิลพร้อมกัน ต่างเห็นยอดเต็ม
 
-## วิธีแก้
-- **C1:** `lockStockItems` ล็อก shared ที่ `stockRebuildLock` แล้วล็อกรายสินค้า `ic_stock:<code>` ตามลำดับ sorted ก่อนแก้ `ic_trans_detail`; `RebuildStock` ทั้งฐานล็อกแบบ exclusive
-- **C2:** `RebuildGL` ล็อก exclusive; save/อนุมัติ/ยกเลิก/ขายสินทรัพย์ล็อก shared (`lockGLShared`) หลังล็อกเอกสารและก่อนเขียน GL; ขายสินทรัพย์ล็อก `asset-sale` ก่อน แล้วค่อย shared GL เพราะ rebuild ไม่เคยถือ `asset-sale` จึงไม่ deadlock
-- **C3:** `docno.Stamp(layout)` ต่อมิลลิวินาทีและแท็กสุ่ม 4 หลัก; checkout ล็อกแถวตัวแทนก่อนแล้วคำนวณ `credit_used` ใหม่จากยอดตั้งต้น + SUM ใบสั่ง และรวมทุก insert ใน ExecBatch เดียว
-- **C4:** ไม่มีแถว OPENING และยอดถูกครอบด้วย `GREATEST(0, ...)` (อนุมานจากคอมเมนต์ใน diff)
+## โค้ดป้องกันไว้อย่างไร
+| ด่าน | ที่อยู่ | ทำอะไร |
+|---|---|---|
+| ล็อกสต็อกรายสินค้า | `backend/internal/application/process/service.go:998-1014` `lockStockItems` | ล็อก shared ที่ `stockRebuildLock` แล้วล็อกรายสินค้า `ic_stock:<code>` ตามลำดับ sorted (`uniqueSorted`) ก่อนแก้ `ic_trans_detail`; rebuild ทั้งฐาน (`:1025`) ล็อก exclusive |
+| ผู้เรียก `lockStockItems` | `trans.go:400,515`, `doc_cancel.go:140`, `stock_beginning.go:324,366` | บันทึก/ลบ/ยกเลิก/ยอดยกมา ล็อกสินค้าก่อนเขียน |
+| ล็อกเอกสาร | `trans.go:474` `lockTransDoc`, `docs.go:180` `runDocPlan` | `ic_trans:<doc_no>:<flag>` กัน save/delete เอกสารเดียวกันชนกัน |
+| GL rebuild กับ save | `backend/internal/application/process/service.go:1367-1388` `glRebuildLock`/`lockGLShared`; `:1331` `RebuildGL` | RebuildGL ล็อก exclusive; save/อนุมัติ/ยกเลิก/ขายสินทรัพย์ล็อก shared หลังล็อกเอกสารและก่อนเขียนแถว GL (`trans.go:477`, `docs.go:183`, `fa_sale.go:407`) |
+| ขายสินทรัพย์ | `fa_sale.go:402-407` | ล็อก `asset-sale` ก่อน แล้วค่อย shared GL — rebuild ไม่เคยถือ `asset-sale` จึงไม่ deadlock |
+| ล็อกบิลตามลำดับ | `pay_check.go:170-176` | ล็อก `bill:<เลขบิล>` ตามลำดับ sorted ก่อนตรวจยอดจ่าย |
+| ล็อกต้นทุนซ่อน | `hidden_cost.go:380-390` `lockHiddenCost` | ล็อกรหัสเอกสารเรียงลำดับคงที่ (แก้เอกสารที่เปลี่ยนเลขก็ไม่ deadlock) |
+| เลขเอกสารกันชน | `backend/internal/platform/docno/docno.go:23` `Stamp` | เวลา + มิลลิวินาที + แท็กสุ่ม 4 hex (เทสต์ `docno_test.go:9,20`) |
+| เครดิตตัวแทน | `backend/internal/adapter/inbound/http/market/handler.go:669-673` | ล็อกแถวตัวแทนก่อน แล้วคำนวณเครดิตใหม่จากยอดตั้งต้น + SUM(ออเดอร์) |
+| เทสต์ลำดับล็อก | `service_test.go:58` `TestSavesTakeGLRebuildLockFirst`, `:85` `TestLockStockItemsSortedAndRebuildStockLock` | ใช้ tx จำลอง (`lockTx`) ตรวจลำดับคำสั่งล็อก ไม่ได้ใช้ฐานจริง |
 
-## commit ที่เกี่ยวข้อง
-- `4341ae81` — ล็อกสต็อกรายสินค้า กัน 40P01
-- `ac839a65` — ล็อก shared/exclusive ของ RebuildGL
-- `4de91436` — checkout/TMS/procure เป็นธุรกรรมเดียว, เลขที่กันชน
-- `5e3dbd36` — rebuild ช่อง WMS แบบกำหนดผลได้
-- `acba317c` / `9e29f6df` — ล็อกบิลและล็อกต้นทุนซ่อน (พบด้วย `git log -S` ยังไม่ได้ตรวจ diff)
-
-## โค้ดปัจจุบันที่ป้องกัน
-- `backend/internal/application/process/service.go:990` `stockRebuildLock`, `:992` `lockStockItems`; เรียกที่ `trans.go:400`, `:515`, `doc_cancel.go:140`, `stock_beginning.go:324`, `:366`
-- `backend/internal/application/process/service.go:1365` `glRebuildLock`, `:1370` `lockGLShared`; เรียกที่ `docs.go:183`, `trans.go:477`, `fa_sale.go:407`
-- `backend/internal/application/process/pay_check.go:170` ล็อกบิลตามลำดับ sorted; `hidden_cost.go:286` ล็อกรหัสเอกสารเรียงลำดับ
-- `backend/internal/platform/docno/docno.go:23` `Stamp`; เทส `docno_test.go:9`
-- `backend/internal/adapter/inbound/http/market/handler.go:669` ล็อกแถวตัวแทน; `wms/handler.go:1997` `WmsBinOpeningSQL`, `:2039` `WmsBinRebuildSQL`
-- เทส `service_test.go:58` `TestSavesTakeGLRebuildLockFirst` และ `:85` `TestLockStockItemsSortedAndRebuildStockLock` ใช้ tx จำลอง ตรวจลำดับคำสั่ง ไม่ใช้ฐานจริง
-
-## บทเรียน / กฎที่ได้
-- ล็อกหลายตัวต้องเรียงลำดับคงที่เสมอ (sorted) และล็อกก่อนเขียนแถวใด ๆ
-- ใช้คีย์ระดับกว้างเมื่อ rebuild ครอบทั้งช่วง; ข้อแลก: save ทุกใบรอ rebuild จบ ถ้า POS หมดเวลาให้เปลี่ยนเป็นคีย์รายงวด (คอมเมนต์ `service.go:1356`)
-- ห้ามคำนวณยอดสะสมจาก "ยอดเดิม + ค่าใหม่" ถ้าคำขอ retry ได้; คำนวณใหม่จาก Raw
-- ข้อค้างตาม handoff: GL lock ยังไม่ทดสอบกับฐานจริงขณะ rebuild และ save วิ่งพร้อมกัน และ B1 ยังไม่ได้รัน repro ซ้ำหลัง 4341ae81 (ยังไม่ verify)
-
-## ดูเพิ่ม
-[[hist-lessons-gl-posting-balance]] · [[hist-lessons-stock-cost-moving-average]] · [[hist-lessons-atomic-transactions-swallowed-errors]] · [[acc-gl-rebuild]] · [[history-overview]]
+## กฎที่ต้องจำ
+1. ล็อกหลายตัวต้องเรียงลำดับคงที่ (sorted) และล็อกก่อนเขียนแถวใดๆ
+2. rebuild ที่ครอบทั้งช่วงใช้คีย์เดียวกว้างๆ — ข้อแลกเปลี่ยนที่โค้ดเขียนไว้ใน comment `backend/internal/application/process/service.go:1371-1375`: ทุก save รอ rebuild ที่กำลังรัน (tx สูงสุด 60 วินาที) ถ้า POS หมดเวลาให้เปลี่ยนเป็นคีย์รายงวด
+3. ห้ามคำนวณยอดสะสมจาก "ยอดเดิม + ค่าใหม่" เมื่อคำขอ retry ได้ ให้คำนวณใหม่จากข้อมูลดิบ
+4. เลขเอกสารอิงเวลาต้องใช้ `docno.Stamp`
+5. ข้อจำกัดที่ยังมี: เทสต์ล็อกใช้ tx จำลองเท่านั้น ยังไม่มีเทสต์ที่รัน rebuild กับ save พร้อมกันบนฐานจริง
 
 ## ที่มาในโค้ด
-- git: `4341ae81`, `ac839a65`, `4de91436`, `5e3dbd36`, `acba317c`, `9e29f6df`
-- `docs/HANDOFF_BCCM_PARITY_2026-10-22.md`
+- `backend/internal/application/process/service.go:998-1014,1331,1367-1388` ล็อกสต็อกและล็อก GL
+- `backend/internal/application/process/service_test.go:58-100` เทสต์ลำดับล็อก
+- `backend/internal/platform/docno/docno.go:23`
+- ดูเพิ่ม: [[acc-gl-rebuild]] · [[acc-inventory-stock-rebuild]] · [[hist-lessons-atomic-transactions-swallowed-errors]]
