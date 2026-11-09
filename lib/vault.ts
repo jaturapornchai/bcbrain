@@ -220,3 +220,7 @@ export function renderNote(n: Note): string {
   });
   return marked.parse(body, { async: false });
 }
+
+// last knowledge update shown on every page and in MCP instructions, Thai date + time in Bangkok time
+export const updatedAt = new Intl.DateTimeFormat("th-TH", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Bangkok" })
+  .format(new Date(process.env.BUILD_TIME ?? Date.now())) + " น.";

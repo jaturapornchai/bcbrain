@@ -1,12 +1,13 @@
 # สมอง BC (BC Brain)
 
-> Knowledge vault of the BC Ai Account system (Go backend, Next.js frontend, accounting logic, team standards), extracted read-only from the source code as Obsidian markdown. Mostly Thai.
+> Customer-facing knowledge base of the BC Ai Account product suite (Thai accounting/ERP for SMEs plus POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Dashboard). Plain-Thai how-to guides, troubleshooting, FAQ, reports, glossary and pre-sale facts, verified against the real source code.
 
-## For AI agents
+## For AI agents (call center / sales)
 - MCP endpoint (Streamable HTTP): https://brain.bcsmethai.com/mcp
 - Public and read-only: no key or auth header needed.
 - Tools: `ask_brain(question)`, `search_brain(query, limit?)`, `read_note(slug)`, `list_notes(folder?, tag?)`
-- Answer only from note content and cite `[[slug]]` plus the source paths each note lists.
+- Start with `read_note("playbook-call-center")` or `read_note("playbook-sales")`, then answer only from note content.
+- Prices, packages, contracts and support hours are not in the notes: hand off to human sales staff.
 
 ## Pages
 - [Home: 3D neural map](https://brain.bcsmethai.com/)

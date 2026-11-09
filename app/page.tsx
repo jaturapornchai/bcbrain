@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Brain3D, { CountUp } from "@/components/Brain3D";
-import { graph } from "@/lib/vault";
+import { graph, updatedAt } from "@/lib/vault";
 
 const MCP_URL = "https://brain.bcsmethai.com/mcp";
 const TOOLS = [
@@ -20,8 +20,9 @@ export default function Home() {
           <p className="eyebrow">BC Ai Account · Second Brain</p>
           <h1>สมอง BC</h1>
           <p className="lead">
-            คลังความรู้ที่สกัดจากซอร์สโค้ดจริง — <CountUp to={g.nodes.length} /> เซลล์ความรู้ · <CountUp to={g.links.length} delay={800} /> ไซแนปส์
+            คู่มือใช้งาน แก้ปัญหา และข้อมูลระบบ ภาษาเข้าใจง่าย — <CountUp to={g.nodes.length} /> เซลล์ความรู้ · <CountUp to={g.links.length} delay={800} /> ไซแนปส์
           </p>
+          <p className="muted">อัปเดตล่าสุด {updatedAt}</p>
           <div className="actions">
             <Link className="btn primary" href="/n">
               เปิดคลังความรู้
@@ -69,10 +70,10 @@ url = "${MCP_URL}"`}</pre>
             "@context": "https://schema.org",
             "@type": "SoftwareApplication",
             name: "สมอง BC (BC Brain)",
-            applicationCategory: "DeveloperApplication",
+            applicationCategory: "BusinessApplication",
             operatingSystem: "Web",
             url: "https://brain.bcsmethai.com",
-            description: "คลังความรู้ BC Ai Account แบบ Obsidian พร้อม MCP server ให้ AI ถาม-ตอบ",
+            description: "คู่มือใช้งานและแก้ปัญหา BC Ai Account พร้อม MCP server ให้ AI ผู้ช่วยตอบลูกค้า",
             publisher: { "@type": "Organization", name: "บริษัท บ้านเชียงซอฟท์ จำกัด", url: "https://www.bcsmethai.com" },
           }),
         }}

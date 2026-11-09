@@ -1,12 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
-import { excerpt, getNote, search, terms, vault, type Note } from "@/lib/vault";
+import { excerpt, getNote, search, terms, updatedAt, vault, type Note } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
 
-const INSTRUCTIONS = `BC Brain = knowledge vault (Obsidian markdown, mostly Thai) extracted read-only from the BC Ai Account source code (Go backend + Next.js frontend + accounting logic + team standards).
-Workflow: ask_brain or search_brain first, then read_note for the notes you need. Answer only from note content, cite [[slug]] and the source paths listed in each note. If notes do not cover the question, say so instead of guessing.`;
+const INSTRUCTIONS = `BC Brain = customer-facing knowledge base of the BC Ai Account product suite: Thai accounting/ERP for SMEs (sales, purchasing, inventory, AR/AP, cash/bank/cheques, fixed assets, general ledger, VAT/WHT, reports) plus add-on systems (POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Dashboard and more). Notes are plain Thai for business owners, accountants and shop staff, verified against the real source code.
+You act as a call-center or sales assistant for BC customers. Before your first answer in a conversation, read_note("playbook-call-center") for usage/support questions or read_note("playbook-sales") for pre-sale questions, and follow it.
+Workflow: ask_brain with the customer's own words -> read_note for linked notes when needed -> answer in plain Thai, step by step, using menu paths and on-screen messages exactly as the notes write them.
+Rules: answer only from note content; if the notes do not cover it, say so and offer a hand-off to human staff - never guess menus, buttons, features or causes. Never quote prices, packages, discounts, contracts or support hours: hand off to the sales team. Never ask for passwords or other secrets. For tax/legal interpretation explain only what the system does and advise the customer's auditor or the Revenue Department. Slugs are for you; do not show them to customers unless asked.`;
 
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 
@@ -14,7 +16,6 @@ function noteText(n: Note, body = n.body): string {
   return [
     `# ${n.title}`,
     `slug: ${n.slug} | folder: ${n.folder} | tags: ${n.tags.join(", ")}`,
-    n.sources.length ? `sources: ${n.sources.join(", ")}` : "",
     "",
     body.trim(),
     "",
@@ -24,7 +25,8 @@ function noteText(n: Note, body = n.body): string {
 }
 
 function buildServer() {
-  const server = new McpServer({ name: "bcbrain", version: "1.1.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: "bcbrain", version: "2.0.0" }, { instructions: `${INSTRUCTIONS}
+Knowledge last updated: ${updatedAt} (Thai time).` });
   const log = (tool: string) => console.log(`[mcp] tool=${tool}`);
   const annotations = { readOnlyHint: true, openWorldHint: false }; // clients may skip the approval prompt for read-only tools
   const folders = [...new Set([...vault().values()].map((n) => n.folder))].sort().join(", ");
@@ -34,7 +36,7 @@ function buildServer() {
     {
       title: "Ask the BC brain",
       description:
-        "Question answering over the BC Ai Account knowledge vault. Returns the 4 most relevant notes (long notes trimmed to the sections that match, with a list of omitted sections) so you can answer and cite them. Thai or English questions.",
+        "Answer a customer question (Thai or English, their own words are fine) from the BC knowledge base. Returns the 4 most relevant notes (long notes trimmed to the sections that match, with a list of omitted sections) so you can answer from them.",
       inputSchema: { question: z.string().min(2).max(500) },
       annotations,
     },

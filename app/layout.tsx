@@ -8,11 +8,11 @@ const head = Mitr({ subsets: ["thai", "latin"], weight: ["400", "500"], variable
 export const metadata: Metadata = {
   metadataBase: new URL("https://brain.bcsmethai.com"),
   title: "สมอง BC — คลังความรู้ BC Ai Account",
-  description: "Second brain ของระบบ BC Ai Account: ความรู้ที่สกัดจากซอร์สโค้ดจริง เป็นโน้ต Obsidian พร้อม MCP ให้ AI ถาม-ตอบ",
+  description: "คู่มือใช้งาน วิธีแก้ปัญหา และข้อมูลระบบ BC Ai Account ภาษาเข้าใจง่าย พร้อม MCP ให้ AI ผู้ช่วยตอบลูกค้า",
   alternates: { canonical: "/" },
   openGraph: {
     title: "สมอง BC",
-    description: "คลังความรู้ BC Ai Account แบบเส้นประสาทสมอง 3 มิติ + MCP สำหรับ AI",
+    description: "คู่มือใช้งานและแก้ปัญหา BC Ai Account + MCP สำหรับ AI ผู้ช่วยตอบลูกค้า",
     url: "https://brain.bcsmethai.com",
     siteName: "สมอง BC",
     locale: "th_TH",

@@ -1,60 +1,42 @@
 ---
-title: "ร้านค้าส่งออนไลน์ B2B (sys-market)"
-tags: [systems, market, sales, b2b, dashboard]
-aliases: ["Market", "B2B Wholesale", "ร้านค้าส่ง", "/market", "สั่งซื้อร้านค้าช่วง", "ยี่ปั๊ว ซาปั๊ว"]
-sources: ["frontend/src/app/market/page.tsx:5-13", "frontend/market/MarketDashboard.tsx:319-320", "frontend/market/MarketDashboard.tsx:456", "frontend/market/MarketDashboard.tsx:866-1039", "frontend/shared/layout/SystemPortalScreen.tsx:212-222", "frontend/shared/layout/PersistentWorkspaceHost.tsx:159", "backend/internal/adapter/inbound/http/router.go:313-318", "backend/internal/adapter/inbound/http/market/handler.go:248-258", "backend/internal/adapter/inbound/http/market/handler.go:270-304", "backend/internal/adapter/inbound/http/market/handler.go:454-549", "backend/internal/adapter/inbound/http/market/handler.go:852-884", "backend/internal/adapter/inbound/http/market/handler.go:1252-1360"]
+title: "ระบบ Market ตลาดสั่งของค้าส่งออนไลน์ (ลุงจืดการค้า)"
+tags: [system, market, sales]
+aliases: ["Market คืออะไร", "ลุงจืดการค้า", "สั่งของค้าส่งออนไลน์", "ร้านค้าช่วงสั่งของ", "ยี่ปั๊ว ซาปั๊ว สั่งของ", "B2B market", "ตะกร้าสั่งของ เข่งลุงจืด", "สมุดจดแปะโป้ง", "ระบบ Market ใช้ทำอะไร"]
+sources: ["frontend/market/MarketDashboard.tsx:218", "frontend/src/app/market/page.tsx:5", "backend/internal/adapter/inbound/http/market/handler.go:273", "backend/internal/adapter/inbound/http/market/handler.go:852", "backend/internal/adapter/inbound/http/market/handler.go:550"]
 ---
-# ร้านค้าส่งออนไลน์ B2B (sys-market)
+# ระบบ Market (ลุงจืดการค้า)
 
-ระบบ `/market` เป็นหน้าร้านค้าส่งให้ร้านค้าช่วง (sub-dealer) เลือกสินค้า ใส่ตะกร้า แล้วสั่งซื้อแบบตัดวงเงินเครดิตโดยไม่ต้องชำระเงินออนไลน์ เมื่อกดสั่งซื้อ ระบบจะสร้างคำสั่งซื้อและเอกสารต่อเนื่องไปยังคลัง ขนส่ง CRM และ e-Tax ใน transaction เดียว การ์ดในหน้าเลือกระบบชื่อ "ร้านค้าส่ง Market (B2B Wholesale)"
+## ระบบนี้คืออะไร
+หน้าร้านค้าส่งออนไลน์แบบ "สั่งของก่อน จ่ายทีหลัง" ร้านค้าช่วง (ร้านชำ ซาปั๊ว ยี่ปั๊ว) เลือกสินค้าลงเข่ง (ตะกร้า) แล้วกดสั่งซื้อ ไม่ต้องจ่ายเงินออนไลน์ ระบบจดเป็นเครดิตการค้า
+หน้าจอตกแต่งสไตล์โกดังค้าส่งแบบเก่า ใช้ภาษาพูดเช่น "เถ้าแก่" "หลงจู๊" "แปะโป้ง" (ซื้อเชื่อ)
 
-## ใครใช้ และเปิดอย่างไร
+## เหมาะกับธุรกิจแบบไหน
+ผู้ค้าส่งที่อยากให้ร้านค้าลูกข่ายเลือกของและสั่งเอง โดยไม่ต้องโทรหรือส่งไลน์ทีละร้าน ใช้ร่วมกับคลังสินค้า (WMS) และขนส่ง (TMS) ถ้าอยากเห็นใบงานครบ
 
-- ใช้ได้เมื่อล็อกอินและเลือกฐานข้อมูลแล้ว ถ้ายังไม่มี session ระบบจะส่งไป `/login` และถ้ายังไม่เลือกฐานจะส่งไป `/select-database` (`page.tsx:12-13`)
-- เปิดได้จากการ์ดในกลุ่ม `supply` หรือพิมพ์ `/market` ตรง ๆ ดู [[fe-app-shell-routing]]
-- หน้าจอมี 3 มุมมองคือ `home` (แคตตาล็อก), `cart` (ตะกร้า) และ `orders` (คำสั่งซื้อ) (`MarketDashboard.tsx:319-320`)
+## ทำอะไรได้
+- **เลือกสินค้า** ค้นหา กรองหมวด เรียงตามราคา/ขายดี ดูรูปและราคาตามจำนวนที่ซื้อ ดู [[howto-market-order-products]]
+- **ราคาขั้นบันได** ยิ่งซื้อเยอะยิ่งถูกลง และมีตั๋วลดราคา 3 แบบ ดู [[sys-market-pricing-vouchers]]
+- **สั่งซื้อแบบเครดิต** กดปุ่มเดียว ระบบเปิดใบงานคลัง จุดส่งของขนส่ง รายการใบกำกับภาษีอิเล็กทรอนิกส์ และบันทึกลง CRM ให้
+- **ติดตามออเดอร์และสั่งซ้ำ** ดู [[howto-market-track-reorder]]
+- **วงเงินเครดิตและส่วนลดสะสม (rebate)** ของแต่ละร้าน ดู [[faq-market-credit-rebate]]
 
-## Endpoint และ action
+## เชื่อมกับระบบบัญชีอย่างไร
+- สินค้าที่ขายในหน้านี้ดึงมาจากรายการสินค้าในระบบบัญชี (สูงสุด 300 รายการ) ราคาปลีกและราคาขั้นบันไดคำนวณจากต้นทุนเฉลี่ยของสินค้า
+- **การสั่งซื้อยังไม่ลงบัญชีและไม่ตัดสต็อกในระบบบัญชี** เลขขึ้นต้น INV ที่เห็นเป็นเพียงเลขอ้างอิง ไม่ใช่ใบกำกับภาษีขายในระบบบัญชี ดู [[faq-market-accounting-link]]
+- รายการใบกำกับภาษีอิเล็กทรอนิกส์ไปแสดงที่หน้า e-Tax ดู [[sys-etax-overview]] ใบงานคลังอยู่ที่ [[sys-wms-overview]] จุดส่งของอยู่ที่ [[sys-tms-overview]]
 
-- `GET /api/v1/market/overview?q=&group=` เรียก `Overview` ซึ่งรับคำค้นและกลุ่มสินค้า (`handler.go:248-258`)
-- `POST /api/v1/market/order` เรียก `CartOrOrderAction` ซึ่งอ่าน `action_type` แล้วแปลงเป็นตัวพิมพ์ใหญ่ก่อนเลือกทาง (`:270-304`)
+## เริ่มใช้งานยังไง
+1. เข้าสู่ระบบและเลือกฐานข้อมูลตามปกติ แล้วเปิดหน้า Market
+2. เลือกร้านค้าช่วงที่แถบบนจอ (ช่อง "เลือกร้านค้าช่วง")
+3. เลือกสินค้า ใส่เข่ง แล้วกด "สั่งซื้อสินค้า" ดู [[howto-market-order-products]]
 
-| `action_type` | ผลในโค้ด |
-|---|---|
-| `ADD_TO_CART` | เพิ่มสินค้าในตะกร้า ถ้า SKU ยังไม่อยู่ในแคตตาล็อกจะดึงจาก `ic_inventory` มาเพิ่มให้ ดู [[sys-market-checkout-sync]] |
-| `UPDATE_CART_QTY`, `REMOVE_CART_ITEM` | แก้จำนวนแล้วคิดราคาขั้นบันไดใหม่ หรือลบรายการ (`:454-502`) |
-| `CLEAR_CART` | `DELETE FROM market_cart_item` ทั้งตาราง (`:503-510`) |
-| `ADVANCE_ORDER_STATUS` | เลื่อนสถานะคำสั่งซื้อ (`:511-545`) |
-| `REORDER_TO_CART` | ใส่สินค้าตัวอย่างชุดตั้งต้นกลับเข้าตะกร้า (`seedDefaultCartItems`) ไม่ได้ใช้รายการของคำสั่งซื้อเดิม (`:546-549`) |
-| `PLACE_B2B_ORDER` | สั่งซื้อและซิงก์ข้ามระบบ ดู [[sys-market-checkout-sync]] |
+## ข้อจำกัดที่รู้ (ตรงๆ)
+- **ส่วนใหญ่ยังเป็นตัวสาธิต** ร้านค้าช่วง วงเงิน และรูปสินค้าบางส่วนเป็นข้อมูลตัวอย่างที่ระบบสร้างให้ ดู [[faq-market-is-it-demo]]
+- ไม่มีการล็อกอินแยกสำหรับร้านค้าช่วง ผู้ที่เปิดหน้านี้สลับร้านได้เอง
+- ระบบไม่ตรวจว่าสั่งเกินวงเงินเครดิตหรือไม่ และไม่ตรวจยอดขั้นต่ำของตั๋วลดราคาบางใบตามที่ข้อความบนจอบอก ดู [[sys-market-pricing-vouchers]]
+- แชท "ถามลุงจืด" เป็นข้อความตอบอัตโนมัติสำเร็จรูป ไม่ใช่คนหรือผู้ช่วย AI ตอบจริง
+- หน้าจอไม่ขึ้นข้อความผิดพลาดเมื่อสั่งไม่สำเร็จ ดู [[ts-market-order-no-response]]
+- เมนู Market ไม่อยู่ในรายการเมนูหลักของระบบบัญชี เปิดผ่านหน้า Market โดยตรง
 
-สถานะคำสั่งซื้อเดินตามลำดับ `PENDING_CONFIRM` → `WMS_PACKING` → `TMS_IN_TRANSIT` → `DELIVERED_COMPLETED` คำสั่งซื้อใหม่เริ่มที่ `WMS_PACKING` การเลื่อนสถานะอัปเดตเฉพาะ `market_b2b_order` (`:511-545`)
-
-## ข้อมูล
-
-ตารางสร้างเองตอนเรียกครั้งแรก (`handler.go:1252-1360`) คอลัมน์เงินเป็น `numeric(18,2)`
-
-| ตาราง | เก็บอะไร |
-|---|---|
-| `market_product_catalog` | แคตตาล็อก ราคาปลีกและราคาขั้นบันได 3 ระดับ |
-| `market_subdealer_profile` | ร้านค้าช่วง วงเงิน (`credit_limit`, `credit_used`, `credit_available`) เทอม (`credit_term_days`) rebate และยอดยกมา |
-| `market_cart_item` | รายการในตะกร้า |
-| `market_b2b_order` | คำสั่งซื้อ พร้อมเลขเอกสารอ้างอิงของ ERP, WMS, TMS และ e-Tax |
-
-Overview อ่านแคตตาล็อก ร้านค้าช่วง ตะกร้า คำสั่งซื้อล่าสุด 20 รายการ จำนวนสินค้าใน `ic_inventory` และรายการสินค้าจาก `ic_inventory` ร่วมกับ `ic_group` ตามคำค้น (`:852-884`) ดู [[tbl-ic-inventory]]
-
-## ความสัมพันธ์กับระบบบัญชี
-
-- คำสั่งซื้อเก็บเลข `erp_so_doc_no` เป็นรูปแบบ `INV6910-…` แต่ในแพ็กเกจนี้ไม่มีการเขียน `ic_trans` หรือบัญชีแยกประเภท รายละเอียดอยู่ที่ [[sys-market-checkout-sync]]
-- ร้านค้าช่วงใช้รหัสรูปแบบ `AR-…` เป็นค่าตั้งต้น แต่ยอดหนี้อยู่ใน `market_subdealer_profile` ไม่ได้อยู่ใน [[tbl-ap-ar-trans]]
-- วงจรขายมาตรฐานของบัญชีอยู่ที่ [[flow-order-to-cash]]
-- ระบบ LINE OA ส่งคำสั่งซื้อมาที่ endpoint นี้เช่นกัน ดู [[sys-lineoa-chat-ai]]
-
-## ที่มาในโค้ด
-
-- `frontend/src/app/market/page.tsx:5-13` metadata และการ redirect
-- `frontend/market/MarketDashboard.tsx:319-320` มุมมองหน้าจอ, `:456` ดึง overview, `:866-1039` ปุ่ม action
-- `frontend/shared/layout/SystemPortalScreen.tsx:212-222` การ์ดระบบ, `frontend/shared/layout/PersistentWorkspaceHost.tsx:159` จับคู่เส้นทาง
-- `backend/internal/adapter/inbound/http/router.go:313-318` route `/api/v1/market`
-- `backend/internal/adapter/inbound/http/market/handler.go:248-258` `Overview`, `:270-304` รายการ action, `:454-549` action ตะกร้าและสถานะ, `:852-884` SQL ของ overview, `:1252-1360` DDL
-- ดูเพิ่ม: [[sys-market-checkout-sync]] · [[api-business-modules]] · [[flow-order-to-cash]] · [[tbl-ar-customer]]
+## ดูต่อ
+[[sys-market-pricing-vouchers]] · [[howto-market-order-products]] · [[howto-market-track-reorder]] · [[ts-market-order-no-response]] · [[faq-market-accounting-link]] · [[faq-market-credit-rebate]] · [[faq-market-is-it-demo]]

@@ -121,6 +121,8 @@ pre { overflow-x: auto; padding: 14px 16px; border-radius: 12px; background: #12
 .brand { display: inline-flex; align-items: center; gap: 8px; font-size: 20px; color: var(--text) !important; white-space: nowrap; }
 .top form.search { flex: 1; display: flex; align-items: center; max-width: 560px; }
 .top form.search input { width: 100%; }
+.top .updated { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+@media (max-width: 640px) { .top .updated { display: none; } }
 .page { max-width: 1100px; margin: 0 auto; padding: 24px clamp(14px, 3vw, 32px) 80px; }
 .crumb { margin: 0 0 4px; color: var(--muted); font-size: 14px; }
 .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 14px; }

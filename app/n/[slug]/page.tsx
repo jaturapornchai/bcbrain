@@ -56,18 +56,7 @@ export default async function NotePage({ params }: Props) {
               <ul>{n.links.map(link)}</ul>
             </section>
           )}
-          {n.sources.length > 0 && (
-            <section className="card">
-              <h3>ที่มาในโค้ด</h3>
-              <ul>
-                {n.sources.map((s) => (
-                  <li key={s}>
-                    <code>{s}</code>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          {/* ponytail: sources stay in frontmatter for internal audit only, never shown to customers */}
         </aside>
       </div>
       <script

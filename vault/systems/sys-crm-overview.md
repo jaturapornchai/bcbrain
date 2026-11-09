@@ -1,61 +1,49 @@
 ---
-title: "ระบบบริหารความสัมพันธ์ลูกค้า (sys-crm)"
-tags: [systems, crm, sales, ar, dashboard]
-aliases: ["CRM", "Smart CRM 360", "บริหารความสัมพันธ์ลูกค้า", "/crm", "Kanban ดีลการขาย", "Customer 360"]
-sources: ["frontend/src/app/crm/page.tsx:6", "frontend/crm/CrmDashboard.tsx:57-64", "frontend/crm/CrmDashboard.tsx:145-180", "frontend/crm/CrmDashboard.tsx:347", "frontend/crm/CrmDashboard.tsx:611-644", "frontend/crm/CrmDashboard.tsx:930-960", "frontend/shared/layout/SystemPortalScreen.tsx:250-259", "frontend/shared/layout/PersistentWorkspaceHost.tsx:158", "backend/internal/adapter/inbound/http/router.go:260-268", "backend/internal/adapter/inbound/http/crm/handler.go:155-250", "backend/internal/adapter/inbound/http/crm/handler.go:340-402", "backend/internal/application/process/pos_bill.go:267"]
+title: "ระบบ CRM บริหารความสัมพันธ์ลูกค้า 360° คืออะไร ทำอะไรได้"
+tags: [system, crm, sales]
+aliases: ["CRM", "ระบบ CRM", "Smart CRM 360", "บริหารความสัมพันธ์ลูกค้า", "กระดานดีลการขาย", "โปรไฟล์ลูกค้า 360", "ติดตามลูกค้า", "ระบบดูแลลูกค้า", "CRM ใช้ทำอะไร"]
+sources: ["frontend/src/app/crm/page.tsx:6", "frontend/shared/layout/SystemPortalScreen.tsx:250", "frontend/crm/CrmDashboard.tsx:553", "backend/internal/adapter/inbound/http/router.go:260", "backend/internal/adapter/inbound/http/crm/handler.go:294", "backend/internal/adapter/inbound/http/crm/handler.go:1683"]
 ---
-# ระบบบริหารความสัมพันธ์ลูกค้า (sys-crm)
+# ระบบ CRM (บริหารความสัมพันธ์ลูกค้า 360°)
 
-ระบบ `/crm` เป็นแดชบอร์ดงานขายที่อ่านข้อมูลลูกค้าและเอกสารขายจริงจากฐานบัญชี มาแสดงเป็นกระดานดีล โปรไฟล์ลูกค้า 360 องศา ตารางโทรติดตาม การจัดเกรดลูกค้า และผลงานทีมขาย ชื่อหน้าใน metadata คือ "ระบบบริหารความสัมพันธ์ลูกค้า (Smart CRM 360°)"
+## ระบบนี้คืออะไร
+หน้าจอสำหรับทีมขายใช้ดูแลลูกค้า: ดูดีลการขายเป็นกระดาน ดูข้อมูลลูกค้ารายคน จดบันทึกการเข้าพบ/โทรติดตาม และดูผลงานทีมขาย
+ข้อมูลยอดซื้อและเอกสารขายดึงมาจากบัญชีของบริษัทเอง (ใบเสนอราคา ใบสั่งขาย ใบขาย) ในการ์ดระบบชื่อ "CRM (บริหารความสัมพันธ์ลูกค้า 360°)" กลุ่มเติบโต
 
-## ใครใช้ และเปิดอย่างไร
+## เหมาะกับธุรกิจแบบไหน
+ธุรกิจขายส่ง/ขายให้ลูกค้าองค์กร (B2B) ที่มีเซลส์ออกเสนอราคาและตามงานลูกค้าประจำ ถ้าขายหน้าร้านอย่างเดียว ใช้ [[sys-pos-overview]] เป็นหลักจะตรงกว่า
 
-- ทีมขายที่ล็อกอินและเลือกฐานข้อมูลแล้ว เปิดได้จากการ์ด "CRM (บริหารความสัมพันธ์ลูกค้า 360°)" ในกลุ่ม `growth` หรือพิมพ์ `/crm` ตรง ๆ ดู [[fe-app-shell-routing]]
-- หน้าจอเลือกได้ 5 โมดูล (`CrmModuleId`): `kanban` กระดานดีลการขาย, `customer360` โปรไฟล์ลูกค้า 360 องศา, `followup` ตารางโทรติดตามและนัดหมาย, `rfm` จัดเกรดลูกค้า VIP และ `salesteam` ผลงานทีมขาย (`CrmDashboard.tsx:57-62`, `:930-960`)
-
-## Endpoint
-
-| Method / path | handler | ทำอะไร |
+## มี 8 หน้าย่อย (แถบเมนูด้านซ้าย)
+| หน้า | ใช้ทำอะไร | ดูต่อ |
 |---|---|---|
-| `GET /api/v1/crm/overview` | `Overview` | KPI ดีล ลูกค้า และทีมขาย |
-| `GET /api/v1/crm/activities` | `ListActivities` | ประวัติการติดต่อลูกค้า |
-| `POST /api/v1/crm/activities` | `CreateActivity` | บันทึกการติดต่อพร้อมรูป |
-| `POST /api/v1/crm/upload` | `UploadImage` | อัปโหลดรูปเข้า MinIO |
-| `GET /api/v1/crm/image` | `ServeImage` | ส่งรูปหรือภาพย่อจาก MinIO |
+| กระดานดีลการขาย (Kanban) | ดูดีลแยก 4 ขั้น เลื่อนขั้น สร้างดีลใหม่ | [[howto-crm-deal-board]] |
+| แชท LINE OA & Chat Commerce | กล่องแชทลูกค้า ตอบ แปลงเป็นดีล | [[howto-crm-chat-inbox]] |
+| ติดตามหนี้ AR & ใบ 50 ทวิ | คิวทวงหนี้ นัดชำระ ตรวจใบหัก ณ ที่จ่าย | [[howto-crm-ar-collection]] |
+| โปรไฟล์ลูกค้า 360° & GPS | ข้อมูลลูกค้า ประวัติเอกสาร จดบันทึกเข้าพบ | [[howto-crm-customer-visit-note]] |
+| แคมเปญ & B2B Loyalty Rebate | แคมเปญส่งเสริมการขาย แต้มสะสม เงินคืน | [[howto-crm-campaign-loyalty]] |
+| ตารางโทรติดตาม & นัดหมาย | รายการงานตามลูกค้าประจำวัน | [[howto-crm-followup-and-sales-team]] |
+| วิเคราะห์เกรดลูกค้า VIP (RFM) | สัดส่วนลูกค้าแต่ละเกรด | [[sys-crm-customer-grades]] |
+| ผลงานทีมขาย (Leaderboard) | รายชื่อทีมขาย | [[howto-crm-followup-and-sales-team]] |
 
-ทั้งหมดอยู่หลัง middleware `Auth` (`router.go:260-268`) รายละเอียดการบันทึกกิจกรรมและรูปอยู่ที่ [[sys-crm-activity-images]]
+## เชื่อมกับระบบบัญชีอย่างไร
+- **อ่านจากบัญชี:** รายชื่อลูกค้า ยอดซื้อ ใบเสนอราคา ใบสั่งขาย ใบขาย ใบลดหนี้ รายการสินค้าในเอกสาร และยอดวางบิล/รับชำระ แสดงเป็นตัวเลขสรุปและการ์ดดีล
+- **ไม่ได้สร้างเอกสารบัญชีให้:** การกด "สร้างดีลการขายใหม่" หรือ "เลื่อนขั้นดีล" เป็นการจดบนกระดาน CRM เท่านั้น ไม่ได้ออกใบเสนอราคา/ใบสั่งขาย/ใบขายจริงในบัญชี ถ้าจะออกเอกสารจริงต้องไปที่เมนูขายตามปกติ (มีปุ่มลัด "ใบเสนอราคา" และ "ทะเบียนลูกหนี้" ที่แถบซ้าย)
+- **ระบบอื่นเขียนประวัติเข้ามาให้เอง:** เมื่อบิลขายหน้าร้านจ่ายสำเร็จ, ลูกค้าสั่งของผ่านตลาดค้าส่ง, หรือขนส่งส่งของถึงมือลูกค้า ระบบจะเพิ่มรายการในประวัติการติดต่อของลูกค้ารายนั้น ดู [[faq-crm-link-accounting]]
 
-## ข้อมูลที่ Overview อ่าน (`handler.go:155-250`)
+## เริ่มใช้งานยังไง
+1. เข้าสู่ระบบ เลือกฐานข้อมูลบริษัท
+2. เปิดการ์ด "CRM" จากหน้ารวมระบบ
+3. เริ่มที่ "โปรไฟล์ลูกค้า 360° & GPS" เลือกลูกค้า จดบันทึกการติดต่อ แล้วค่อยใช้กระดานดีล
 
-| ส่วน | แหล่งข้อมูล |
-|---|---|
-| KPI | `ic_trans` ธง 40 (ใบเสนอราคา), 36 (ใบสั่งขาย), 44 (ขาย), 48 (ลดหนี้) นับจำนวนและรวม `total_amount` ส่วน `ap_ar_trans` ธง 41 (วางบิล) และ 43 (รับชำระ) รวม `total_net_value` |
-| กราฟ pipeline รายวัน | ยอดธง 40+36 เทียบกับยอดปิดการขายธง 44 |
-| Customer 360 | `ar_customer` + `ar_customer_detail` + ยอดซื้อจาก `ic_trans` |
-| ดีล | เอกสารธง 40/36/44 พร้อมรายการสินค้าจาก `ic_trans_detail` |
-| ทีมขาย | `erp_user` ไม่เกิน 15 คน |
+## ข้อจำกัดที่ต้องบอกตรงๆ
+ระบบนี้ส่วนหนึ่งยังเป็นตัวสาธิต ลูกค้าควรรู้ก่อนใช้จริง:
+- หน้าแชท ติดตามหนี้ และแคมเปญ มีข้อมูลตัวอย่างให้เฉพาะฐานข้อมูลสาธิต ฐานข้อมูลของบริษัทจริงจะเริ่มว่าง ดู [[ts-crm-screen-empty-or-sample-data]]
+- การ "ส่ง" ข้อความตอบแชท ทวงหนี้ผ่าน LINE และยิงแคมเปญ ระบบบันทึกว่าส่งแล้ว แต่ไม่ได้ส่งข้อความออกไปหาลูกค้าจริง
+- ตัวเลขผลงานทีมขาย ใน "ผลงานทีมขาย" เป็นตัวเลขสมมุติ ไม่ใช่ยอดขายจริงของแต่ละคน
+- ตัวเลขสรุปด้านบนรวมเอกสารทุกใบตั้งแต่ต้น ไม่มีตัวกรองช่วงวันที่ และแถบ "เป้าหมายไปป์ไลน์เดือนนี้" ใช้เป้า 10 ล้านบาทตายตัว ปรับไม่ได้
+- ปุ่ม "ดึงพิกัด GPS ปัจจุบัน" ใส่พิกัดตายตัว ไม่ได้อ่านตำแหน่งจริง และหน้าจอไม่มีช่องเลือกรูปจากเครื่อง
 
-ความหมายของธงดูที่ [[acc-trans-flag-map]] และเอกสาร [[doc-sale-quotation]] · [[doc-sale-order]] · [[doc-sale-invoice]]
+สรุปว่าข้อมูลส่วนไหนจริง/ไม่จริง ดู [[faq-crm-demo-or-real]]
 
-## กระดานดีลและเกรดลูกค้า
-
-- ขั้นของดีลมาจากธงเอกสาร: 40 เป็น `qt`, 36 เป็น `so` และธงอื่นเป็น `won` ชื่อผู้ดูแลดีลวนตามรายชื่อทีมขาย (`handler.go:340-370`)
-- ลูกค้าที่ยังไม่มีเอกสารเลยถูกสร้างเป็นการ์ด `lead` ไม่เกิน 6 ใบ ยอดดีลตั้งเป็น 1,850,000 + ลำดับ × 640,000 (`:376-402`)
-- เกรดลูกค้าคิดในหน้าจอจากยอดซื้อรวม: ≥ 18,000,000 เป็น VIP Diamond, ≥ 9,000,000 เป็น Gold Loyal, > 0 เป็น Silver Active ต่ำกว่านั้นเป็นลูกค้ามุ่งหวัง (`CrmDashboard.tsx:145-180`)
-
-> ข้อสังเกตจากโค้ด: ยอดของการ์ด `lead` เป็นตัวเลขสาธิต และการเลื่อนขั้นดีลหรือสร้างดีลใหม่บนกระดาน (`advanceDealStage`, `handleCreateNewDeal`) เปลี่ยนเฉพาะ state ในเบราว์เซอร์ ไม่มีการเรียก API (`CrmDashboard.tsx:611-644`)
-
-## ความสัมพันธ์กับระบบบัญชี
-
-- CRM อ่านอย่างเดียวจาก [[tbl-ic-trans]], [[tbl-ic-trans-detail]], [[tbl-ar-customer]], [[tbl-ar-customer-detail]], [[tbl-ap-ar-trans]] และ [[tbl-erp-user]] ไม่ได้เขียนเอกสารขาย
-- ตารางที่ CRM เขียนเองคือ `crm_customer_activity` ระบบ POS และ Market ก็เขียนตารางนี้ตรงด้วย (`pos_bill.go:267`) ดู [[sys-market-checkout-sync]] ส่วน LINE OA เรียก `POST /api/v1/crm/activities` แต่ส่งชื่อฟิลด์ไม่ตรง ดู [[sys-lineoa-chat-ai]]
-- วงจรขายของบัญชีอยู่ที่ [[flow-order-to-cash]]
-
-## ที่มาในโค้ด
-
-- `frontend/src/app/crm/page.tsx:6` metadata
-- `frontend/crm/CrmDashboard.tsx:57-64` โมดูลและขั้นดีล, `:145-180` เกรดลูกค้า, `:347` ดึง overview, `:611-644` ปุ่มบนกระดาน, `:930-960` ป้ายโมดูล
-- `frontend/shared/layout/SystemPortalScreen.tsx:250-259` การ์ดระบบ, `frontend/shared/layout/PersistentWorkspaceHost.tsx:158` จับคู่เส้นทาง
-- `backend/internal/adapter/inbound/http/router.go:260-268` route `/api/v1/crm`
-- `backend/internal/adapter/inbound/http/crm/handler.go:155-250` SQL ของ overview, `:340-402` ขั้นดีลและการ์ด `lead`
-- ดูเพิ่ม: [[sys-crm-activity-images]] · [[api-business-modules]] · [[term-trans-flag]]
+## ดูต่อ
+[[howto-crm-deal-board]] · [[howto-crm-chat-inbox]] · [[howto-crm-ar-collection]] · [[howto-crm-customer-visit-note]] · [[howto-crm-campaign-loyalty]] · [[howto-crm-followup-and-sales-team]] · [[sys-crm-customer-grades]] · [[ts-crm-screen-empty-or-sample-data]] · [[ts-crm-visit-note-photo-failed]] · [[faq-crm-demo-or-real]] · [[faq-crm-link-accounting]] · [[sys-lineoa-overview]] · [[sys-account-overview]]

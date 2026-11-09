@@ -10,6 +10,9 @@ assert.deepEqual(terms("ตัดสต็อกยังไง"), ["ตัด",
 assert.ok(terms("query gateway คือ อะไร").includes("gateway"));
 assert.ok(vault().has("index"), "vault/index.md loads");
 assert.equal(search("สารบัญ เริ่มที่นี่")[0]?.slug, "index");
+// customer phrasing must land on the right note within the top 3 (what the call-center AI reads first)
+for (const [q, slug] of [["ราคาเท่าไร", "sales-faq-before-buy"], ["เช็คเด้ง ทำยังไง", "howto-cheque-received-return-renew"], ["โอนสินค้าระหว่างคลัง", "howto-stock-transfer"], ["ออกใบกำกับภาษีอิเล็กทรอนิกส์", "sys-etax-overview"]])
+  assert.ok(search(q, 3).some((h) => h.slug === slug), `${q} → ${slug}`);
 assert.ok(terms("bc_mcp_tokens").includes("mcp"), "identifier parts are searchable");
 for (const s of ["INDEX", "[[index]]", "[[index|สารบัญ]]", "index.md", "vault/index.md"]) assert.equal(getNote(s)?.slug, "index", s);
 const ex = excerpt("intro\n## A\n" + "x".repeat(50) + "\n## B gold\ngold", ["gold"], 30);

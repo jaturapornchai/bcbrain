@@ -1,11 +1,13 @@
 # สมอง BC (BC Brain)
 
 ## Objective
-คลังความรู้ของระบบ **BC Ai Account** (`d:\bcaiaccount`, อ่านอย่างเดียว) ในรูปโน้ต markdown แบบ Obsidian
-เปิดสาธารณะ 3 ทาง: หน้าแรกเป็นสมอง 3 มิติ (Three.js), หน้าอ่านโน้ต `/n`, และ MCP server `/mcp` ให้ AI ตัวอื่นถาม-ตอบ
+คู่มือระบบ **BC Ai Account** และระบบในชุด BC สำหรับลูกค้า เขียนเป็นภาษาไทยที่คนทั่วไปอ่านเข้าใจ (วิธีทำทีละขั้น, แก้ปัญหา, ถาม-ตอบ, รายงาน, คำศัพท์, ข้อมูลการขาย)
+สกัดจากโค้ดจริงใน `d:caiaccount` (อ่านอย่างเดียว) ให้ AI ตัวอื่นเชื่อมผ่าน MCP ไปทำ call center และตอบคำถามก่อนซื้อ
+เปิดสาธารณะ 3 ทาง: หน้าแรกเป็นสมอง 3 มิติ (Three.js), หน้าอ่านโน้ต `/n`, และ MCP server `/mcp`
 
 ## Workflow
-1. สกัดความรู้จากโค้ด → เขียนโน้ตลง `vault/<กลุ่ม>/<slug>.md` (frontmatter `title/tags/aliases/sources` + `## ที่มาในโค้ด` อ้าง `path:line`)
+1. สกัดความรู้จากโค้ด → เขียนโน้ตลง `vault/<กลุ่ม>/<slug>.md` ตามกติกาใน `docs/extract-brief.md` (frontmatter `title/tags/aliases/sources`; `sources` = `path:line` ใช้ตรวจภายใน ไม่แสดงบนเว็บและ MCP)
+   แล้วรัน `npm run check` ตรวจ frontmatter, ศัพท์โค้ดหลุดในเนื้อหา, `sources` ชี้บรรทัดที่มีจริง และลิงก์เสีย
 2. `npm run build` → `prebuild` รัน `scripts/scan-secrets.mjs` ถ้าโน้ตไหนมี key/token/รหัสผ่าน/อีเมล/IP สาธารณะ build จะหยุดทันที (พิมพ์แค่ไฟล์:บรรทัด ไม่พิมพ์ค่า)
 3. `bash deploy/deploy.sh` → build + แพ็ก standalone + vault → scp → `/opt/bcbrain` (เก็บรุ่นก่อนไว้ที่ `/opt/bcbrain.prev`) → restart `bcbrain.service`
 4. Caddy (`brain.bcsmethai.com` → `127.0.0.1:3951`) ออก HTTPS ให้อัตโนมัติ
@@ -17,7 +19,8 @@
 |---|---|---|
 | `PORT=3951`, `HOSTNAME=127.0.0.1` | `deploy/bcbrain.service` | ฟังเฉพาะ localhost ให้ Caddy proxy |
 | `BC_DEPLOY_HOST` (env), `APP` | `deploy/deploy.sh` | เซิร์ฟเวอร์ปลายทาง (SSH key) และโฟลเดอร์ติดตั้ง |
-| กลุ่ม/สีโน้ต | `lib/groups.ts` | ชื่อโฟลเดอร์ใน `vault/` → ชื่อไทย + สีเซลล์ |
+| กลุ่ม/สีโน้ต | `lib/groups.ts` | ชื่อโฟลเดอร์ใน `vault/` (start, howto, troubleshoot, faq, reports, systems, glossary, sales, playbook) → ชื่อไทย + สีเซลล์ |
+| กติกา AI ตอบลูกค้า | `app/mcp/route.ts` (INSTRUCTIONS), `vault/playbook/` | บอก AI ให้อ่าน playbook ก่อน, ห้ามบอกราคา, ส่งต่อคนเมื่อไม่มีข้อมูล |
 | บรรทัดที่ยืนยันแล้วว่าไม่ใช่ความลับ | ใส่ `secret-scan:allow` ในบรรทัดนั้น | ข้ามตัวสแกน (ใช้เมื่อตรวจแล้วเท่านั้น) |
 
 ไม่มี env ลับ ไม่มี API key ทั้งเว็บและ MCP เป็น public อ่านอย่างเดียว
@@ -30,6 +33,7 @@ Node 24+, Next.js 16 (standalone), React 19, three 0.187, `@modelcontextprotocol
 npm install
 npm run dev            # http://localhost:3000
 npm test               # selftest: ตัดคำไทย, ค้นหา, กัน XSS, ตัวสแกนความลับ
+npm run check          # ตรวจโน้ต (ต้องมี d:\bcaiaccount ในเครื่องจึงตรวจ sources)
 npm run scan           # สแกนความลับใน vault อย่างเดียว
 BC_DEPLOY_HOST=root@<server> bash deploy/deploy.sh  # deploy ขึ้น brain.bcsmethai.com
 ```
@@ -44,4 +48,5 @@ Tools: `ask_brain(question)` · `search_brain(query, limit?)` · `read_note(slug
 - โน้ตเป็นภาพถ่ายโค้ด ณ วันที่สกัด ถ้าขัดกับโค้ดปัจจุบันให้เชื่อโค้ด; อัปเดตต้องสกัดใหม่แล้ว deploy
 - ขอบเขต: ทุกระบบใน `d:\bcaiaccount` (บัญชีหลัก + POS, AutoCare, CRM, LINE OA, Market, Procure, eTax, WMS, TMS, Dashboard, MonitorMap, WorkMonitor, AI, UAT, tests, scripts) แหล่งเดียว ไม่อ้างโค้ดภายนอก
 - MCP เปิดสาธารณะ ไม่มี rate limit ในแอป
+- ไม่มีราคา แพ็กเกจ สัญญา ในคู่มือ AI ถูกสั่งให้ส่งต่อฝ่ายขายที่เป็นคน
 - slug ต้องไม่ซ้ำทั้ง vault (ชื่อไฟล์ซ้ำคนละโฟลเดอร์ ตัวหลังจะถูกข้าม)

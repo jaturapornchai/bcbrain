@@ -7,7 +7,7 @@ import { search, vault, type Note } from "@/lib/vault";
 
 export const metadata: Metadata = {
   title: "คลังความรู้ทั้งหมด · สมอง BC",
-  description: "สารบัญโน้ตความรู้ระบบ BC Ai Account แยกตามกลุ่ม: หลังบ้าน Go, ตรรกะบัญชี, Process Engine, หน้าจอ, มาตรฐาน",
+  description: "สารบัญคู่มือระบบ BC Ai Account แยกตามกลุ่ม: เริ่มต้นใช้งาน, วิธีทำทีละขั้น, แก้ปัญหา, รายงาน, ระบบงานในชุด, คำศัพท์",
   alternates: { canonical: "/n" },
 };
 
@@ -21,7 +21,7 @@ export default async function Notes({ searchParams }: { searchParams: Promise<{ 
     return (
       <Shell q={q}>
         <h1>ผลค้นหา “{q}”</h1>
-        {!hits.length && <p className="muted">ไม่พบโน้ตที่ตรง ลองคำอื่น หรือชื่อโค้ด/ตาราง</p>}
+        {!hits.length && <p className="muted">ไม่พบโน้ตที่ตรง ลองคำอื่น หรือพิมพ์ชื่อเมนูตามที่เห็นบนหน้าจอ</p>}
         <ul className="results">
           {hits.map((h, i) => (
             <li key={h.slug} style={{ "--i": i } as CSSProperties}>

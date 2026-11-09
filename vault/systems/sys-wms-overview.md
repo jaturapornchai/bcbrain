@@ -1,50 +1,52 @@
 ---
-title: "ระบบคลังสินค้า WMS ภาพรวม (SYS-06 Smart WMS)"
-tags: [systems, wms, warehouse]
-aliases: ["WMS", "ระบบคลังสินค้า", "Smart WMS", "SYS-06", "/wms", "wms_stock_bin", "wms_fulfillment_order"]
-sources: ["frontend/src/app/wms/page.tsx:12-15", "frontend/shared/layout/SystemPortalScreen.tsx:178-193", "frontend/shared/layout/PersistentWorkspaceHost.tsx:554-568", "backend/internal/adapter/inbound/http/router.go:279-285", "backend/internal/adapter/inbound/http/wms/handler.go:1-8", "backend/internal/adapter/inbound/http/wms/handler.go:182-215", "backend/internal/adapter/inbound/http/wms/handler.go:1208-1286", "frontend/wms/WmsDashboard.tsx:176", "frontend/src/app/api/wms/overview/route.ts:1-57"]
+title: "ระบบคลังสินค้า WMS (หยิบ แพ็ค ส่ง ย้ายช่อง ตรวจนับ) ภาพรวม"
+tags: [system, wms, warehouse]
+aliases: ["WMS", "ระบบคลังสินค้า", "คลังสินค้าอัจฉริยะ", "Smart WMS", "ระบบหยิบแพ็คส่ง", "ระบบจัดการคลัง", "สต็อกคลังจริง", "ชั้นวางสินค้า", "ถ่ายรูปหลักฐานคลัง", "ใบงานคลัง"]
+sources: ["frontend/wms/WmsDashboard.tsx:790-925", "frontend/wms/WmsDashboard.tsx:1040-1060", "frontend/wms/WmsDashboard.tsx:3140-3155", "backend/internal/adapter/inbound/http/wms/handler.go:1-8", "backend/internal/adapter/inbound/http/wms/handler.go:1288-1310", "backend/internal/adapter/inbound/http/market/handler.go:693-715"]
 ---
-# ระบบคลังสินค้า WMS (SYS-06 Smart WMS)
+# ระบบคลังสินค้า WMS
 
-WMS คือระบบ "คลังสินค้าจริง" ของ BC Ai Account ใช้บันทึกว่าสินค้าอยู่ช่องไหนของโกดัง หยิบ-แพ็ค-ส่งไปแล้วเท่าไร และมีรูปถ่ายหลักฐานทุกขั้น โดยเก็บ **สต็อกคลังจริง** แยกจาก **สต็อกบัญชี** (ที่คำนวณจาก `ic_trans_detail`) แล้วนำสองตัวเลขมาเทียบกันบนหน้าจอเดียวกัน
+## ระบบนี้คืออะไร
+WMS เป็นระบบเสริมของ BC สำหรับ "คลังจริง" คือบันทึกว่าสินค้าวางอยู่ช่องไหนของโกดัง ใบงานคลังหยิบ แพ็ค ส่งไปถึงขั้นไหนแล้ว และมีรูปถ่ายหลักฐานแต่ละขั้น
+WMS เก็บยอด "ของจริงบนชั้น" แยกต่างหากจากสต็อกบัญชี แล้วเอามาเทียบกับยอดบัญชีในหน้าจอ ใบงานที่ยังไม่ปล่อยรถนับเป็นยอด "รอส่ง" ของยังอยู่บนชั้นจนกว่าจะกดปล่อยรถ
 
-## ใครใช้ / เปิดอย่างไร
-- ผู้ใช้หลัก: พนักงานคลัง (หยิบ แพ็ค ขึ้นรถ รับเข้า ย้ายช่อง ตรวจนับ) และผู้จัดการคลังที่ดูความตรงกันของสต็อกจริงกับบัญชี
-- เปิดจากหน้ารวมระบบ (Portal) การ์ด `SYS-06` กลุ่ม "supply" ซึ่งลิงก์ไป `/wms` หรือจากแถบหัวระบบ "ระบบ คลัง WMS"
-- หน้า `/wms` เป็น Server Page: ไม่มี session จะเด้งไป `/login`, ยังไม่เลือกฐานข้อมูลจะเด้งไป `/select-database` ถ้าผ่านจะวาง `WorkspaceRouteSync` แล้วให้ `PersistentWorkspaceHost` แสดงจอ `WmsDashboard` (ค้างสถานะไว้เมื่อสลับระบบ ดู [[fe-tabs-workspace]])
+## เหมาะกับธุรกิจแบบไหน
+- ร้านค้าส่ง/ตัวแทนจำหน่ายที่มีโกดัง มีพนักงานคลังหยิบของตามใบงาน (รุ่นปัจจุบันใบงานมาจากคำสั่งซื้อค้าส่ง B2B)
+- ร้านที่ขายออนไลน์แล้วต้องแพ็คส่งขนส่ง (ต้องการใบปะหน้า รูปหลักฐานกันลูกค้าเคลม)
+- ร้านที่อยากรู้ว่าของจริงในคลังตรงกับบัญชีหรือไม่
 
-## 5 แท็บในจอ
-| แท็บ | เนื้อหา | อ่านต่อ |
+## จอหลักมี 5 แท็บ (ระบบ คลัง WMS)
+| แท็บ | ใช้ทำอะไร | อ่านต่อ |
 |---|---|---|
-| 1. หยิบ · แพ็ค · ขนส่ง (Pick & Pack) | ใบงานคลัง เลื่อนสถานะ WAITING_PICK → PICKING → PACKED → SHIPPED พร้อมรูปหลักฐาน | [[sys-wms-fulfillment-pick-pack-ship]] |
-| 2. สต็อกคลังจริง vs สต็อกบัญชี | ตารางเทียบยอดจริง/ยอดบัญชี/ยอดจอง | [[sys-wms-stock-ledger-reconcile]] |
-| 3. แผนผังโซน & ชั้นวาง (Bin Map) | 4 โซน (ZONE-A ถึง ZONE-D) และช่องเก็บ | [[sys-wms-stock-ledger-reconcile]] |
-| 4. รับเข้า · ย้ายช่อง · ตรวจนับ | บันทึกความเคลื่อนไหว (movement) | [[sys-wms-movements-evidence-photos]] |
-| 5. ผังเชื่อมโยง 5 ระบบ (End-to-End) | แท็บผังเชื่อมโยงของโมดูล | - |
+| 1. หยิบ · แพ็ค · ขนส่ง | เลื่อนใบงานคลังตามขั้น ถ่ายรูป พิมพ์ใบปะหน้า | [[howto-wms-pick-pack-ship]] [[howto-wms-print-label]] |
+| 2. สต็อกคลังจริง vs สต็อกบัญชี | เทียบยอดของจริงกับยอดบัญชีรายสินค้า | [[howto-wms-check-stock-vs-accounting]] |
+| 3. แผนผังโซน & ชั้นวาง (Bin Map) | ดูโซนและช่องชั้นวาง กดย้ายช่อง/นับสต็อก | [[howto-wms-bin-transfer]] [[howto-wms-cycle-count]] |
+| 4. รับเข้า · ย้ายช่อง · ตรวจนับ | บันทึกการเคลื่อนไหวของในคลังพร้อมรูป | [[howto-wms-receive-putaway]] [[howto-wms-evidence-photos]] |
+| 5. ผังเชื่อมโยง 5 ระบบ (End-to-End) | หน้าอธิบายภาพรวมการเชื่อมกัน รวมรายการสั่งซื้อค้าส่งที่ผ่านมา (ใช้ดูภาพรวม ไม่ได้ใช้บันทึกข้อมูลคลัง) | - |
 
-## ข้อมูลและตาราง
-เมื่อเรียก Overview ครั้งแรกของแต่ละฐานข้อมูล แบ็กเอนด์จะสร้างตารางเองด้วย `CREATE TABLE IF NOT EXISTS` (ผ่านสิทธิ์ `AllowDDL`):
-- `wms_stock_bin`: ยอดจริงต่อ "สินค้า x ช่องเก็บ" (physical, reserved, inbound putaway, min/max)
-- `wms_fulfillment_order`: ใบงานหยิบ-แพ็ค-ส่ง ผูกกับเลขใบกำกับขาย (ERP) และเก็บ JSON รูปหลักฐาน
-- `wms_movement_log`: สมุดความเคลื่อนไหว (รับเข้า ย้าย นับ ส่งออก) ใช้สร้างยอด physical ขึ้นใหม่
-- อ่านเพิ่มจากตารางหลักของบัญชี: `ic_trans_detail` (ยอดบัญชี), `ic_inventory` (รายการสินค้า), `images` (รูปสินค้า) ดู [[tbl-ic-trans-detail]], [[tbl-ic-inventory]]
-- ข้อมูลตัวอย่าง (seed) ใส่ให้เฉพาะฐาน `bcdemo` เท่านั้น ฐานอื่นเริ่มว่าง
+โซนที่ระบบแสดงมี 4 โซน: โซน A สินค้าขายดีหยิบด่วน, โซน B ชั้นพาเลทสูง, โซน C ควบคุมอุณหภูมิ/สินค้ามูลค่าสูง, โซน D จุดพักรอขึ้นรถ
 
-## API และการเชื่อมต่อ
-- Next.js proxy: `/api/wms/overview`, `/api/wms/fulfillment`, `/api/wms/movement` (ตรวจ session แล้วเรียก Go ด้วย token; ไม่มี token ตอบ `NO_TOKEN` 401) ดู [[fe-api-proxy-routes]]
-- Go (chi) ใต้ `/api/v1/wms` ทุกเส้นอยู่หลัง `Auth` ดูรายละเอียด request/response ที่ [[api-business-modules]]
-- เชื่อมกับระบบอื่น: เมื่อใบงานเป็น `SHIPPED` ระบบอัปเดต `market_b2b_order` เป็น `SHIPPED_IN_TRANSIT` และ `tms_delivery_stop` เป็น `IN_TRANSIT` ใน transaction เดียว (ดู [[sys-wms-fulfillment-pick-pack-ship]]) และฝั่ง TMS ปิดใบงานคลังให้เมื่อส่งมอบ (ดู [[sys-tms-trip-pod-flow]])
-- ใช้ MinIO เก็บรูปหลักฐาน ฐานข้อมูลเก็บเฉพาะ key และ JSON
+## เชื่อมกับระบบบัญชีและระบบอื่นอย่างไร
+- ยอดบัญชีที่นำมาเทียบมาจากเอกสารซื้อ ขาย และรับคืนในระบบบัญชีจริง (รวมทุกคลังของระบบบัญชี)
+- การรับเข้า ย้ายช่อง ตรวจนับ และปล่อยรถ ทำให้เปลี่ยนเฉพาะยอดในคลัง WMS **ไม่ไปแก้ยอดสต็อกหรือลงบัญชีให้**
+- ใบงานคลังเกิดจากคำสั่งซื้อค้าส่งในระบบตลาด B2B ของ BC (สั่งซื้อแล้วระบบสร้างใบงานคลังให้อัตโนมัติ) แต่ **ไม่ออกบิลขายหรือรายการในระบบบัญชีให้** ใบงานจึงไม่ได้ผูกกับบิลขายธรรมดา
+- ตอนกดปล่อยรถ จุดส่งของในระบบขนส่ง (TMS) ที่รอขึ้นรถจะเปลี่ยนเป็นกำลังขนส่ง และถ้าใบงานยังไม่เคยปล่อยรถ TMS จะตัดยอดคลังให้ตอนส่งถึงลูกค้า ดู [[sys-tms-overview]]
+- การรับสินค้าตามใบสั่งซื้อในระบบจัดซื้อออนไลน์ บันทึกใบรับเข้าสต็อกบัญชีและลงยอดเข้าคลัง WMS ให้พร้อมกัน ดู [[sys-procure-overview]]
+- แดชบอร์ดผู้บริหารมีปฏิทินลิงก์มาที่ WMS ดู [[sys-dashboard-overview]]
 
-## ข้อจำกัดที่ควรรู้
-- ตัวเลขจำนวน/น้ำหนักในแฮนด์เลอร์ใช้ `float64` ไม่ใช่ decimal (หลักการเงินดู [[std-data-integrity-money-transactions]])
-- ค่า "ความแม่นยำสต็อก" และ "การใช้ความจุ" บนหัวจอมีค่าตั้งต้นที่ฝังในโค้ด (รายละเอียดใน [[sys-wms-stock-ledger-reconcile]])
+## เริ่มใช้งาน
+1. เปิดระบบ "คลัง WMS" จากหน้ารวมระบบ เลือกฐานข้อมูลก่อน
+2. ฐานข้อมูลสาธิต: ระบบใส่ข้อมูลตัวอย่าง (สินค้า ช่องชั้นวาง ใบงาน รูปตัวอย่าง) ให้เองครั้งแรกที่เปิด
+3. ฐานข้อมูลจริงของร้านเอง: ระบบสร้างโครงสร้างให้แต่ **ยังว่าง** ต้องมีใบงานจากระบบตลาด B2B หรือข้อมูลช่องชั้นวางเข้ามาก่อนจึงจะเห็นรายการ (ดู [[faq-wms-demo-data-and-limits]])
 
-## ที่มาในโค้ด
-- `frontend/src/app/wms/page.tsx:12-15` redirect ตาม session และวาง `WorkspaceRouteSync`
-- `frontend/shared/layout/SystemPortalScreen.tsx:178-193` การ์ด SYS-06 และลิงก์ `/wms`
-- `frontend/shared/layout/PersistentWorkspaceHost.tsx:554-568` ติดตั้งจอ `WmsDashboard` ในโฮสต์
-- `backend/internal/adapter/inbound/http/router.go:279-285` เส้นทาง `/api/v1/wms` (overview, fulfillment, movement)
-- `backend/internal/adapter/inbound/http/wms/handler.go:1-8` คำอธิบายแพ็กเกจ; `:182-215` โครง `OverviewResponse` และ `Overview`; `:1208-1286` DDL สามตาราง
-- `frontend/wms/WmsDashboard.tsx:176` ชนิดแท็บ `fulfillment | ledger | binmap | operations | ecosystem`
-- ดูเพิ่ม: [[sys-wms-fulfillment-pick-pack-ship]] · [[sys-wms-stock-ledger-reconcile]] · [[sys-wms-movements-evidence-photos]] · [[sys-tms-overview]] · [[api-business-modules]] · [[backend-overview]] · [[be-multi-tenant]]
+## ข้อจำกัดที่ควรรู้ (ตรงๆ)
+- หน้าตาเน้นเป็นตัวอย่างสาธิต หลายช่องมีชื่อพนักงาน รหัสสินค้า เลขเอกสาร และจำนวน 50 ใส่ไว้ให้ก่อน ต้องแก้ให้เป็นของจริง
+- หลังกดบันทึกหรือเลื่อนขั้น จอขึ้นข้อความสำเร็จเสมอ แม้ระบบบันทึกไม่สำเร็จ ให้ตรวจประวัติหรือคอลัมน์ใบงานอีกครั้ง
+- ปุ่มเลื่อนสถานะจะเติม "รูปตัวอย่างที่ระบบสร้าง" ให้ถ้าไม่ได้แนบรูปจริง ดู [[howto-wms-evidence-photos]]
+- แท็บ 5 มีข้อความ "ตัดสต็อกทางบัญชีแล้ว" ข้างรายการสั่งซื้อ แต่รุ่นปัจจุบันระบบไม่ได้ตัดสต็อกบัญชีจริง อย่าอ้างข้อความนี้กับลูกค้า
+- ช่องสแกนบาร์โค้ดตรวจหลวมมาก (พิมพ์ 3 ตัวอักษรขึ้นไปก็ผ่าน) ดู [[howto-wms-pick-pack-ship]]
+- ยังไม่มีเครื่องมือสร้างใบงานคลังเองจากบิลขายธรรมดาบนหน้านี้
+- ตอบ "ตัดสต็อกตอนไหน" ดู [[faq-wms-when-stock-deducted]]
+
+## ดูต่อ
+[[howto-wms-pick-pack-ship]] · [[howto-wms-print-label]] · [[howto-wms-receive-putaway]] · [[howto-wms-bin-transfer]] · [[howto-wms-cycle-count]] · [[howto-wms-check-stock-vs-accounting]] · [[howto-wms-evidence-photos]] · [[ts-wms-stock-mismatch-status]] · [[ts-wms-order-or-item-not-found]] · [[faq-wms-when-stock-deducted]] · [[faq-wms-demo-data-and-limits]] · [[sys-account-overview]]

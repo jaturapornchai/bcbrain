@@ -1,59 +1,45 @@
 ---
-title: "ระบบจัดซื้ออัจฉริยะ (sys-procure)"
-tags: [systems, procure, purchase, ap, dashboard]
-aliases: ["Procure", "Smart Procurement", "จัดซื้อ PO", "/procure", "ระบบจัดซื้อ", "3-Way Matching"]
-sources: ["frontend/src/app/procure/page.tsx:5-13", "frontend/procure/ProcureDashboard.tsx:363", "frontend/procure/ProcureDashboard.tsx:396-682", "frontend/procure/ProcureDashboard.tsx:1051-1121", "frontend/shared/layout/SystemPortalScreen.tsx:161-172", "frontend/shared/layout/PersistentWorkspaceHost.tsx:160-161", "backend/internal/adapter/inbound/http/router.go:297-302", "backend/internal/adapter/inbound/http/procure/handler.go:298", "backend/internal/adapter/inbound/http/procure/handler.go:318", "backend/internal/adapter/inbound/http/procure/handler.go:1507-1515", "backend/internal/adapter/inbound/http/procure/handler.go:1626-1650", "backend/internal/adapter/inbound/http/procure/handler.go:1787-1900"]
+title: "ระบบจัดซื้อออนไลน์ ภาพรวม"
+tags: [system, procure]
+aliases: ["ระบบจัดซื้อ", "Smart Procurement", "จัดซื้ออัจฉริยะ", "ตะกร้าจัดซื้อ", "สืบราคา", "RFQ", "ใบสั่งซื้อ PO", "3-Way Match", "เรดาร์ AI จุดสั่งซื้อ"]
+sources: ["frontend/src/app/procure/page.tsx:5", "frontend/procure/ProcureDashboard.tsx:1058", "frontend/procure/ProcureDashboard.tsx:1096", "backend/internal/adapter/inbound/http/router.go:300", "backend/internal/adapter/inbound/http/procure/handler.go:1787"]
 ---
-# ระบบจัดซื้ออัจฉริยะ (sys-procure)
+# ระบบจัดซื้อออนไลน์ ภาพรวม
 
-ระบบ `/procure` เป็นแดชบอร์ดงานจัดซื้อแบบครบวงจร เริ่มจากตะกร้าขอซื้อ ส่งสืบราคา (RFQ) ต่อรองราคา ปิดเป็นใบสั่งซื้อ แล้วเดินสถานะไปถึงรับของเข้าคลังและจับคู่ใบกำกับภาษีซื้อ (3-Way Matching) ชื่อหน้าใน metadata คือ "ระบบจัดซื้ออัจฉริยะ (Smart Procurement · AI จุดสั่งซื้อ & 3-Way Matching)"
+ระบบเสริมของ BC Ai Account ช่วยงานจัดซื้อเป็นลำดับ: เก็บรายการที่ต้องซื้อใส่ตะกร้า, สืบราคาเทียบ 3 ผู้ขาย, ต่อรองหลายรอบ, ปิดเป็นใบสั่งซื้อ (PO), รับของเข้าคลัง, แล้วตรวจให้ตรงกัน 3 ฝั่ง (3-Way Match) เปิดจากหน้ารวมระบบ การ์ด "จัดซื้อ PO"
 
-ระบบนี้แยกจากหน้าจอเอกสารซื้อของระบบบัญชี วงจรซื้อมาตรฐานของบัญชี (ขอซื้อ สั่งซื้อ ซื้อ/ตั้งหนี้ จ่ายชำระ) อธิบายไว้ที่ [[flow-procure-to-pay]] และ [[faq-procure-to-pay-steps]]
+## เหมาะกับธุรกิจแบบไหน
+ร้านค้า/โรงงานที่สั่งของซ้ำๆ จากหลายเจ้า และอยากมีขั้นตอนเทียบราคาก่อนออก PO
 
-## ใครใช้ และเปิดอย่างไร
-
-- ฝ่ายจัดซื้อที่ล็อกอินและเลือกฐานข้อมูลแล้ว ถ้ายังไม่มี session ระบบจะส่งไป `/login` และถ้ายังไม่เลือกฐานจะส่งไป `/select-database` (`page.tsx:12-13`)
-- เปิดได้จากการ์ด "จัดซื้อ PO" ในหน้าเลือกระบบ (กลุ่ม `supply`) หรือพิมพ์ `/procure` ตรง ๆ ดู [[fe-app-shell-routing]]
-
-## แท็บบนหน้าจอ
-
+## หน้าจอมี 5 แท็บ
 | แท็บ | ทำอะไร |
 |---|---|
-| `cart_rfq` | ตะกร้าขอซื้อ ส่งสืบราคา ต่อรอง และปิดเป็น PO ดู [[sys-procure-cart-rfq-po]] |
-| `matching` | กระดานใบสั่งซื้อและการเดินสถานะ 3-Way Matching ดู [[sys-procure-3way-match-sync]] |
-| `replenish` | เรดาร์เตือนจุดสั่งซื้อจากยอดในคลัง |
-| `suppliers` | ตารางเปรียบเทียบผู้ขาย |
-| `create` | ฟอร์มสร้าง PO ใหม่ (`CREATE_PO`) |
+| 1. ตะกร้าจัดซื้อ & สืบราคาต่อรองจนปิดเป็น PO | ตะกร้า → ใบสืบราคา → ปิดเป็น PO ([[howto-procure-cart]], [[howto-procure-rfq-to-po]]) |
+| 2. กระดานใบสั่งซื้อ PO & 3-Way Matching | ดู PO รับของ ตรวจ 3 ฝั่ง ([[howto-procure-receive-and-match]]) |
+| 3. เรดาร์ AI เตือนจุดสั่งซื้อ | รายการสินค้าที่ควรสั่งเพิ่ม ([[howto-procure-reorder-radar]]) |
+| 4. ตารางเปรียบเทียบเจ้าหนี้ | ข้อมูลผู้ขาย ราคาเสนอ เครดิต MOQ (ข้อมูลตัวอย่างเฉพาะฐานสาธิต ไม่มีหน้าจอเพิ่มผู้ขายเอง) |
+| 5. เปิด PO / บันทึกรับของเข้าคลัง | ฟอร์มเปิด PO และเปลี่ยนสถานะ ([[howto-procure-open-po-form]]) |
 
-## เส้นทางข้อมูล
+## เชื่อมกับระบบอื่น
+- เมื่อรับของเข้าคลัง: เพิ่มสต็อกในชั้นวางของระบบคลัง (WMS) ถ้ามีแถวชั้นวางของสินค้านั้นอยู่แล้ว และสร้างเอกสารรับของในฝั่งสต็อก ([[faq-procure-links-wms-etax]])
+- เมื่อตรวจ 3 ฝั่งครบ: เพิ่มรายการใบกำกับภาษีซื้อในระบบ e-Tax (เลขใบกำกับระบบสร้างเอง ไม่ใช่เลขในใบจริง)
+- ระบบจัดซื้อไม่ลงบัญชีและไม่ตั้งเจ้าหนี้
+- เรดาร์ AI อ่านยอดสินค้าบนชั้นวางจากระบบคลัง เฉพาะ 8 แถวแรก
 
-- `GET /api/v1/procure/overview` เรียก `Overview` ซึ่งอ่าน PO, ตารางผู้ขาย, ยอดในคลัง `wms_stock_bin`, ตะกร้า และ RFQ (`handler.go:1507-1515`)
-- `POST /api/v1/procure/order` เรียก `AdvanceOrCreateOrder` ทุกปุ่มส่ง `action_type` มาที่ endpoint นี้ (`ProcureDashboard.tsx:396-682`)
-- หน้าจอเรียกผ่าน Next API proxy `/api/procure/overview` และ `/api/procure/order`
-- ตารางของระบบนี้ถูกสร้างเองตอนเรียกครั้งแรก ได้แก่ `procure_purchase_order`, `procure_supplier_matrix`, `procure_cart_item`, `procure_rfq_inquiry` คอลัมน์จำนวนและเงินเป็น `numeric(18,2)` (`handler.go:1787-1900`)
+## เริ่มใช้งาน
+1. เปิดแท็บเรดาร์ AI หรือแท็บตะกร้า แล้วหยิบสินค้าใส่ตะกร้า
+2. ส่งสืบราคา ต่อรอง แล้วปิดเป็น PO
+3. เมื่อของมาถึง กดรับเข้าคลัง
 
-## เรดาร์จุดสั่งซื้อ (แท็บ `replenish`)
+## ข้อจำกัดที่ต้องรู้ (พูดตรงๆ)
+- **ใบเสนอราคาจากผู้ขายเป็นตัวเลขที่ระบบสร้างเอง ไม่ได้ส่งไปถามผู้ขายจริง** และการต่อรองแต่ละรอบเป็นการลดราคาอัตโนมัติ ผู้ขายมาจากตารางตัวอย่าง ([[faq-procure-quotes-simulated]])
+- เรดาร์ AI ใช้ตัวเลข "ยอดขายต่อวัน" ที่ระบบตั้งสมมุติ ไม่ได้คำนวณจากยอดขายจริง ([[faq-procure-radar-accuracy]])
+- ตัวเลข "ลดต้นทุนซื้อเฉลี่ย" เป็นค่าคงที่ ([[faq-procure-radar-accuracy]])
+- ฟอร์มเปิด PO ใหม่ใช้ผู้ขาย จำนวน ราคา และเลขที่ PO ตั้งต้นของระบบ เลขซ้ำได้ ยังไม่ควรใช้จริง ([[howto-procure-open-po-form]])
+- คอลัมน์ "คงเหลือ vs จุดสั่งซื้อ" ในตะกร้าเป็นเลขตัวอย่างเหมือนกันทุกบรรทัด ([[howto-procure-cart]])
+- กดแล้วเงียบ ดู [[ts-procure-no-response]]
+- ฐานข้อมูลลูกค้าจริงเริ่มว่าง ข้อมูลตัวอย่างมีเฉพาะฐานข้อมูลสาธิต ([[ts-procure-empty-screen]])
+- เรื่องภาษีซื้อ ให้ปรึกษาผู้สอบบัญชี/สรรพากร
 
-ตัวเลขในแท็บนี้คำนวณจากยอดในคลังจริงร่วมกับค่าที่กำหนดตายตัวในโค้ด (`handler.go:1626-1650`)
-
-- ยอดพร้อมใช้ = `physical_qty − reserved_pick_qty` และ safety stock ตั้งต้น 80 เมื่อไม่มีค่า
-- อัตราใช้ต่อวัน = `14 + (ลำดับแถว mod 4) × 5` ไม่ได้มาจากประวัติการขาย
-- จุดสั่งซื้อ = safety + อัตราใช้ × 14
-- 2 แถวแรกขึ้น `REORDER_NOW` เสมอ และ `cost_savings_pct` ตายตัวที่ 7.4
-
-> ข้อสังเกตจากโค้ด: อัตราใช้และ KPI ประหยัดต้นทุนเป็นค่าสาธิต ยังไม่ใช่การพยากรณ์จากข้อมูลจริง
-
-## ความสัมพันธ์กับระบบบัญชี
-
-- เมื่อ PO เดินถึงขั้นรับของ ระบบเขียนแถว `ic_trans` และ `ic_trans_detail` ธง 12 ลงตรง และเมื่อถึงขั้น 3-Way จะเขียน `etax_document_log` ด้วย รายละเอียดและข้อสังเกตอยู่ที่ [[sys-procure-3way-match-sync]]
-- รหัสผู้ขาย (`ap_code`) ใช้ใน `cust_code` ของ `ic_trans` ดู [[tbl-ap-supplier]] และ [[tbl-ic-trans]]
-
-## ที่มาในโค้ด
-
-- `frontend/src/app/procure/page.tsx:5-13` metadata และการ redirect
-- `frontend/procure/ProcureDashboard.tsx:363` ดึง overview, `:396-682` ปุ่ม action ทั้งหมด, `:1051-1121` แท็บ
-- `frontend/shared/layout/SystemPortalScreen.tsx:161-172` การ์ดระบบในหน้าเลือกระบบ
-- `frontend/shared/layout/PersistentWorkspaceHost.tsx:160-161` จับคู่ `/procure` กับโมดูล
-- `backend/internal/adapter/inbound/http/router.go:297-302` route `/api/v1/procure`
-- `backend/internal/adapter/inbound/http/procure/handler.go:298` `Overview`, `:318` `AdvanceOrCreateOrder`, `:1507-1515` SQL ของ overview, `:1626-1650` เรดาร์จุดสั่งซื้อ, `:1787-1900` DDL
-- ดูเพิ่ม: [[sys-procure-cart-rfq-po]] · [[sys-procure-3way-match-sync]] · [[flow-procure-to-pay]] · [[faq-procure-to-pay-steps]] · [[api-business-modules]]
+## ดูต่อ
+[[howto-procure-cart]] · [[howto-procure-rfq-to-po]] · [[howto-procure-receive-and-match]] · [[howto-procure-reorder-radar]] · [[howto-procure-open-po-form]] · [[ts-procure-no-response]] · [[ts-procure-empty-screen]] · [[faq-procure-quotes-simulated]] · [[faq-procure-three-way-match]] · [[faq-procure-radar-accuracy]] · [[faq-procure-links-wms-etax]] · [[sys-wms-overview]] · [[sys-etax-overview]] · [[howto-buy-overview]]
