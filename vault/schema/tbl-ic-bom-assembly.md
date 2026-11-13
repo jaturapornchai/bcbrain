@@ -1,0 +1,57 @@
+---
+title: "ic_bom_header, ic_bom_detail & ic_assembly_order — สูตรผลิต BOM และใบสั่งประกอบ"
+tags: [schema, inventory, bom, assembly, production, bcaiaccount]
+aliases: [ic_bom_header, ic_bom_detail, ic_assembly_order, ic_formular, ic_production_formula, สูตรผลิต]
+sources:
+  - scripts/sql/02_data_schema.sql:5087-5116
+  - scripts/sql/02_data_schema.sql:6043-6084
+  - backend/internal/application/process/bom_assembly.go:167-235
+---
+
+# `ic_bom_header`, `ic_bom_detail` & `ic_assembly_order` — สูตรผลิต BOM และใบสั่งประกอบ
+
+ระบบสูตรการผลิตและใบสั่งประกอบ/ผลิตสินค้าใช้ชุดตาราง **`ic_bom_*` + `ic_assembly_order`** ที่สร้างโดย Go Backend (`bom_assembly.go:167-235` พร้อม `PRIMARY KEY` จริง) และรองรับการทำงานแบบ Atomic Transaction โดยสร้างเอกสาร **เบิกวัตถุดิบ (`trans_flag = 56`)** คู่กับ **รับสินค้าสำเร็จรูป (`trans_flag = 54`)** ใน [[tbl-ic-trans]] / [[tbl-ic-trans-detail]] นอกจากนี้ใน `02_data_schema.sql` ยังมีตารางสูตร C# ดั้งเดิม (`ic_formular*` และ `ic_production_formula*`) อยู่ด้วย
+
+## 1. ตารางสูตรผลิตและใบสั่งประกอบ (`bom_assembly.go:167-230`)
+
+### 1.1 `ic_bom_header` (หัวสูตรผลิต BOM)
+- **SQL Primary Key**: `PRIMARY KEY (bom_code)`
+- **คอลัมน์สำคัญ**:
+  - `bom_code` (`varchar(30)`), `bom_name` (`varchar(200)`), `active_status` (`smallint DEFAULT 1`)
+  - สินค้าสำเร็จรูป (Finished Goods): `fg_item_code` (`varchar(50)`), `fg_unit_code` (`varchar(30)`), `fg_yield_qty` (`NUMERIC(18,4) DEFAULT 1`) และหน่วยขนาน `fg_unit_code_2`, `fg_yield_qty_2`
+  - ต้นทุนมาตรฐานต่อรอบผลิต: `labor_cost NUMERIC(18,2)`, `overhead_cost NUMERIC(18,2)`
+  - คลังเริ่มต้น: `default_wh_code`, `default_shelf_code`
+
+### 1.2 `ic_bom_detail` (รายการวัตถุดิบในสูตร BOM)
+- **SQL Primary Key**: `PRIMARY KEY (bom_code, line_number)`
+- **คอลัมน์สำคัญ**: `bom_code`, `line_number` (`INT`), `rm_item_code` (`varchar(50)`), `rm_unit_code`, `rm_qty` (`NUMERIC(18,4)`), `rm_unit_code_2`, `rm_qty_2`, `scrap_pct` (`NUMERIC(9,4)` — เปอร์เซ็นต์สูญเสีย), `remark`
+
+### 1.3 `ic_assembly_order` (ใบสั่งประกอบ / บันทึกผลิตจริง)
+- **SQL Primary Key**: `PRIMARY KEY (order_doc_no)`
+- **Index**: `idx_ic_assembly_order_bom` ON `ic_assembly_order (bom_code, doc_date DESC)`
+- **คอลัมน์สำคัญ**:
+  - `order_doc_no` (`varchar(30)`), `doc_date DATE`, `bom_code`, `fg_item_code`
+  - `batch_count NUMERIC(18,4)`, `produced_fg_qty NUMERIC(18,4)`
+  - **เอกสารสต็อกคู่ที่สร้างใน `ic_trans`**: `issue_doc_no` (เอกสารเบิกวัตถุดิบ `trans_flag = 56`) และ `receipt_doc_no` (เอกสารรับสินค้าสำเร็จรูป `trans_flag = 54`)
+  - สรุปต้นทุนผลิต: `rm_total_cost`, `labor_cost`, `overhead_cost`, `fg_total_cost` (`NUMERIC(18,2)`), `fg_unit_cost` (`NUMERIC(18,4)`), `wh_code`, `shelf_code`
+
+## 2. ตารางสูตรผลิตเดิมใน `02_data_schema.sql`
+
+- **`ic_formular`** (`5087-5102`, Index `code`) & **`ic_formular_detail`** (`5104-5116`): สูตรสินค้าแบบเดิมของ C# *(สะกด `formular` ตาม DDL จริง)* มี `code`, `name_1`, `wage`, `cost` และรายการ `formular_code`, `ic_code`, `unit_code`, `qty`
+- **`ic_production_formula`** (`6043-6058`, Index `code`): หัวสูตรผลิตพร้อมช่วงวันที่ (`date_from`, `date_to`)
+- **`ic_production_formula_material`** (`6060-6071`, Index `item_code`) & **`ic_production_formula_product`** (`6073-6084`, Index `item_code`): รายการวัตถุดิบเข้า (`formula_code`, `item_code`, `unit_code`, `qty`, `line_number`) และสินค้าผลผลิตออก
+
+## ตัวอย่าง SQL จริง: คำนวณต้นทุนวัตถุดิบตาม BOM และตรวจสอบใบสั่งประกอบคู่เอกสาร `ic_trans`
+
+```sql
+SELECT h.bom_code, h.bom_name, h.fg_item_code, h.fg_yield_qty,
+       h.labor_cost, h.overhead_cost,
+       d.line_number, d.rm_item_code, i.name_1 AS rm_name,
+       d.rm_qty, d.scrap_pct,
+       ROUND(d.rm_qty * (1 + COALESCE(d.scrap_pct, 0) / 100.0) * COALESCE(i.average_cost, 0), 4) AS est_rm_cost
+FROM ic_bom_header h
+JOIN ic_bom_detail d ON d.bom_code = h.bom_code
+LEFT JOIN ic_inventory i ON i.code = d.rm_item_code
+WHERE h.bom_code = $1
+ORDER BY d.line_number;
+```

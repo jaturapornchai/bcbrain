@@ -2,6 +2,7 @@
   "name": "bcbrain",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "scan": "node scripts/scan-secrets.mjs",
@@ -9,7 +10,9 @@
     "build": "next build",
     "start": "next start",
     "test": "node scripts/selftest.ts",
-    "check": "node scripts/check-notes.mjs"
+    "test:deep": "node scripts/deep-test.ts",
+    "check": "node scripts/check-notes.mjs",
+    "check:drift": "node scripts/check-notes.mjs D:/bcaiaccount --strict --drift"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

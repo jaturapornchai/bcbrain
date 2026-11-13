@@ -1,13 +1,14 @@
-import Link from "next/link";
 import Brain3D, { CountUp } from "@/components/Brain3D";
 import { graph, updatedAt } from "@/lib/vault";
 
 const MCP_URL = "https://brain.bcsmethai.com/mcp";
+const SKILL_URL = "https://brain.bcsmethai.com/skills/bcbrain/SKILL.md";
 const TOOLS = [
-  ["ask_brain", "ถามเป็นภาษาคน ได้โน้ตที่เกี่ยวข้องเต็มๆ ไปตอบพร้อมอ้างอิง"],
-  ["search_brain", "ค้นคำ (ตัดคำไทยให้เอง) ได้รายการโน้ต + ข้อความตัวอย่าง"],
-  ["read_note", "อ่านโน้ตเต็มตาม slug พร้อมลิงก์ไป-กลับ"],
-  ["list_notes", "สารบัญโน้ตทั้งหมด กรองตามกลุ่มหรือ tag ได้"],
+  ["ask_brain", "ถามเป็นภาษาคนหรือคำถาม Dev (กรอง audience: user/dev/all) ได้โน้ตที่เกี่ยวข้องเต็มๆ พร้อมบริบทกราฟ 1 ทอด"],
+  ["search_brain", "ค้นคำ (ตัดคำไทย + คำพ้องไทย-SQL + ชื่อตาราง SQL พร้อม BM25 + 1-hop graph boost)"],
+  ["traverse_brain", "ไล่สายสัมพันธ์หลายทอด 1–3 hops (uses_table, writes_table, posts_rule) หรือหาเส้นทางสั้นสุดระหว่าง 2 โน้ต"],
+  ["read_note", "อ่านโน้ตเต็มตาม slug พร้อมกลุ่ม โซน audience และลิงก์ระบุชนิดความสัมพันธ์ไป-กลับ"],
+  ["list_notes", "สารบัญโน้ตทั้งหมด กรองตาม folder, tag หรือ audience ('all' | 'user' | 'dev') ได้"],
 ];
 
 export default function Home() {
@@ -16,28 +17,22 @@ export default function Home() {
   return (
     <>
       <main className="home">
-        <Brain3D nodes={g.nodes} links={g.links}>
+        <Brain3D nodes={g.nodes} links={g.links} rels={g.rels}>
           <p className="eyebrow">BC Ai Account · Second Brain</p>
           <h1>สมอง BC</h1>
           <p className="lead">
-            คู่มือใช้งาน แก้ปัญหา และข้อมูลระบบ ภาษาเข้าใจง่าย — <CountUp to={g.nodes.length} /> เซลล์ความรู้ · <CountUp to={g.links.length} delay={800} /> ไซแนปส์
+            คลังความรู้สำหรับผู้ใช้ทั่วไป และสเปก Schema / SQL / API สำหรับนักพัฒนา — <CountUp to={g.nodes.length} /> เซลล์ความรู้ ·{" "}
+            <CountUp to={g.links.length} delay={800} /> ไซแนปส์
           </p>
           <p className="muted">อัปเดตล่าสุด {updatedAt}</p>
-          <div className="actions">
-            <Link className="btn primary" href="/n">
-              เปิดคลังความรู้
-            </Link>
-            <a className="btn" href="#mcp">
-              เชื่อม AI ผ่าน MCP
-            </a>
-          </div>
         </Brain3D>
       </main>
 
       <section className="mcp" id="mcp">
         <h2>ให้ AI ตัวอื่นมาใช้สมองนี้ (MCP)</h2>
         <p className="lead">
-          Endpoint <code>{MCP_URL}</code> (Streamable HTTP) — เปิดสาธารณะ อ่านอย่างเดียว ไม่ต้องใช้ key
+          Endpoint <code>{MCP_URL}</code> (Stateless Streamable HTTP) — เปิดสาธารณะ อ่านอย่างเดียว ไม่ต้องใช้ key · รองรับตัวกรอง{" "}
+          <code>audience</code> แยกโซน <code>user</code> และ <code>dev</code>
         </p>
         <div className="cards">
           {TOOLS.map(([name, desc]) => (
@@ -49,8 +44,38 @@ export default function Home() {
             </div>
           ))}
         </div>
+
+        <h3>ตัวอย่างเรียกใช้แยกตามบทบาท</h3>
+        <div className="mcp-modes">
+          <div className="card">
+            <h3>โหมดผู้ใช้ทั่วไป / Call Center / ฝ่ายขาย</h3>
+            <p className="muted">อ่าน playbook ก่อน แล้วส่ง audience: &quot;user&quot; เสมอ เพื่อตอบเป็นภาษาไทยเข้าใจง่ายไร้ศัพท์โค้ด</p>
+            <pre>{`read_note({ slug: "playbook-call-center" })
+// หรือ read_note({ slug: "playbook-sales" })
+ask_brain({ question: "เช็คเด้งทำยังไง", audience: "user" })
+search_brain({ query: "ภพ30 ภาษีซื้อขาย", audience: "user" })
+traverse_brain({ slug: "howto-cheque-received", depth: 2, audience: "user" })`}</pre>
+          </div>
+          <div className="card">
+            <h3>โหมดนักพัฒนา / Dev / เขียนโค้ดต่อยอด</h3>
+            <p className="muted">อ่าน playbook-dev ก่อน แล้วใช้ audience: &quot;dev&quot; (หรือ &quot;all&quot; เมื่อต้องดูบริบทหน้างานร่วมด้วย)</p>
+            <pre>{`read_note({ slug: "playbook-dev" })
+ask_brain({ question: "โครงสร้าง ic_trans และ trans_flag ขาย", audience: "dev" })
+search_brain({ query: "gl_journal_detail NUMERIC", audience: "dev" })
+traverse_brain({ slug: "sql-ic-stock-balance", to_slug: "tbl-ic-unit", audience: "dev" })`}</pre>
+          </div>
+        </div>
+
         <h3>Claude Code</h3>
         <pre>{`claude mcp add --transport http bcbrain ${MCP_URL}`}</pre>
+        <h3>Antigravity — mcp_config.json</h3>
+        <pre>{`{
+  "mcpServers": {
+    "bcbrain": {
+      "serverUrl": "${MCP_URL}"
+    }
+  }
+}`}</pre>
         <h3>Gemini CLI — settings.json</h3>
         <pre>{`{
   "mcpServers": {
@@ -62,20 +87,65 @@ export default function Home() {
         <h3>Codex — config.toml</h3>
         <pre>{`[mcp_servers.bcbrain]
 url = "${MCP_URL}"`}</pre>
+
+        <h3>ติดตั้ง Skill /bcbrain (คำสั่งลัดพร้อมกติกาครบในไฟล์เดียว)</h3>
+        <p className="lead">
+          เมื่อติดตั้ง Skill นี้แล้ว พิมพ์ <code>/bcbrain &lt;คำถาม&gt;</code> หรือ{" "}
+          <code>/bcbrain dev &lt;โจทย์ SQL/Schema/API&gt;</code> ได้ทันที และมีตัวสำรอง HTTP JSON-RPC เมื่อยังไม่ผูก MCP
+        </p>
+        <div className="actions">
+          <a className="btn" href="/skills/bcbrain/SKILL.md">
+            ดาวน์โหลด SKILL.md (/bcbrain)
+          </a>
+        </div>
+        <div className="mcp-modes">
+          <div className="card">
+            <h3>macOS / Linux / Git Bash</h3>
+            <p className="muted">ติดตั้งแบบ Global สำหรับ Claude Code, Gemini CLI, Codex และ Antigravity</p>
+            <pre>{`for d in ~/.claude/skills/bcbrain ~/.gemini/config/skills/bcbrain ~/.codex/skills/bcbrain ~/.agents/skills/bcbrain; do mkdir -p "$d" && curl -fsSL ${SKILL_URL} -o "$d/SKILL.md"; done`}</pre>
+          </div>
+          <div className="card">
+            <h3>Windows PowerShell</h3>
+            <p className="muted">รันคำสั่งเดียวเพื่อคัดลอก SKILL.md ลงทุกเครื่องมือหรือในโปรเจกต์ปัจจุบัน</p>
+            <pre>{`"$HOME/.claude/skills/bcbrain","$HOME/.gemini/config/skills/bcbrain","$HOME/.codex/skills/bcbrain","$HOME/.agents/skills/bcbrain" | ForEach-Object { New-Item -ItemType Directory -Force $_ | Out-Null; Invoke-WebRequest "${SKILL_URL}" -OutFile "$_/SKILL.md" }`}</pre>
+          </div>
+        </div>
       </section>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
-            "@type": "SoftwareApplication",
-            name: "สมอง BC (BC Brain)",
-            applicationCategory: "BusinessApplication",
-            operatingSystem: "Web",
-            url: "https://brain.bcsmethai.com",
-            description: "คู่มือใช้งานและแก้ปัญหา BC Ai Account พร้อม MCP server ให้ AI ผู้ช่วยตอบลูกค้า",
-            publisher: { "@type": "Organization", name: "บริษัท บ้านเชียงซอฟท์ จำกัด", url: "https://www.bcsmethai.com" },
-          }),
+            "@graph": [
+              {
+                "@type": "Organization",
+                name: "บริษัท บ้านเชียงซอฟท์ จำกัด",
+                url: "https://www.bcsmethai.com",
+              },
+              {
+                "@type": "WebSite",
+                name: "สมอง BC",
+                url: "https://brain.bcsmethai.com",
+                inLanguage: "th",
+                potentialAction: {
+                  "@type": "SearchAction",
+                  target: "https://brain.bcsmethai.com/n?q={search_term_string}",
+                  "query-input": "required name=search_term_string",
+                },
+              },
+              {
+                "@type": "SoftwareApplication",
+                name: "สมอง BC (BC Brain)",
+                applicationCategory: "BusinessApplication",
+                operatingSystem: "Web",
+                url: "https://brain.bcsmethai.com",
+                inLanguage: "th",
+                description:
+                  "คลังความรู้ BC Ai Account สำหรับทั้งผู้ใช้ทั่วไป (Call Center/ฝ่ายขาย) และนักพัฒนา (Schema/SQL/API/Architecture) พร้อม MCP server รองรับตัวกรอง audience",
+                publisher: { "@type": "Organization", name: "บริษัท บ้านเชียงซอฟท์ จำกัด", url: "https://www.bcsmethai.com" },
+              },
+            ],
+          }).replace(/</g, "\\u003c"),
         }}
       />
     </>

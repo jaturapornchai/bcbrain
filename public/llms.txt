@@ -1,14 +1,36 @@
 # สมอง BC (BC Brain)
 
-> Customer-facing knowledge base of the BC Ai Account product suite (Thai accounting/ERP for SMEs plus POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Dashboard). Plain-Thai how-to guides, troubleshooting, FAQ, reports, glossary and pre-sale facts, verified against the real source code.
+> Dual-audience knowledge base of the BC Ai Account product suite (Thai accounting/ERP for SMEs plus POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Market, Dashboard, MonitorMap, WorkMonitor, Company Brain), verified against the real source code.
 
-## For AI agents (call center / sales)
+## Audience Zones (`audience` filter)
+- `user`: Plain-Thai guides for end users, Call Center, and pre-sale assistants (`playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`). No SQL/code jargon.
+- `dev`: Technical specifications for developers and coding agents (`dev-playbook`, `schema`, `queries`, `api`, `doctypes`, `architecture`) — table schemas, PostgreSQL `SELECT`/`WITH` queries, `trans_flag` catalog, GL Dr/Cr rules, API/MCP contracts.
+- `both`: Shared core map (`root` / `index.md`), included in both `"user"` and `"dev"` filters.
+- `all`: Full knowledge base across every zone.
+
+## For AI agents (MCP)
 - MCP endpoint (Streamable HTTP): https://brain.bcsmethai.com/mcp
 - Public and read-only: no key or auth header needed.
-- Tools: `ask_brain(question)`, `search_brain(query, limit?)`, `read_note(slug)`, `list_notes(folder?, tag?)`
-- Start with `read_note("playbook-call-center")` or `read_note("playbook-sales")`, then answer only from note content.
-- Prices, packages, contracts and support hours are not in the notes: hand off to human sales staff.
+- Tools:
+  - `ask_brain(question, audience?)` — returns top 4 matching notes (`audience`: `"all" | "user" | "dev"`) plus 1-hop Connected Graph Context
+  - `search_brain(query, limit?, audience?)` — BM25 length-normalized Thai + SQL identifier search with Thai-SQL synonym expansion & 1-hop neighbor boost
+  - `traverse_brain(slug, to_slug?, depth?, direction?, relation?, folder?, limit?, audience?)` — follow typed relations (`uses_table`, `writes_table`, `posts_rule`, `has_query`, `exposes_api`, `solves_issue`, etc.) 1–3 hops or find shortest paths
+  - `read_note(slug)` — full markdown note with `audience`, typed outgoing links, and typed backlinks
+  - `list_notes(folder?, tag?, audience?)` — index of notes filterable by `folder`, `tag`, and `audience`
+- **Call Center / Sales mode**: Read `read_note("playbook-call-center")` or `read_note("playbook-sales")` first, then ALWAYS pass `audience: "user"` and answer in plain Thai without code/SQL jargon. Prices, packages, contracts, and support hours are not in the notes: hand off to human sales staff.
+- **Developer mode**: Read `read_note("playbook-dev")` first, then pass `audience: "dev"` (or `"all"` when business workflow context is also needed). Follow `dev-rules-accounting-sql` (`NUMERIC`, `COALESCE(last_status, 0) = 0`).
+- **Slash Skill (`/bcbrain`)**: Installable skill instructions at https://brain.bcsmethai.com/skills/bcbrain/SKILL.md (handles `/bcbrain`, `/bcbrain dev`, `/bcbrain all`, `/bcbrain setup`, and stateless HTTP JSON-RPC fallback).
 
 ## Pages
 - [Home: 3D neural map](https://brain.bcsmethai.com/)
 - [All notes](https://brain.bcsmethai.com/n)
+- [User zone notes](https://brain.bcsmethai.com/n?mode=user)
+- [Developer zone notes](https://brain.bcsmethai.com/n?mode=dev)
+
+## Canonical Entry Hubs
+- User / Call Center Playbook: https://brain.bcsmethai.com/n/playbook-call-center?mode=user
+- User / Sales Playbook: https://brain.bcsmethai.com/n/playbook-sales?mode=user
+- User How-To (Sales, Purchasing, Stock, GL, Tax): https://brain.bcsmethai.com/n/howto-sale-overview?mode=user | https://brain.bcsmethai.com/n/howto-buy-overview?mode=user | https://brain.bcsmethai.com/n/howto-stock-overview?mode=user | https://brain.bcsmethai.com/n/howto-gl-overview?mode=user | https://brain.bcsmethai.com/n/howto-tax-overview?mode=user
+- Reports, Systems & FAQ: https://brain.bcsmethai.com/n/rpt-overview?mode=user | https://brain.bcsmethai.com/n/sys-overview?mode=user | https://brain.bcsmethai.com/n/faq-overview?mode=user
+- Developer Playbook & SQL Rules: https://brain.bcsmethai.com/n/playbook-dev?mode=dev | https://brain.bcsmethai.com/n/dev-rules-accounting-sql?mode=dev
+- Developer Technical Hubs (Schema, SQL, DocTypes, API, Arch): https://brain.bcsmethai.com/n/schema-overview?mode=dev | https://brain.bcsmethai.com/n/sql-overview?mode=dev | https://brain.bcsmethai.com/n/doctypes-overview?mode=dev | https://brain.bcsmethai.com/n/api-overview?mode=dev | https://brain.bcsmethai.com/n/arch-overview?mode=dev

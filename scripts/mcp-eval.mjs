@@ -1,4 +1,4 @@
-// node scripts/mcp-eval.mjs [url]  — protocol, latency and retrieval check against a running MCP endpoint
+// node scripts/mcp-eval.mjs [url]  — protocol, audience isolation, latency and retrieval check against a running MCP endpoint
 // default url: http://localhost:3952/mcp ; production: https://brain.bcsmethai.com/mcp
 const URL_ = process.argv[2] ?? "http://localhost:3952/mcp";
 const ms = [];
@@ -26,59 +26,103 @@ const check = (ok, msg) => ok || fails.push(msg);
 // ---- protocol ----
 const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "eval", version: "1" } });
 check(init.result?.serverInfo?.name === "bcbrain", "initialize serverInfo");
-check((init.result?.instructions ?? "").length > 50, "initialize instructions");
-const tools = (await rpc("tools/list")).result?.tools?.map((t) => t.name) ?? [];
-for (const t of ["ask_brain", "search_brain", "read_note", "list_notes"]) check(tools.includes(t), `tools/list has ${t}`);
+const instr = init.result?.instructions ?? "";
+check(instr.includes("playbook-dev") && instr.includes("playbook-call-center") && instr.includes("audience"), "initialize instructions cover both modes");
 
-for (const slug of ["sales-overview", "SALES-OVERVIEW", "[[sales-overview]]", "sales-overview.md"]) {
+const listedTools = (await rpc("tools/list")).result?.tools ?? [];
+for (const t of ["ask_brain", "search_brain", "traverse_brain", "read_note", "list_notes"]) {
+  const tool = listedTools.find((x) => x.name === t);
+  check(!!tool, `tools/list has ${t}`);
+  if (t !== "read_note") check(!!tool?.inputSchema?.properties?.audience, `${t} exposes audience param`);
+}
+const travTool = listedTools.find((x) => x.name === "traverse_brain");
+check(!!travTool?.inputSchema?.properties?.to_slug, "traverse_brain exposes to_slug param");
+
+for (const slug of ["index", "INDEX", "[[index]]", "index.md", "sales-overview", "playbook-dev"]) {
   const r = await call("read_note", { slug });
-  check(r.text.startsWith("# "), `read_note accepts ${slug}`);
+  check(r.text.startsWith("# ") && r.text.includes("audience: "), `read_note accepts ${slug} and includes audience`);
 }
 check((await call("read_note", { slug: "no-such-note" })).text.includes("not found"), "read_note missing → hint");
-const faq = (await call("list_notes", { folder: "faq" })).text.split("\n").length;
-check(faq > 50, `list_notes folder=faq (${faq})`);
+
+const userList = (await call("list_notes", { audience: "user" })).text.split("\n").filter(Boolean);
+const devList = (await call("list_notes", { audience: "dev" })).text.split("\n").filter(Boolean);
+check(userList.length > 0 && userList.every((row) => !row.includes("| dev |")), "list_notes audience=user excludes dev");
+check(devList.length > 0 && devList.every((row) => !row.includes("| user |")), "list_notes audience=dev excludes user");
+check((await call("list_notes", { folder: "schema", audience: "user" })).text === "No notes match.", "list_notes folder=schema audience=user returns empty");
 check((await call("ask_brain", { question: "x" })).isError, "ask_brain rejects 1-char question");
 
-// ---- retrieval: [query, ...acceptable slugs]; hit = any expected slug in top 5 ----
-const CASES = [ // customer phrasing (call center + presale); acceptable slugs, hit = any in top 5
-  ["ต้นทุนแฝงคำนวณยังไง", "howto-stock-hidden-cost", "faq-stock-hidden-cost-effect", "term-landed-cost"],
-  ["ต้นทุนเฉลี่ยคิดอย่างไร", "faq-stock-cost-method", "term-cost-method"],
-  ["ยกเลิกเอกสารแล้วบัญชีกลับยังไง", "howto-doc-edit-cancel-delete", "howto-sale-cancel-docs", "howto-ap-cancel-docs", "ts-common-cannot-cancel-doc"],
-  ["ปิดงวดบัญชีสิ้นปี", "howto-gl-end-of-year", "term-accounting-period", "ts-gl-close-errors"],
-  ["ภาษีหัก ณ ที่จ่าย ภ.ง.ด.3", "howto-tax-wht-report", "howto-tax-wht-entry", "faq-tax-wht-certificate"],
-  ["สต็อกติดลบ", "faq-stock-negative-allowed", "ts-sale-stock-negative", "ts-stock-negative-not-allowed"],
-  ["ออกใบกำกับภาษีขาย", "howto-sale-invoice", "term-tax-invoice"],
-  ["เช็คเด้ง ทำยังไง", "howto-cheque-received-return-renew"],
-  ["แปลงหน่วยนับ", "howto-stock-units", "term-unit"],
-  ["ค่าเสื่อมราคาสินทรัพย์", "howto-asset-depreciation-view", "term-depreciation", "rpt-asset-reports"],
-  ["เข้าเมนูไม่ได้ ไม่มีสิทธิ์", "ts-common-no-permission", "howto-user-screen-permission"],
-  ["รูปแบบเลขที่เอกสาร", "howto-setup-doc-format", "term-doc-no"],
-  ["เชื่อม AI ผ่าน MCP token", "howto-setup-mcp-token", "faq-general-ai-connect"],
-  ["วงเงินเครดิตลูกค้าเกิน", "ts-sale-credit-over", "howto-sale-credit-limit"],
-  ["เงินมัดจำกับเงินล่วงหน้าต่างกันอย่างไร", "faq-sale-deposit-vs-advance", "faq-buy-advance-vs-deposit"],
-  ["งบทดลองไม่ลงตัว", "rpt-gl-trial-balance", "howto-gl-inquiry-trial-balance"],
-  ["ตรวจนับสต็อก", "howto-stock-count", "faq-stock-count-change-stock", "term-stock-count-adjust"],
-  ["โอนสินค้าระหว่างคลัง", "howto-stock-transfer"],
-  ["ล็อกอินไม่ได้", "ts-common-cannot-login"],
-  ["ระบบในชุด BC มีอะไรบ้าง", "sales-overview", "index"],
-  ["POS ขายตอนเน็ตหลุด", "sys-pos-app-offline-sync", "faq-pos-app-need-internet"],
-  ["ศูนย์บริการรถยนต์ รับรถถึงปิดบิล", "sys-autocare-job-flow", "sales-by-business-autocare"],
-  ["คลังสินค้า หยิบ แพ็ค ส่ง", "howto-wms-pick-pack-ship", "sys-wms-overview"],
-  ["คนขับยืนยันส่งของ ถ่ายรูป", "howto-tms-record-pod", "sys-tms-overview"],
-  ["ออกใบกำกับภาษีอิเล็กทรอนิกส์", "sys-etax-overview"],
-  ["ราคาเท่าไร", "sales-faq-before-buy", "faq-general-price-and-support"],
-  ["มีอะไรที่ยังไม่พร้อมใช้", "sales-current-limits"],
-  ["ร้านค้าปลีกใช้ได้ไหม", "sales-by-business-retail"],
+// ---- isolation checks ----
+for (const q of ["ic_trans gl_journal SELECT", "trans_flag schema API"]) {
+  const hits = JSON.parse((await call("search_brain", { query: q, audience: "user", limit: 10 })).text || "[]");
+  check(hits.every((h) => h.audience !== "dev"), `search_brain audience=user isolation for "${q}"`);
+}
+for (const q of ["เช็คเด้ง ออกใบกำกับภาษี ราคา", "เปิดบิลขาย ลูกหนี้"]) {
+  const hits = JSON.parse((await call("search_brain", { query: q, audience: "dev", limit: 10 })).text || "[]");
+  check(hits.every((h) => h.audience !== "user"), `search_brain audience=dev isolation for "${q}"`);
+}
+const askUser = (await call("ask_brain", { question: "ตาราง ic_trans", audience: "user" })).text;
+check(!askUser.includes("| audience: dev |"), "ask_brain audience=user excludes dev notes");
+const askDev = (await call("ask_brain", { question: "ออกใบกำกับภาษีขาย", audience: "dev" })).text;
+check(!askDev.includes("| audience: user |"), "ask_brain audience=dev excludes user notes");
+check(askDev.includes("Connected Graph Context"), "ask_brain includes Connected Graph Context");
+
+// ---- traverse_brain (multi-hop, shortest path & isolation) ----
+const travMulti = await call("traverse_brain", { slug: "sql-ic-stock-balance", depth: 2, audience: "dev" });
+check(!travMulti.isError && travMulti.text.includes("## Hop 1") && travMulti.text.includes("## Hop 2"), "traverse_brain returns multi-hop results");
+check(!travMulti.text.includes("| user |"), "traverse_brain audience=dev excludes user notes");
+
+const travPath = await call("traverse_brain", { slug: "sql-ic-stock-balance", to_slug: "tbl-ic-unit", audience: "dev" });
+check(!travPath.isError && travPath.text.includes("Path (") && travPath.text.includes("tbl-ic-unit"), "traverse_brain finds shortest path to tbl-ic-unit");
+
+const travIso = await call("traverse_brain", { slug: "sql-ic-stock-balance", depth: 2, audience: "user" });
+check(travIso.text.includes("not found in audience=user"), "traverse_brain blocks dev slug when audience=user");
+
+// ---- retrieval: [audience, query, ...acceptable canonical hub slugs]; hit = any expected slug in top 5 ----
+const CASES = [
+  ["all", "สารบัญ แผนที่สมอง BC", "index"],
+  ["user", "คู่มือ AI Call Center ตอบลูกค้า", "playbook-call-center"],
+  ["user", "คู่มือ AI ฝ่ายขาย ก่อนซื้อ", "playbook-sales"],
+  ["user", "เริ่มต้นใช้งานวันแรก ตั้งค่าบริษัท", "start-first-day"],
+  ["user", "ขายสินค้า ออกใบกำกับภาษีขาย", "howto-sale-overview"],
+  ["user", "ลูกหนี้ วางบิล รับชำระหนี้", "howto-ar-overview"],
+  ["user", "สั่งซื้อ รับสินค้า ใบกำกับภาษีซื้อ", "howto-buy-overview"],
+  ["user", "เจ้าหนี้ จ่ายชำระหนี้", "howto-ap-overview"],
+  ["user", "คลังสินค้า ตรวจนับสต็อก โอนคลัง", "howto-stock-overview"],
+  ["user", "เงินสด ธนาคาร เช็ค เงินมัดจำ", "howto-cash-bank-overview"],
+  ["user", "สมุดรายวัน ปิดงวดบัญชี งบทดลอง", "howto-gl-overview"],
+  ["user", "ภาษีมูลค่าเพิ่ม ภาษีหัก ณ ที่จ่าย", "howto-tax-overview"],
+  ["user", "สินทรัพย์ถาวร ค่าเสื่อมราคา", "howto-asset-overview"],
+  ["user", "แก้ไข ยกเลิก ลบ เอกสาร", "howto-doc-edit-cancel-delete"],
+  ["user", "แก้ปัญหา เข้าเมนูไม่ได้ ไม่มีสิทธิ์", "ts-common-no-permission", "ts-overview"],
+  ["user", "ปิดงวดบัญชีแล้ว แก้เอกสารไม่ได้", "ts-common-period-closed", "ts-overview"],
+  ["user", "คำถามที่พบบ่อย FAQ", "faq-overview"],
+  ["user", "ดูรายงาน กรองข้อมูล เจาะลึก", "rpt-overview"],
+  ["user", "ระบบในชุด BC POS AutoCare WMS TMS", "sys-overview", "sales-overview"],
+  ["user", "ภาพรวมระบบบัญชีหลัก BC Ai Account", "sys-account-overview", "sys-overview"],
+  ["user", "คำศัพท์บัญชี ภาษี สต็อก", "term-overview"],
+  ["user", "จุดเด่นระบบ ข้อมูลการขาย ข้อจำกัด", "sales-overview"],
+  ["dev", "คู่มือ AI นักพัฒนา เขียนโค้ดต่อยอด", "playbook-dev"],
+  ["dev", "กฎเหล็ก SQL บัญชี NUMERIC last_status", "dev-rules-accounting-sql"],
+  ["dev", "เริ่มต้นเชื่อมต่อระบบ API quickstart", "dev-integration-quickstart"],
+  ["dev", "โครงสร้างตาราง Data Dictionary schema", "schema-overview"],
+  ["dev", "คลังคำสั่ง SQL SELECT รายงาน", "sql-overview"],
+  ["dev", "สเปก MCP Gateway 11 tools", "api-mcp-gateway", "api-overview"],
+  ["dev", "REST API Process Actions menuKey", "api-overview"],
+  ["dev", "รหัส trans_flag Document Flow ผังบัญชี Dr Cr", "doctypes-overview"],
+  ["dev", "สถาปัตยกรรม Multi-Tenant Feature Switchboard Company Brain", "arch-overview"],
 ];
-let top1 = 0, top5 = 0, askHit = 0;
+
+let top1 = 0,
+  top5 = 0,
+  askHit = 0;
 const notFirst = [];
-for (const [q, ...want] of CASES) {
-  const hits = JSON.parse((await call("search_brain", { query: q, limit: 5 })).text || "[]").map((h) => h.slug);
+for (const [audience, q, ...want] of CASES) {
+  const hits = JSON.parse((await call("search_brain", { query: q, limit: 5, audience })).text || "[]").map((h) => h.slug);
   if (want.includes(hits[0])) top1++;
-  else notFirst.push(`"${q}" → ${hits[0]} (want ${want[0]})`);
+  else notFirst.push(`[${audience}] "${q}" → ${hits[0]} (want ${want[0]})`);
   if (hits.some((s) => want.includes(s))) top5++;
-  else fails.push(`miss "${q}" → got ${hits.slice(0, 3).join(", ") || "(none)"}`);
-  const ask = (await call("ask_brain", { question: q })).text;
+  else fails.push(`miss [${audience}] "${q}" → got ${hits.slice(0, 3).join(", ") || "(none)"}`);
+  const ask = (await call("ask_brain", { question: q, audience })).text;
   if (want.some((s) => ask.includes(`slug: ${s} `))) askHit++;
 }
 

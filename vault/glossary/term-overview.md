@@ -1,89 +1,51 @@
 ---
-title: "อภิธานศัพท์ BC Ai Account: คำศัพท์บัญชีและเอกสารแบบเข้าใจง่าย"
-tags: [term, general]
-aliases: ["อภิธานศัพท์", "คำศัพท์", "glossary", "ศัพท์บัญชี", "คำนี้แปลว่าอะไร", "คืออะไร", "ศัพท์ในโปรแกรม"]
-sources: ["backend/internal/application/process/bcMenu.json:180", "backend/internal/application/process/bcMenu.json:9373", "frontend/src/config/help/data/trans.json:99"]
+title: "คลังคำศัพท์ธุรกิจ บัญชี สต็อก และภาษี (Glossary Overview)"
+tags:
+  - glossary
+  - terminology
+  - overview
+aliases:
+  - คำศัพท์บัญชี
+  - คำศัพท์สต็อก
+  - คำศัพท์ระบบ
+  - พจนานุกรมระบบ
+sources:
+  - frontend/src/config/help/data/ic.json:169-269
+  - frontend/src/config/help/data/trans.json:7-176
+  - frontend/src/config/help/data/ar_ap.json:7-103
+  - frontend/src/config/help/data/gl_tax.json:7-64
 ---
-# อภิธานศัพท์ (คำศัพท์ในระบบ BC)
 
-## ความหมายแบบบ้านๆ
-รวมคำที่ลูกค้าถามบ่อย อธิบายแบบชาวบ้าน พร้อมบอกว่าในโปรแกรมอยู่เมนูไหน และระบบทำอะไรให้เอง
-ใช้คู่กับ [[playbook-call-center]] เมื่อต้องอธิบายคำให้ลูกค้าฟัง
+# คลังคำศัพท์ธุรกิจ บัญชี สต็อก และภาษี
 
-## ซื้อ-ขาย
-- [[term-quotation]] ใบเสนอราคา
-- [[term-sale-order]] ใบสั่งจอง / ใบสั่งขาย
-- [[term-purchase-requisition]] ใบขอซื้อ
-- [[term-purchase-order]] ใบสั่งซื้อ
-- [[term-goods-receipt]] รับสินค้า / ซื้อสินค้า
-- [[term-credit-cash-sale]] ขายสด / ขายเชื่อ
-- [[term-tax-invoice]] ใบกำกับภาษี
-- [[term-approve]] อนุมัติเอกสาร
-- ดูขั้นตอน: [[howto-sale-overview]], [[howto-buy-overview]]
+รวบรวมคำอธิบายภาษาไทยแบบเข้าใจง่ายสำหรับเจ้าของกิจการ พนักงานหน้าร้าน และฝ่ายบัญชี เพื่อใช้เข้าใจความหมายของช่องกรอกและรายงานต่างๆ ใน BC Ai Account ได้ตรงกัน
 
-## ลูกหนี้-เจ้าหนี้
-- [[term-ar-customer]] ลูกหนี้ / ลูกค้า
-- [[term-ap-supplier]] เจ้าหนี้ / ผู้จำหน่าย
-- [[term-receipt]] ใบเสร็จรับเงิน / รับ-จ่ายชำระหนี้
-- [[term-billing-note]] ใบวางบิล
-- [[term-set-debt]] ตั้งหนี้
-- [[term-credit-debit-note]] ใบลดหนี้ / ใบเพิ่มหนี้
-- [[term-deposit]] เงินมัดจำ
-- [[term-advance-payment]] เงินล่วงหน้า
-- [[term-credit-limit]] วงเงินเครดิต
-- [[term-credit-days-due-date]] เครดิตเทอม / วันครบกำหนด
-- [[term-loyalty-points]] แต้มสะสม / สมาชิก
-- ดูขั้นตอน: [[howto-ar-overview]], [[howto-ap-overview]]
+## หมวดสินค้าคงคลังและต้นทุน
 
-## ภาษี
-- [[term-vat]] ภาษีมูลค่าเพิ่ม (VAT)
-- [[term-input-output-vat]] ภาษีซื้อ / ภาษีขาย
-- [[term-vat-not-due]] ภาษีไม่ถึงกำหนด
-- [[term-wht]] ภาษีหัก ณ ที่จ่าย
-- [[term-tax-id-branch]] เลขประจำตัวผู้เสียภาษี / สาขา
-- ดูขั้นตอน: [[howto-tax-overview]]
+- [[term-cost-method]] — วิธีคำนวณต้นทุนสินค้าทั้ง 6 แบบ (เฉลี่ย, FIFO, LOT กำหนดเอง, FEFO, ต้นทุนมาตรฐาน, ต้นทุนแบบพิเศษ)
+- [[term-unit]] — หน่วยนับสินค้า (หน่วยนับเดี่ยว, หลายหน่วยนับ, หน่วยขนาน, หน่วยต้นทุน และหน่วยยอดคงเหลือ)
+- [[term-landed-cost]] — ต้นทุนแฝงและต้นทุนนำเข้า (ค่าขนส่ง ค่าประกัน อากรขาเข้า และการปันส่วนเข้าต้นทุนสินค้า)
+- [[term-stock-count-adjust]] — ใบตรวจนับสินค้าและใบปรับปรุงสต็อก (ปรับเพิ่ม / ปรับลด / ปรับมูลค่าคงเหลือ)
 
-## สินค้า-คลัง
-- [[term-item-type]] ประเภทสินค้า
-- [[term-cost-method]] วิธีคิดต้นทุน
-- [[term-warehouse-location]] คลัง / ที่เก็บ
-- [[term-unit]] หน่วยนับ
-- [[term-lot-serial-expire]] ล็อต / Serial / วันหมดอายุ
-- [[term-stock-issue-transfer]] เบิก / โอนสินค้า
-- [[term-stock-count-adjust]] ตรวจนับ / ปรับปรุงสต็อก
-- [[term-landed-cost]] ต้นทุนแฝง / ต้นทุนนำเข้า
-- ดูขั้นตอน: [[howto-stock-overview]]
+## หมวดเอกสารขาย ซื้อ และลูกหนี้-เจ้าหนี้
 
-## เงินสด-ธนาคาร-เช็ค
-- [[term-cheque]] เช็ครับ / เช็คจ่าย
-- [[term-petty-cash]] เงินสดย่อย
-- [[term-currency-fx]] สกุลเงิน / อัตราแลกเปลี่ยน
-- [[term-other-income-expense]] รายได้อื่น / ค่าใช้จ่ายอื่น
-- ดูขั้นตอน: [[howto-cash-bank-overview]], [[howto-setup-currency]]
+- [[term-doc-no]] — เลขที่เอกสารและรูปแบบเลขที่เอกสาร (คำนำหน้า ปี เดือน ลำดับเลขรันอัตโนมัติ)
+- [[term-ar-ap-aging]] — อายุหนี้ลูกหนี้-เจ้าหนี้ (วันครบกำหนด ใบวางบิล ช่วงวันค้างชำระ และสถานะเครดิต)
 
-## บัญชี-งบ
-- [[term-chart-of-accounts]] ผังบัญชี
-- [[term-debit-credit]] เดบิต / เครดิต
-- [[term-journal-voucher]] ข้อมูลรายวัน / ใบสำคัญ
-- [[term-posting]] ผ่านรายการ / ประมวลผลลงบัญชี
-- [[term-accounting-period]] งวดบัญชี / ปิดงวด
-- [[term-trial-balance]] งบทดลอง / บัญชีแยกประเภท
-- [[term-financial-statements]] งบดุล / งบกำไรขาดทุน
-- [[term-depreciation]] สินทรัพย์ถาวร / ค่าเสื่อมราคา
-- ดูขั้นตอน: [[howto-gl-overview]], [[howto-asset-overview]], [[rpt-overview]]
+## หมวดบัญชี การเงิน และสินทรัพย์
 
-## ทั่วไป
-- [[term-opening-balance]] ยอดยกมา
-- [[term-doc-no]] เลขที่เอกสาร / รูปแบบเลขที่
-- [[term-doc-ref]] เอกสารอ้างอิง / ดึงเอกสารต้นทาง
-- [[term-cancel-doc]] ยกเลิกเอกสาร / คืนสถานะ
-- ดูขั้นตอน: [[howto-doc-edit-cancel-delete]], [[start-first-day]]
+- [[term-accounting-period]] — งวดบัญชี การเปิด-ปิดงวด การผ่านรายการ และการปิดบัญชีสิ้นปี
+- [[term-cheque-status]] — สถานะเช็ครับ-เช็คจ่าย (เช็คในมือ นำฝาก ผ่านเช็ค เช็คคืน เปลี่ยนเช็ค ขาดสิทธิ์ และตั้งหนี้ใหม่)
+- [[term-depreciation]] — ค่าเสื่อมราคาสินทรัพย์ถาวร (ราคาทุน มูลค่าซาก อายุใช้งาน เกณฑ์สรรพากร/บัญชี และการโอนค่าเสื่อม)
 
-## ข้อควรรู้
-- อัตราภาษีและกำหนดยื่นตามกฎหมาย ไม่อยู่ในอภิธานศัพท์นี้ เรื่องข้อกฎหมายให้ปรึกษาผู้สอบบัญชี/สรรพากร
-- ราคาและแพ็กเกจ สอบถามฝ่ายขาย
+## หมวดภาษีอากร
 
-## ดูต่อ
-- [[index]]
-- [[sys-account-overview]]
-- [[playbook-call-center]]
+- [[term-tax-invoice]] — ใบกำกับภาษี ประเภทภาษี (แยกนอก รวมใน ภาษีศูนย์) และภาษีไม่ถึงกำหนดชำระ
+- [[term-wht-50tawi]] — ภาษีหัก ณ ที่จ่าย ภ.ง.ด.3 / ภ.ง.ด.53 และหนังสือรับรอง 50 ทวิ
+
+## ดูเพิ่มเติม
+
+- [[faq-overview]] — รวมคำถามพบบ่อยเรื่องหลักการทำงานของระบบ
+- [[ts-overview]] — คู่มือแก้ปัญหาเมื่อหน้าจอขึ้นข้อความแจ้งเตือน
+- [[rpt-overview]] — ภาพรวมรายงานในระบบ
+- [[index]] — กลับหน้าหลักคลังความรู้

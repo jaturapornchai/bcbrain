@@ -7,16 +7,24 @@ const head = Mitr({ subsets: ["thai", "latin"], weight: ["400", "500"], variable
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://brain.bcsmethai.com"),
-  title: "สมอง BC — คลังความรู้ BC Ai Account",
-  description: "คู่มือใช้งาน วิธีแก้ปัญหา และข้อมูลระบบ BC Ai Account ภาษาเข้าใจง่าย พร้อม MCP ให้ AI ผู้ช่วยตอบลูกค้า",
+  title: "สมอง BC — คลังความรู้ BC Ai Account (ผู้ใช้ทั่วไป & นักพัฒนา)",
+  description:
+    "คลังความรู้ BC Ai Account ครบทั้งโซนผู้ใช้ทั่วไป (คู่มือใช้งาน แก้ปัญหา ข้อมูลการขาย) และโซนนักพัฒนา (Schema ตาราง, SQL SELECT, trans_flag, ผังบัญชี, API/MCP) พร้อม MCP server รองรับตัวกรอง audience",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "สมอง BC",
-    description: "คู่มือใช้งานและแก้ปัญหา BC Ai Account + MCP สำหรับ AI ผู้ช่วยตอบลูกค้า",
+    title: "สมอง BC — คลังความรู้ BC Ai Account",
+    description:
+      "คลังความรู้ BC Ai Account สำหรับผู้ใช้ทั่วไป (Call Center/Sales) และนักพัฒนา (Schema/SQL/API/Architecture) พร้อม MCP แบบกรอง audience",
     url: "https://brain.bcsmethai.com",
     siteName: "สมอง BC",
     locale: "th_TH",
     type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "สมอง BC — คลังความรู้ BC Ai Account",
+    description:
+      "คลังความรู้ BC Ai Account สำหรับผู้ใช้ทั่วไป (Call Center/Sales) และนักพัฒนา (Schema/SQL/API/Architecture) พร้อม MCP แบบกรอง audience",
   },
 };
 

@@ -4,10 +4,29 @@ import Link from "next/link";
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { groupOf } from "@/lib/groups";
+import {
+  GROUP_ORDER,
+  MODE_OPTIONS,
+  RELATION_LABEL,
+  ZONE_LABEL,
+  groupOf,
+  matchesAudience,
+  normalizeAudienceFilter,
+  type Audience,
+  type AudienceFilter,
+  type RelationType,
+} from "@/lib/groups";
 
-type BrainNode = { slug: string; title: string; folder: string; degree: number };
-type Props = { nodes: BrainNode[]; links: [number, number][]; children?: ReactNode };
+type BrainNode = {
+  slug: string;
+  title: string;
+  folder: string;
+  audience: Audience;
+  degree: number;
+  keywords?: string;
+  pos?: [number, number, number];
+};
+type Props = { nodes: BrainNode[]; links: [number, number][]; rels?: RelationType[]; children?: ReactNode };
 type Scene3D = { select(i: number): void; emphasize(set: Set<number> | null): void; reset(): void; spin(on: boolean): void };
 
 const R = new THREE.Vector3(6.2, 4.8, 7.4); // brain ellipsoid radii: x left-right, y up, z front-back
@@ -122,37 +141,68 @@ export function CountUp({ to, delay = 600 }: { to: number; delay?: number }) {
   return <>{n.toLocaleString("th-TH")}</>;
 }
 
-export default function Brain3D({ nodes, links, children }: Props) {
+export default function Brain3D({ nodes, links, rels, children }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const tip = useRef<HTMLDivElement>(null);
   const stream = useRef<HTMLButtonElement>(null); // "latest signal" ticker, written by the render loop
   const fired = useRef(-1);
   const scene3d = useRef<Scene3D | null>(null);
   const [failed, setFailed] = useState(false);
+  const [mode, setMode] = useState<AudienceFilter>("all");
+  const modeRef = useRef<AudienceFilter>("all");
+  modeRef.current = mode;
   const [selected, setSelected] = useState(-1);
   const [group, setGroup] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [spinning, setSpinning] = useState(true);
 
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get("mode");
+    const initial = normalizeAudienceFilter(param);
+    if (initial !== "all") setMode(initial);
+  }, []);
+
   const neighbors = useMemo(() => {
-    const nb = nodes.map(() => [] as number[]);
-    links.forEach(([a, b]) => (nb[a].push(b), nb[b].push(a)));
+    const nb = nodes.map(() => [] as { idx: number; rel: RelationType }[]);
+    links.forEach(([a, b], k) => {
+      const rel: RelationType = rels?.[k] ?? "related";
+      nb[a].push({ idx: b, rel });
+      nb[b].push({ idx: a, rel });
+    });
     return nb;
-  }, [nodes, links]);
+  }, [nodes, links, rels]);
+
   const groups = useMemo(() => {
     const c = new Map<string, number>();
-    nodes.forEach((n) => c.set(n.folder, (c.get(n.folder) ?? 0) + 1));
-    return [...c];
-  }, [nodes]);
-  const needle = q.trim().toLowerCase();
+    nodes.forEach((n) => {
+      if (matchesAudience(n.audience, mode)) c.set(n.folder, (c.get(n.folder) ?? 0) + 1);
+    });
+    return [...c].sort((a, b) => {
+      const ia = GROUP_ORDER.indexOf(a[0]);
+      const ib = GROUP_ORDER.indexOf(b[0]);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+  }, [nodes, mode]);
+
+  const needle = q.trim().toLowerCase().replace(/สต๊อก/g, "สต็อก");
   const matches = useMemo(
     () =>
       needle
         ? nodes
-            .flatMap((n, i) => (`${n.title} ${n.slug}`.toLowerCase().includes(needle) ? [i] : []))
+            .flatMap((n, i) =>
+              matchesAudience(n.audience, mode) &&
+              `${n.title} ${n.slug} ${n.keywords ?? ""}`.toLowerCase().replace(/สต๊อก/g, "สต็อก").includes(needle)
+                ? [i]
+                : [],
+            )
             .sort((a, b) => nodes[b].degree - nodes[a].degree)
         : [],
-    [nodes, needle],
+    [nodes, needle, mode],
+  );
+
+  const visibleNeighbors = useMemo(
+    () => (selected >= 0 ? neighbors[selected].filter((nb) => matchesAudience(nodes[nb.idx].audience, mode)) : []),
+    [selected, neighbors, nodes, mode],
   );
 
   useEffect(() => {
@@ -201,7 +251,9 @@ export default function Brain3D({ nodes, links, children }: Props) {
     const stars = add(new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(starArr, 3)), glow(0.12, 0.35, 0x6f7bff)));
 
     // neurons: lit pastel beads; they shrink as the vault grows so hundreds of notes never blur into one white blob
-    const pos = layout(nodes, links);
+    const pos = nodes.every((n) => n.pos)
+      ? nodes.map((n) => new THREE.Vector3(n.pos![0], n.pos![1], n.pos![2]))
+      : layout(nodes, links);
     const colors = nodes.map((n) => new THREE.Color(groupOf(n.folder).color));
     const k = Math.min(1, Math.max(0.55, Math.sqrt(120 / nodes.length)));
     const baseSize = nodes.map((n) => (n.folder === "root" ? 0.3 : (0.12 + 0.04 * Math.sqrt(n.degree)) * k));
@@ -223,7 +275,7 @@ export default function Brain3D({ nodes, links, children }: Props) {
     const delay = pos.map((p) => 0.2 + (p.length() / far) * 1.3 + Math.random() * 0.25);
     const pop = new Float32Array(nodes.length).fill(still ? 1 : 0);
     let introDone = still;
-    const shown = colors.map((c) => c.clone()); // colour after search/group dimming; flashes brighten from here
+    const shown = colors.map((c) => c.clone()); // colour after search/group/mode dimming; flashes brighten from here
 
     // synapses: gently curved toward the centre like axons
     const curves = links.map(([a, b]) => {
@@ -247,7 +299,8 @@ export default function Brain3D({ nodes, links, children }: Props) {
     add(new THREE.LineSegments(synGeom, synMat));
     const synCount = synGeom.attributes.position.count;
     if (!still) synGeom.setDrawRange(0, 0); // wiring grows in during the intro
-    const hiLines = add(new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xfff1fa, transparent: true, opacity: 0.55, depthWrite: false })));
+    const hiMat = new THREE.LineBasicMaterial({ color: 0xfff1fa, transparent: true, opacity: 0.55, depthWrite: false });
+    const hiLines = add(new THREE.LineSegments(new THREE.BufferGeometry(), hiMat));
 
     // signals: small sparks that hop from neuron to neuron along real links
     const adjacency = nodes.map(() => [] as number[]);
@@ -288,6 +341,13 @@ export default function Brain3D({ nodes, links, children }: Props) {
     let down = { x: 0, y: 0 };
     let touched = false;
     let goal: { target: THREE.Vector3; dist: number } | null = null; // camera glide destination
+    const activePick = () => {
+      ray.setFromCamera(mouse, camera);
+      const hit = ray
+        .intersectObject(halos)
+        .find((h) => h.index !== undefined && matchesAudience(nodes[h.index].audience, modeRef.current));
+      return hit?.index ?? -1;
+    };
     const setHover = (i: number) => {
       if (i === hovered) return;
       hovered = i;
@@ -310,8 +370,7 @@ export default function Brain3D({ nodes, links, children }: Props) {
     };
     const onUp = (e: PointerEvent) => {
       if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) return;
-      ray.setFromCamera(mouse, camera);
-      setSelected(ray.intersectObject(halos)[0]?.index ?? -1);
+      setSelected(activePick());
     };
     const onStart = () => ((touched = true), (goal = null));
     renderer.domElement.addEventListener("pointermove", onMove);
@@ -336,6 +395,7 @@ export default function Brain3D({ nodes, links, children }: Props) {
         emph = set;
         colors.forEach((c, i) => shown[i].copy(c).multiplyScalar(set && !set.has(i) ? 0.12 : 1)); // the loop paints it
         synMat.opacity = set ? 0.04 : 0.14;
+        hiMat.opacity = set && set.size > 40 ? 0.2 : 0.55;
         setLines(hiLines, set ? segs(links.flatMap(([a, b], i) => (set.has(a) && set.has(b) ? [i] : []))) : []);
       },
     };
@@ -383,13 +443,13 @@ export default function Brain3D({ nodes, links, children }: Props) {
       if (!introDone) {
         let landed = true;
         for (let i = 0; i < nodes.length; i++) {
-          const k = clamp01((t - delay[i]) / 1.6);
-          if (k < 1) landed = false;
-          const e = easeOutCubic(k);
+          const k2 = clamp01((t - delay[i]) / 1.6);
+          if (k2 < 1) landed = false;
+          const e = easeOutCubic(k2);
           const a = (1 - e) * 2.6; // spiral that unwinds as the cell lands
           const p = pos[i];
           live[i].set(p.x * Math.cos(a) - p.z * Math.sin(a), p.y, p.x * Math.sin(a) + p.z * Math.cos(a)).multiplyScalar(e).addScaledVector(CORE, 1 - e);
-          pop[i] = easeOutBack(k);
+          pop[i] = easeOutBack(k2);
           haloGeom.attributes.position.setXYZ(i, live[i].x, live[i].y, live[i].z);
         }
         haloGeom.attributes.position.needsUpdate = true;
@@ -423,7 +483,7 @@ export default function Brain3D({ nodes, links, children }: Props) {
           const [a, b] = links[sp.link];
           const at = sp.forward ? b : a;
           flash[at] = 1;
-          if (t - lastTick > 2.4 && stream.current) {
+          if (t - lastTick > 2.4 && stream.current && matchesAudience(nodes[at].audience, modeRef.current)) {
             lastTick = t;
             fired.current = at;
             stream.current.textContent = `${nodes[sp.forward ? a : b].title} → ${nodes[at].title}`;
@@ -445,8 +505,7 @@ export default function Brain3D({ nodes, links, children }: Props) {
       });
       sparkGeom.attributes.position.needsUpdate = trailGeom.attributes.position.needsUpdate = true;
 
-      ray.setFromCamera(mouse, camera);
-      setHover(ray.intersectObject(halos)[0]?.index ?? -1);
+      setHover(activePick());
 
       const decay = 0.93 ** f60;
       for (let i = 0; i < nodes.length; i++) {
@@ -479,18 +538,22 @@ export default function Brain3D({ nodes, links, children }: Props) {
     };
   }, [nodes, links]);
 
-  // what is lit: the picked cell + its neighbours, else search hits, else the chosen group, else everything
+  // what is lit: the picked cell + its neighbours, else search hits, else the chosen group, else active mode, else everything
   useEffect(() => {
+    const modeMatch = (i: number) => matchesAudience(nodes[i].audience, mode);
     const set =
       selected >= 0
-        ? new Set([selected, ...neighbors[selected]])
+        ? new Set([selected, ...visibleNeighbors.map((nb) => nb.idx)])
         : needle
           ? new Set(matches)
           : group
-            ? new Set(nodes.flatMap((n, i) => (n.folder === group ? [i] : [])))
-            : null;
+            ? new Set(nodes.flatMap((n, i) => (n.folder === group && modeMatch(i) ? [i] : [])))
+            : mode !== "all"
+              ? new Set(nodes.flatMap((n, i) => (modeMatch(i) ? [i] : [])))
+              : null;
     scene3d.current?.emphasize(set);
-  }, [selected, needle, matches, group, nodes, neighbors]);
+  }, [selected, visibleNeighbors, needle, matches, group, mode, nodes]);
+
   useEffect(() => scene3d.current?.select(selected), [selected]);
   useEffect(() => scene3d.current?.spin(spinning && selected < 0), [spinning, selected]);
   useEffect(() => {
@@ -499,9 +562,21 @@ export default function Brain3D({ nodes, links, children }: Props) {
     return () => removeEventListener("keydown", onKey);
   }, []);
 
+  const selectMode = (next: AudienceFilter) => {
+    setMode(next);
+    if (group && !matchesAudience(groupOf(group).audience, next)) setGroup(null);
+    if (selected >= 0 && !matchesAudience(nodes[selected].audience, next)) setSelected(-1);
+  };
   const pick = (i: number) => (setSelected(i), setQ(""));
-  const reset = () => (setSelected(-1), setGroup(null), setQ(""), scene3d.current?.reset());
+  const reset = () => (setSelected(-1), setGroup(null), setQ(""), setMode("all"), scene3d.current?.reset());
   const sel = selected >= 0 ? nodes[selected] : null;
+  const modeQuery = mode !== "all" ? `?mode=${mode}` : "";
+  const searchPlaceholder =
+    mode === "dev"
+      ? "ค้นหาฝั่ง Dev เช่น ic_trans, gl_journal, trans_flag, MCP"
+      : mode === "user"
+        ? "ค้นหาเซลล์ เช่น ภาษีซื้อ, ตัดสต็อก, เช็ค"
+        : "ค้นหาเซลล์ เช่น ภาษีซื้อ, ตัดสต็อก, ic_trans, gl_journal";
 
   return (
     <>
@@ -512,6 +587,27 @@ export default function Brain3D({ nodes, links, children }: Props) {
 
       <section className="hero">
         {children}
+        <div className="mode-switch" role="group" aria-label="เลือกโซนความรู้">
+          {MODE_OPTIONS.map(([m, label]) => (
+            <button
+              key={m}
+              type="button"
+              className="mode-btn"
+              aria-pressed={mode === m}
+              onClick={() => selectMode(m)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="actions">
+          <Link className="btn primary" href={`/n${modeQuery}`}>
+            เปิดคลังความรู้
+          </Link>
+          <a className="btn" href="#mcp">
+            เชื่อม AI ผ่าน MCP
+          </a>
+        </div>
         <form
           className="brain-search"
           role="search"
@@ -520,9 +616,15 @@ export default function Brain3D({ nodes, links, children }: Props) {
             if (matches.length) (e.preventDefault(), pick(matches[0]));
           }}
         >
+          {mode !== "all" && <input type="hidden" name="mode" value={mode} />}
           <input
-            type="search" name="q" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off"
-            placeholder="ค้นหาเซลล์ เช่น ภาษีซื้อ, ตัดสต็อก, เช็ค" aria-label="ค้นหาเซลล์ความรู้"
+            type="search"
+            name="q"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            autoComplete="off"
+            placeholder={searchPlaceholder}
+            aria-label="ค้นหาเซลล์ความรู้"
           />
           {needle && (
             <ul className="brain-suggest">
@@ -535,7 +637,9 @@ export default function Brain3D({ nodes, links, children }: Props) {
                 </li>
               ))}
               <li>
-                <Link href={`/n?q=${encodeURIComponent(q.trim())}`}>ค้นในเนื้อหาทั้งหมด “{q.trim()}” →</Link>
+                <Link href={`/n?q=${encodeURIComponent(q.trim())}${mode !== "all" ? `&mode=${mode}` : ""}`}>
+                  ค้นในเนื้อหาทั้งหมด “{q.trim()}” →
+                </Link>
               </li>
             </ul>
           )}
@@ -549,21 +653,23 @@ export default function Brain3D({ nodes, links, children }: Props) {
           </button>
           <p className="brain-card-group" style={{ color: groupOf(sel.folder).color }}>
             <i className="dot" />
-            {groupOf(sel.folder).label}
+            <span>{groupOf(sel.folder).label}</span>
+            <span className={`chip zone zone-${sel.audience}`}>{ZONE_LABEL[sel.audience]}</span>
           </p>
           <h2>{sel.title}</h2>
-          <Link className="btn primary" href={`/n/${encodeURIComponent(sel.slug)}`}>
+          <Link className="btn primary" href={`/n/${encodeURIComponent(sel.slug)}${modeQuery}`}>
             อ่านโน้ตเต็ม →
           </Link>
-          {neighbors[selected].length > 0 && (
+          {visibleNeighbors.length > 0 && (
             <>
-              <h3>เชื่อมกับ {neighbors[selected].length} เซลล์ — แตะเพื่อไปต่อ</h3>
+              <h3>เชื่อมกับ {visibleNeighbors.length} เซลล์ — แตะเพื่อไปต่อ</h3>
               <ul>
-                {neighbors[selected].map((j, n) => (
+                {visibleNeighbors.map(({ idx: j, rel }, n) => (
                   <li key={j} style={{ "--i": n } as CSSProperties}>
                     <button onClick={() => setSelected(j)}>
                       <i className="dot" style={{ color: groupOf(nodes[j].folder).color }} />
-                      {nodes[j].title}
+                      <span className="brain-nb-label">{nodes[j].title}</span>
+                      <span className="chip rel">{RELATION_LABEL[rel]}</span>
                     </button>
                   </li>
                 ))}

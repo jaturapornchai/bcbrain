@@ -1,66 +1,50 @@
 ---
-title: ภาพรวมรายงานทั้งหมดของระบบบัญชี
-tags: [report, overview]
+title: ภาพรวมระบบรายงานทั้งหมดใน BC Ai Account
+tags:
+  - reports
+  - overview
 aliases:
-  - รายงานมีอะไรบ้าง
-  - อยากดูรายงาน
-  - รายงานอยู่เมนูไหน
-  - รวมรายงานทั้งหมด
-  - หารายงานไม่เจอ
-  - รายงานที่ใช้บ่อย
+  - ภาพรวมรายงาน
+  - ศูนย์รายงานทั้งหมด
+  - คู่มือรายงาน
+  - ดูรายงาน กรองข้อมูล เจาะลึก
 sources:
-  - backend/internal/application/process/report_menu_ic.go:340
-  - backend/internal/application/process/report_menu_ap_ar.go:563
-  - backend/internal/application/process/report_menu_gl_fa_tb.go:6
-  - frontend/account/report/UniversalReportScreen.tsx:2339
+  - "frontend/src/config/bcMenu.json:1-200"
+  - "frontend/account/report/UniversalReportScreen.tsx:1-250"
+  - "frontend/account/report/UniversalReportScreen.tsx:1150-1560"
+  - "frontend/account/report/BuySaleInformationScreen.tsx:1-250"
+  - "backend/internal/application/process/report_menu_autocare.go:1-45"
 ---
 
-# ภาพรวมรายงานทั้งหมดของระบบบัญชี
+# ภาพรวมระบบรายงานทั้งหมดใน BC Ai Account
 
-รายงานทุกตัวใช้หน้าจอรูปแบบเดียวกัน: เลือกเงื่อนไข กด "ประมวลผลรายงาน" แล้วพิมพ์หรือส่งออกได้ วิธีใช้ตัวกรองดู [[rpt-run-filters]] วิธีพิมพ์และส่งออกดู [[rpt-print-export]]
+ทุกรายงานในระบบ **BC Account** และระบบศูนย์บริการ **BC AutoCare** ถูกออกแบบให้เปิดใช้งานบนหน้าจอรายงานมาตรฐานเดียวกัน ทั้งการกรองข้อมูล ปรับความกว้างคอลัมน์ พิมพ์เป็นไฟล์ PDF ส่งออกตาราง CSV และคลิกเจาะลึกไปเอกสารต้นทาง
 
-## รายงานที่ถูกถามบ่อย
-- ลูกหนี้ค้างชำระ/อายุหนี้: [[rpt-ar-aging]]
-- สินค้าคงเหลือ: [[rpt-ic-stock-balance]]
-- กำไรขั้นต้น: [[rpt-ic-gross-profit]]
-- ยอดขายสรุป: [[rpt-so-sales-summary]]
-- งบทดลองและงบการเงิน: [[rpt-gl-trial-balance]] [[rpt-gl-financial-statements]]
+## แผนผังคู่มือรายงานแยกตามสายงาน
 
-## สินค้าและคลัง
-[[rpt-ic-stock-balance]] · [[rpt-ic-item-info]] · [[rpt-ic-stock-docs]] · [[rpt-ic-status-control]] · [[rpt-ic-movement-reorder]] · [[rpt-ic-gross-profit]] · [[rpt-ic-cancel-docs]]
+### เครื่องมือกลางที่ใช้ได้กับทุกรายงาน
+- **ตั้งค่าหน้ากระดาษ พิมพ์ PDF และส่งออก CSV**: เลือกภาษาไทย/อังกฤษ ขนาดกระดาษ แนวตั้ง-แนวนอน ธีมสี ปรับสัดส่วนคอลัมน์เป็น % และบันทึกเป็น Excel/PDF ดูวิธีใช้ที่ [[rpt-print-export]]
+- **คลิกเจาะลึก 2 จังหวะจากตัวเลขในรายงานไปเอกสารต้นทาง**: คลิกเลขที่เอกสาร คู่ค้า สินค้า ผังบัญชี หรือสมุดรายวัน เพื่อเปิดหน้าจอจริง ดูรายละเอียดที่ [[rpt-drilldown-2hop]]
+- **ออกแบบรายงาน ฟอร์มเอกสาร และงบการเงินเอง**: ตั้งแม่แบบส่วนตัว ปรับคำสั่งดึงข้อมูล (Read-only) และวางฟอร์มพิมพ์ใบกำกับภาษี ดูเพิ่มเติมที่ [[rpt-designer-custom]]
 
-## ซื้อ
-[[rpt-po-pr-po]] · [[rpt-po-deposit-advance]] · [[rpt-po-purchase-docs]] · [[rpt-po-purchase-summary]] · [[rpt-po-purchase-analysis]] · [[rpt-po-cancel-docs]]
+### รายงานแยกตามหมวดงานหลัก
+1. **รายงานระบบขาย ใบเสนอราคา ใบสั่งขาย POS และร้านยา**: [[rpt-sale-so]]
+2. **รายงานระบบจัดซื้อ ใบขอซื้อ ใบสั่งซื้อ รับของ และเทียบ 12 เดือน**: [[rpt-buy-po]]
+3. **รายงานลูกหนี้และเจ้าหนี้ (วงเงิน เคลื่อนไหว วางบิล และอายุหนี้)**: [[rpt-ar-ap]]
+4. **รายงานสินค้า คงเหลือ ล็อต/Serial บัญชีคุมพิเศษ และกำไรขั้นต้น 12 มิติ**: [[rpt-stock-cost]]
+5. **รายงานเงินสด เงินสดย่อย สมุดเงินฝาก บัตรเครดิต และทะเบียนเช็ค**: [[rpt-cash-bank-cheque]]
+6. **รายงานบัญชีแยกประเภท สมุดรายวัน งบทดลอง และงบการเงิน (DBD e-Filing)**: [[rpt-gl-financial]]
+7. **รายงานภาษีซื้อ-ขาย (ภ.พ.30), หัก ณ ที่จ่าย (ภ.ง.ด.3/53/50/51/54) และ 50 ทวิ**: [[rpt-tax-vat-wht]]
+8. **รายงานทะเบียนสินทรัพย์ ค่าเสื่อมราคา และการซ่อมบำรุง**: [[rpt-fixed-assets]]
+9. **รายงานเฉพาะศูนย์บริการรถยนต์และร้านยาง BC AutoCare (5 รายงานหลัก)**: [[rpt-autocare]]
 
-## ขาย
-[[rpt-so-quote-order]] · [[rpt-so-deposit-advance]] · [[rpt-so-sales-docs]] · [[rpt-so-sales-summary]] · [[rpt-so-sales-analysis]] · [[rpt-so-cancel-docs]]
+## ฟีเจอร์มาตรฐานที่มีบนหน้าจอรายงาน
 
-## เจ้าหนี้
-[[rpt-ap-master-opening]] · [[rpt-ap-bill-payment]] · [[rpt-ap-outstanding]] · [[rpt-ap-aging]] · [[rpt-ap-cancel-docs]]
+- **กรองช่วงข้อมูลละเอียด**: กรองได้ทั้งช่วงวันที่ ช่วงรหัสเอกสาร/สินค้า/คู่ค้า คำค้นหา และตัวเลือกเรียงลำดับ
+- **สลับมุมมองสรุปกับแสดงรายละเอียด**: รายงานเอกสารสำคัญส่วนใหญ่มีปุ่มสลับระหว่างมุมมองสรุประดับหัวเอกสาร และมุมมองแสดงรายละเอียดสินค้าในบิล
+- **จอสอบถามข้อมูลซื้อ-ขาย 4 มิติ**: ในหมวดซื้อและขายมีหน้าจอสอบถามแบบ 4 ช่อง (ข้อมูลหลัก — รายละเอียดสินค้า — สรุปยอด — เอกสารเชื่อมโยง) เพื่อดูความเชื่อมโยงอย่างรวดเร็ว
+- **ปกป้องความลับต้นทุน**: หากตั้งค่าสิทธิ์ไม่ให้พนักงานบางรายดูต้นทุน ระบบจะซ่อนหรือปิดบังคอลัมน์ต้นทุนและกำไรในรายงานสต็อกและกำไรขั้นต้นโดยอัตโนมัติ ดูเรื่องสิทธิ์ที่ [[ts-common-no-permission]]
 
-## ลูกหนี้
-[[rpt-ar-master-opening]] · [[rpt-ar-bill-receipt]] · [[rpt-ar-outstanding-credit]] · [[rpt-ar-aging]] · [[rpt-ar-cancel-docs]]
-
-## เงินสดและธนาคาร
-[[rpt-cb-cash-petty]] · [[rpt-cb-bank-credit-card]] · [[rpt-cb-cheque-receive]] · [[rpt-cb-cheque-pay]] · [[rpt-cb-cancel-docs]]
-
-## สินทรัพย์
-[[rpt-asset-reports]]
-
-## บัญชีแยกประเภทและงบการเงิน
-[[rpt-gl-ledger-journal]] · [[rpt-gl-trial-balance]] · [[rpt-gl-financial-statements]]
-
-## รายงานอื่น ๆ
-[[rpt-other-custom]]
-
-## รายงานภาษีมูลค่าเพิ่มและภาษีหัก ณ ที่จ่าย
-ดู [[howto-tax-overview]]
-
-## ปัญหาที่พบบ่อย
-[[ts-rpt-no-data]] · [[ts-rpt-no-cost-permission]] · [[ts-rpt-numbers-mismatch]] · [[ts-rpt-slow-too-big]] · [[ts-rpt-export-fail]] · [[ts-rpt-pdf-fail]]
-
-## คำถามที่พบบ่อย
-[[faq-rpt-cancelled-docs]] · [[faq-rpt-ar-vs-ledger]] · [[faq-rpt-stock-vs-value]] · [[faq-rpt-save-template]]
-
-## ดูต่อ
-[[index]] · [[playbook-call-center]] · [[sys-account-overview]]
+## เชื่อมโยงระบบที่เกี่ยวข้อง
+- ระบบหลัก BC Account: [[sys-account-overview]]
+- ผู้ช่วย AI สรุปรายงานเป็น A4 PDF และ CSV: [[sys-ai-copilot]]

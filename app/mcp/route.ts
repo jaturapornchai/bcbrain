@@ -1,56 +1,139 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
-import { excerpt, getNote, search, terms, updatedAt, vault, type Note } from "@/lib/vault";
+import { RELATION_TYPES } from "@/lib/groups";
+import {
+  connectedNeighbors,
+  excerpt,
+  getNote,
+  listVaultRows,
+  search,
+  terms,
+  traverseGraph,
+  updatedAt,
+  vaultFolders,
+  type Note,
+} from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
 
-const INSTRUCTIONS = `BC Brain = customer-facing knowledge base of the BC Ai Account product suite: Thai accounting/ERP for SMEs (sales, purchasing, inventory, AR/AP, cash/bank/cheques, fixed assets, general ledger, VAT/WHT, reports) plus add-on systems (POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Dashboard and more). Notes are plain Thai for business owners, accountants and shop staff, verified against the real source code.
-You act as a call-center or sales assistant for BC customers. Before your first answer in a conversation, read_note("playbook-call-center") for usage/support questions or read_note("playbook-sales") for pre-sale questions, and follow it.
-Workflow: ask_brain with the customer's own words -> read_note for linked notes when needed -> answer in plain Thai, step by step, using menu paths and on-screen messages exactly as the notes write them.
-Rules: answer only from note content; if the notes do not cover it, say so and offer a hand-off to human staff - never guess menus, buttons, features or causes. Never quote prices, packages, discounts, contracts or support hours: hand off to the sales team. Never ask for passwords or other secrets. For tax/legal interpretation explain only what the system does and advise the customer's auditor or the Revenue Department. Slugs are for you; do not show them to customers unless asked.`;
+const INSTRUCTIONS = `BC Brain = dual-audience knowledge base of the BC Ai Account product suite (Thai accounting/ERP for SMEs: sales, purchasing, inventory, AR/AP, cash/bank/cheques, fixed assets, GL, VAT/WHT, reports + add-on systems: POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Market, Dashboard, MonitorMap, WorkMonitor, Company Brain), verified against the real source code.
+
+Choose the mode that matches the caller's role before answering:
+(a) Developers / building integrations / writing SQL / checking schemas, trans_flag, GL Dr/Cr, API or architecture:
+    - First call read_note("playbook-dev") and follow its rules.
+    - Pass audience: "dev" to ask_brain, search_brain, traverse_brain, and list_notes (or audience: "all" when business workflow context is also needed).
+    - Use traverse_brain to trace multi-hop relationships (e.g. SQL query -> schema tables -> doctype flags -> GL rules) or find shortest paths between two slugs.
+    - Provide exact table names, columns, SQL types, trans_flag values, API/MCP contracts, and valid PostgreSQL SELECT/WITH queries using NUMERIC (no float/double) and COALESCE(last_status, 0) = 0 where applicable.
+(b) General users / call-center / pre-sale assistants:
+    - First call read_note("playbook-call-center") for usage/support or read_note("playbook-sales") for pre-sale questions, and follow it.
+    - ALWAYS pass audience: "user" to ask_brain, search_brain, traverse_brain, and list_notes.
+    - Answer in plain, easy-to-understand Thai step by step without code, SQL, table names, or developer jargon, using exact Thai menu names and on-screen messages.
+    - Never quote prices, packages, discounts, contracts, or support hours: hand off to the human sales team. For tax/legal interpretation, explain only what the system does and advise consulting the customer's auditor or the Revenue Department.
+
+General rules: answer only from note content; if the notes do not cover it, say so honestly without guessing. Never ask for or expose passwords, tokens, or secrets. Slugs are internal references; do not show them to general users unless asked.`;
+
+const audienceSchema = z
+  .enum(["all", "user", "dev"])
+  .optional()
+  .describe('Filter by audience zone: "user" (plain Thai guides/sales), "dev" (schema/SQL/API/architecture), or "all" (default).');
 
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 
 function noteText(n: Note, body = n.body): string {
+  const out = n.outEdges.map((e) => `[[${e.slug}]] (${e.rel})`).join(" ") || "-";
+  const inn = n.inEdges.map((e) => `[[${e.slug}]] (${e.rel})`).join(" ") || "-";
   return [
     `# ${n.title}`,
-    `slug: ${n.slug} | folder: ${n.folder} | tags: ${n.tags.join(", ")}`,
+    `slug: ${n.slug} | folder: ${n.folder} | audience: ${n.audience} | tags: ${n.tags.join(", ")}`,
     "",
     body.trim(),
     "",
-    `links: ${n.links.map((l) => `[[${l}]]`).join(" ") || "-"}`,
-    `backlinks: ${n.backlinks.map((l) => `[[${l}]]`).join(" ") || "-"}`,
+    `links: ${out}`,
+    `backlinks: ${inn}`,
   ].join("\n");
 }
 
+const ANNOTATIONS = { readOnlyHint: true, openWorldHint: false }; // clients may skip the approval prompt for read-only tools
+
+const ASK_INPUT = {
+  question: z.string().min(2).max(500),
+  audience: audienceSchema,
+};
+
+const SEARCH_INPUT = {
+  query: z.string().min(1).max(300),
+  limit: z.number().int().min(1).max(20).optional(),
+  audience: audienceSchema,
+};
+
+const TRAVERSE_INPUT = {
+  slug: z.string().min(1).max(120),
+  to_slug: z.string().min(1).max(120).optional(),
+  depth: z.number().int().min(1).max(3).optional(),
+  direction: z.enum(["both", "out", "in"]).optional(),
+  relation: z.enum(RELATION_TYPES).optional(),
+  folder: z.string().max(40).optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+  audience: audienceSchema,
+};
+
+const READ_INPUT = {
+  slug: z.string().min(1).max(120),
+};
+
+const LIST_INPUT = {
+  folder: z.string().max(40).optional(),
+  tag: z.string().max(40).optional(),
+  audience: audienceSchema,
+};
+
 function buildServer() {
-  const server = new McpServer({ name: "bcbrain", version: "2.0.0" }, { instructions: `${INSTRUCTIONS}
-Knowledge last updated: ${updatedAt} (Thai time).` });
+  const server = new McpServer(
+    { name: "bcbrain", version: "2.0.0" },
+    {
+      instructions: `${INSTRUCTIONS}
+Knowledge last updated: ${updatedAt} (Thai time).`,
+    },
+  );
   const log = (tool: string) => console.log(`[mcp] tool=${tool}`);
-  const annotations = { readOnlyHint: true, openWorldHint: false }; // clients may skip the approval prompt for read-only tools
-  const folders = [...new Set([...vault().values()].map((n) => n.folder))].sort().join(", ");
+  const folders =
+    vaultFolders().join(", ") ||
+    "root, playbook, start, howto, troubleshoot, faq, reports, systems, glossary, sales, dev-playbook, schema, queries, api, doctypes, architecture";
 
   server.registerTool(
     "ask_brain",
     {
       title: "Ask the BC brain",
       description:
-        "Answer a customer question (Thai or English, their own words are fine) from the BC knowledge base. Returns the 4 most relevant notes (long notes trimmed to the sections that match, with a list of omitted sections) so you can answer from them.",
-      inputSchema: { question: z.string().min(2).max(500) },
-      annotations,
+        "Answer a user or developer question (Thai or English) from the BC knowledge base. Pass audience: 'user' for plain-Thai call-center/sales answers, 'dev' for schema/SQL/API/architecture, or 'all' (default). Returns up to 4 most relevant notes (long notes trimmed to matching sections).",
+      inputSchema: ASK_INPUT,
+      annotations: ANNOTATIONS,
     },
-    async ({ question }) => {
+    async ({ question, audience }) => {
       log("ask_brain");
-      const hits = search(question, 4);
-      if (!hits.length) return text("No matching notes. Try other keywords (Thai or code identifiers) or list_notes.");
+      const filter = audience ?? "all";
+      const hits = search(question, 4, filter);
+      if (!hits.length) {
+        return text(`No matching notes (audience=${filter}). Try other keywords (Thai or SQL/API identifiers) or list_notes.`);
+      }
       const ts = terms(question);
       // ponytail: fixed budget ~24k chars total; first hit gets more room since it is usually the answer
       const parts = hits.map((h, i) => {
         const n = getNote(h.slug)!;
         return noteText(n, excerpt(n.body, ts, i === 0 ? 9000 : 5000));
       });
-      return text(`Top ${hits.length} notes for: ${question}\n\n${parts.join("\n\n---\n\n")}`);
+      const graphCtx = connectedNeighbors(
+        hits.map((h) => h.slug),
+        filter,
+        6,
+      );
+      const ctxBlock = graphCtx.length
+        ? `\n\n---\n\n## Connected Graph Context (1-hop — use read_note or traverse_brain to inspect)\n${graphCtx
+            .map((g) => `- [${g.rel}] ${g.slug} (${g.folder}) — ${g.title} (via ${g.via})`)
+            .join("\n")}`
+        : "";
+      return text(`Top ${hits.length} notes (audience=${filter}) for: ${question}\n\n${parts.join("\n\n---\n\n")}${ctxBlock}`);
     },
   );
 
@@ -58,13 +141,67 @@ Knowledge last updated: ${updatedAt} (Thai time).` });
     "search_brain",
     {
       title: "Search notes",
-      description: "Keyword search (Thai word segmentation supported) across note titles, aliases, tags and bodies. Returns slug, title, score and a snippet.",
-      inputSchema: { query: z.string().min(1).max(300), limit: z.number().int().min(1).max(20).optional() },
-      annotations,
+      description:
+        "Keyword search (Thai word segmentation + SQL table/identifier matching) across note titles, aliases, tags and bodies with BM25 length normalization. Supports audience filtering ('all' | 'user' | 'dev').",
+      inputSchema: SEARCH_INPUT,
+      annotations: ANNOTATIONS,
     },
-    async ({ query, limit }) => {
+    async ({ query, limit, audience }) => {
       log("search_brain");
-      return text(JSON.stringify(search(query, limit ?? 8), null, 1));
+      return text(JSON.stringify(search(query, limit ?? 8, audience ?? "all"), null, 1));
+    },
+  );
+
+  server.registerTool(
+    "traverse_brain",
+    {
+      title: "Traverse knowledge graph",
+      description:
+        "Follow typed synapses 1–3 hops from a note (or find the shortest graph path to to_slug). Respects audience isolation ('all' | 'user' | 'dev').",
+      inputSchema: TRAVERSE_INPUT,
+      annotations: ANNOTATIONS,
+    },
+    async ({ slug, to_slug, depth, direction, relation, folder, limit, audience }) => {
+      log("traverse_brain");
+      const filter = audience ?? "all";
+      const res = traverseGraph({ slug, toSlug: to_slug, depth, direction, relation, folder, limit, audience: filter });
+      if (!res.start) {
+        return text(`Start note "${slug}" not found in audience=${filter}.`);
+      }
+      const header = `# Traverse from ${res.start.slug} | audience: ${filter} | ${res.start.title}`;
+      if (res.mode === "path") {
+        if (!res.target) return text(`${header}\nTarget note "${to_slug}" not found in audience=${filter}.`);
+        if (!res.path?.length) {
+          return text(
+            res.start.slug === res.target.slug
+              ? `${header}\nSame note (0 hops).`
+              : `${header}\nNo path found to ${res.target.slug} within 6 hops (audience=${filter}).`,
+          );
+        }
+        const chain = [
+          res.start.slug,
+          ...res.path.map((s) => `${s.direction === "out" ? `--[${s.rel}]-->` : `<--[${s.rel}]--`} ${s.slug}`),
+        ].join(" ");
+        const lines = res.path.map(
+          (s) => `${s.hop}. ${s.slug} | ${s.folder} | ${s.audience} | [${s.rel}] via ${s.via} — ${s.title}`,
+        );
+        return text(`${header}\nPath (${res.path.length} hops): ${chain}\n\n${lines.join("\n")}`);
+      }
+
+      if (!res.neighbors.length) {
+        return text(`${header}\nNo matching connected notes (depth=${depth ?? 2}, audience=${filter}).`);
+      }
+      const grouped = new Map<number, typeof res.neighbors>();
+      for (const s of res.neighbors) grouped.set(s.hop, [...(grouped.get(s.hop) ?? []), s]);
+      const sections = [...grouped.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(
+          ([hop, steps]) =>
+            `## Hop ${hop} (${steps.length})\n${steps
+              .map((s) => `- ${s.slug} | ${s.folder} | ${s.audience} | [${s.rel} ${s.direction} via ${s.via}] ${s.title}`)
+              .join("\n")}`,
+        );
+      return text(`${header}\n\n${sections.join("\n\n")}`);
     },
   );
 
@@ -72,9 +209,9 @@ Knowledge last updated: ${updatedAt} (Thai time).` });
     "read_note",
     {
       title: "Read a note",
-      description: "Full markdown of one note by slug (also accepts [[slug]] or slug.md), plus its outgoing links and backlinks.",
-      inputSchema: { slug: z.string().min(1).max(120) },
-      annotations,
+      description: "Full markdown of one note by slug (also accepts [[slug]] or slug.md), plus audience, outgoing links and backlinks.",
+      inputSchema: READ_INPUT,
+      annotations: ANNOTATIONS,
     },
     async ({ slug }) => {
       log("read_note");
@@ -89,17 +226,18 @@ Knowledge last updated: ${updatedAt} (Thai time).` });
     "list_notes",
     {
       title: "List notes",
-      description: `Index of notes (slug, title, folder, tags). Optional filter by folder (${folders}) or tag.`,
-      inputSchema: { folder: z.string().max(40).optional(), tag: z.string().max(40).optional() },
-      annotations,
+      description: `Index of notes (slug, folder, audience, title, tags). Optional filter by folder (${folders}), tag, or audience ('all' | 'user' | 'dev').`,
+      inputSchema: LIST_INPUT,
+      annotations: ANNOTATIONS,
     },
-    async ({ folder, tag }) => {
+    async ({ folder, tag, audience }) => {
       log("list_notes");
       const f = folder?.toLowerCase();
       const t = tag?.toLowerCase();
-      const rows = [...vault().values()]
+      const filter = audience ?? "all";
+      const rows = listVaultRows(filter)
         .filter((n) => (!f || n.folder === f) && (!t || n.tags.some((x) => x.toLowerCase() === t)))
-        .map((n) => `${n.slug} | ${n.folder} | ${n.title} | ${n.tags.join(",")}`);
+        .map((n) => `${n.slug} | ${n.folder} | ${n.audience} | ${n.title} | ${n.tags.join(",")}`);
       return text(rows.join("\n") || "No notes match.");
     },
   );
@@ -107,11 +245,95 @@ Knowledge last updated: ${updatedAt} (Thai time).` });
   return server;
 }
 
+const MAX_BODY_BYTES = 32 * 1024;
+const RATE_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 180;
+const RATE_MAX_KEYS = 4096;
+
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Accept, Mcp-Session-Id, Last-Event-ID, Mcp-Protocol-Version",
+  "Access-Control-Expose-Headers": "Mcp-Session-Id, Retry-After",
+  "Cache-Control": "no-store",
+};
+
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function clientIp(req: Request): string {
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) {
+    const first = fwd.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return req.headers.get("x-real-ip")?.trim() || "local";
+}
+
+function checkRateLimit(ip: string): { ok: true } | { ok: false; retryAfterSec: number } {
+  const now = Date.now();
+  const cur = rateBuckets.get(ip);
+  if (!cur || cur.resetAt <= now) {
+    if (!cur && rateBuckets.size >= RATE_MAX_KEYS) {
+      for (const [k, v] of rateBuckets) {
+        if (v.resetAt <= now) rateBuckets.delete(k);
+      }
+      if (rateBuckets.size >= RATE_MAX_KEYS) {
+        const oldest = rateBuckets.keys().next().value;
+        if (oldest !== undefined) rateBuckets.delete(oldest);
+      }
+    }
+    rateBuckets.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return { ok: true };
+  }
+  cur.count += 1;
+  if (cur.count > RATE_LIMIT_MAX) {
+    return { ok: false, retryAfterSec: Math.max(1, Math.ceil((cur.resetAt - now) / 1000)) };
+  }
+  return { ok: true };
+}
+
+function withHeaders(res: Response, extra?: Record<string, string>): Response {
+  const headers = new Headers(res.headers);
+  for (const [k, v] of Object.entries(CORS_HEADERS)) headers.set(k, v);
+  if (extra) {
+    for (const [k, v] of Object.entries(extra)) headers.set(k, v);
+  }
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
+export async function OPTIONS(): Promise<Response> {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
 async function handle(req: Request): Promise<Response> {
+  const rl = checkRateLimit(clientIp(req));
+  if (!rl.ok) {
+    return Response.json(
+      {
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32000, message: "Rate limit exceeded (max 180 requests/minute). Please retry shortly." },
+      },
+      { status: 429, headers: { ...CORS_HEADERS, "Retry-After": String(rl.retryAfterSec) } },
+    );
+  }
+
+  const len = Number(req.headers.get("content-length") ?? "0");
+  if (Number.isFinite(len) && len > MAX_BODY_BYTES) {
+    return Response.json(
+      { jsonrpc: "2.0", id: null, error: { code: -32000, message: "Request body too large (max 32 KB)." } },
+      { status: 413, headers: CORS_HEADERS },
+    );
+  }
+
   // public + read-only: no auth. stateless: fresh server + transport per request, JSON responses (no SSE session to keep alive)
-  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+    enableJsonResponse: true,
+    maxRequestBodySize: MAX_BODY_BYTES,
+  });
   await buildServer().connect(transport);
-  return transport.handleRequest(req);
+  return withHeaders(await transport.handleRequest(req));
 }
 
 export { handle as GET, handle as POST, handle as DELETE };

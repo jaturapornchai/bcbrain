@@ -1,4 +1,4 @@
-// Fails (exit 1) when any vault note looks like it contains a secret. Runs before every build.
+// Fails (exit 1) when any vault note looks like it contains a secret or password hash. Runs before every build.
 // A line can opt out with the marker  secret-scan:allow  (use only after checking it is not a secret).
 import fs from "node:fs";
 import path from "node:path";
@@ -15,6 +15,8 @@ const RULES = [
   ["URI with password", /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@`'"]+:[^\s/@`'"<>{}$]+@/i],
   ["Bearer token", /\bBearer\s+(?!<)[A-Za-z0-9._~+/-]{20,}/],
   ["assigned secret", /\b(?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\s*[:=]\s*["']?(?![<{$*])[^\s"'`<>,;)]{8,}/i],
+  ["bcrypt hash", /\$2[aby]\$\d{2}\$[./A-Za-z0-9]{50,}/],
+  ["argon2 hash", /\$argon2(?:id|i|d)\$v=\d+\$[^\s"'`<>,;]+/],
   ["email", /\b[A-Za-z0-9._%+-]+@(?!example\.(?:com|org|net)\b)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:com|net|org|co|th|io|ai|dev|app|me|info|biz)\b/i],
 ];
 // ponytail: BC menu codes look like 7.10.1.1; all-small octets (<=31) are treated as codes, not hosts. Tighten if a real host in that range ever matters. // pragma: allowlist secret
@@ -22,12 +24,14 @@ const MENU_CODE = /^(?:[12]?\d|3[01])(?:\.(?:[12]?\d|3[01])){3}$/;
 const PRIVATE_IP = /^(?:127\.|10\.|0\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.|255\.)/;
 const IPV4 = /\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}\b/g;
 
-const files = (function walk(d) {
+function walk(d) {
+  if (!fs.existsSync(d)) return [];
   return fs.readdirSync(d, { withFileTypes: true }).flatMap((e) =>
-    e.name.startsWith(".") ? [] : e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith(".md") ? [path.join(d, e.name)] : [],
+    e.name.startsWith(".") ? [] : e.isDirectory() ? walk(path.join(d, e.name)) : e.isFile() && e.name.endsWith(".md") ? [path.join(d, e.name)] : [],
   );
-})(VAULT);
+}
 
+const files = walk(VAULT);
 const hits = [];
 for (const f of files) {
   fs.readFileSync(f, "utf8").split(/\r?\n/).forEach((line, i) => {
