@@ -16,6 +16,7 @@ import {
   type AudienceFilter,
   type RelationType,
 } from "@/lib/groups";
+import type { McpCallEvent } from "@/lib/mcp-events";
 
 type BrainNode = {
   slug: string;
@@ -27,7 +28,7 @@ type BrainNode = {
   pos?: [number, number, number];
 };
 type Props = { nodes: BrainNode[]; links: [number, number][]; rels?: RelationType[]; children?: ReactNode };
-type Scene3D = { select(i: number): void; emphasize(set: Set<number> | null): void; reset(): void; spin(on: boolean): void };
+type Scene3D = { select(i: number): void; emphasize(set: Set<number> | null): void; pulse(indices: number[]): void; reset(): void; spin(on: boolean): void };
 
 const R = new THREE.Vector3(6.2, 4.8, 7.4); // brain ellipsoid radii: x left-right, y up, z front-back
 
@@ -155,6 +156,15 @@ export default function Brain3D({ nodes, links, rels, children }: Props) {
   const [group, setGroup] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [spinning, setSpinning] = useState(true);
+  const [mcpLogs, setMcpLogs] = useState<McpCallEvent[]>([]);
+  const [termOpen, setTermOpen] = useState(false);
+  const [termLive, setTermLive] = useState(false);
+  const [termBurst, setTermBurst] = useState(false);
+  const [testingMcp, setTestingMcp] = useState(false);
+  const termBodyRef = useRef<HTMLDivElement>(null);
+  const pickRef = useRef<(i: number) => void>(() => {});
+
+  const slugIndex = useMemo(() => new Map(nodes.map((n, i) => [n.slug, i])), [nodes]);
 
   useEffect(() => {
     const param = new URLSearchParams(window.location.search).get("mode");
@@ -398,6 +408,20 @@ export default function Brain3D({ nodes, links, rels, children }: Props) {
         hiMat.opacity = set && set.size > 40 ? 0.2 : 0.55;
         setLines(hiLines, set ? segs(links.flatMap(([a, b], i) => (set.has(a) && set.has(b) ? [i] : []))) : []);
       },
+      pulse(indices) {
+        if (!indices.length) return;
+        indices.forEach((idx, rank) => {
+          if (idx >= 0 && idx < nodes.length) flash[idx] = rank === 0 ? 1.8 : 1.35;
+        });
+        const primary = indices[0];
+        if (primary >= 0 && primary < nodes.length) {
+          startWave(live[primary], 14);
+          if (!emph) {
+            const pulseLinks = indices.flatMap((idx) => adjacency[idx] ?? []);
+            setLines(hiLines, segs([...new Set(pulseLinks)]));
+          }
+        }
+      },
     };
 
     const resize = () => {
@@ -562,13 +586,110 @@ export default function Brain3D({ nodes, links, rels, children }: Props) {
     return () => removeEventListener("keydown", onKey);
   }, []);
 
+  useEffect(() => {
+    const es = new EventSource("/mcp/events");
+    let burstTimer: ReturnType<typeof setTimeout> | undefined;
+
+    es.onopen = () => setTermLive(true);
+    es.onerror = () => setTermLive(false);
+
+    es.addEventListener("snapshot", (msg) => {
+      try {
+        const list = JSON.parse((msg as MessageEvent<string>).data) as McpCallEvent[];
+        if (Array.isArray(list)) {
+          const recent = list.slice(-25);
+          setMcpLogs(recent);
+          const newest = recent[recent.length - 1];
+          if (newest && Date.now() - Date.parse(newest.ts) < 15_000) {
+            setTermOpen(true);
+          }
+        }
+      } catch {
+        // ignore malformed snapshot
+      }
+    });
+
+    es.addEventListener("mcp", (msg) => {
+      try {
+        const ev = JSON.parse((msg as MessageEvent<string>).data) as McpCallEvent;
+        setMcpLogs((prev) => {
+          const next = prev.some((x) => x.id === ev.id) ? prev : [...prev, ev];
+          return next.slice(-25);
+        });
+        setTermOpen(true);
+        setTermBurst(true);
+        if (burstTimer) clearTimeout(burstTimer);
+        burstTimer = setTimeout(() => setTermBurst(false), 900);
+
+        const hitIndices = ev.hits
+          .map((h) => slugIndex.get(h.slug))
+          .filter((idx): idx is number => idx !== undefined);
+        const pulseTargets = hitIndices.length ? hitIndices : nodes.length ? [0] : [];
+        if (pulseTargets.length) {
+          scene3d.current?.pulse(pulseTargets);
+          fired.current = pulseTargets[0];
+          if (stream.current) {
+            const label = ev.hits[0]?.title ?? ev.arg;
+            stream.current.textContent = `MCP ${ev.tool} → ${label}`;
+          }
+        }
+      } catch {
+        // ignore malformed event
+      }
+    });
+
+    return () => {
+      if (burstTimer) clearTimeout(burstTimer);
+      es.close();
+      setTermLive(false);
+    };
+  }, [slugIndex, nodes.length]);
+
+  useEffect(() => {
+    if (termOpen && termBodyRef.current) {
+      termBodyRef.current.scrollTop = termBodyRef.current.scrollHeight;
+    }
+  }, [mcpLogs, termOpen]);
+
   const selectMode = (next: AudienceFilter) => {
     setMode(next);
     if (group && !matchesAudience(groupOf(group).audience, next)) setGroup(null);
     if (selected >= 0 && !matchesAudience(nodes[selected].audience, next)) setSelected(-1);
   };
-  const pick = (i: number) => (setSelected(i), setQ(""));
+  const pick = (i: number) => {
+    if (i >= 0 && !matchesAudience(nodes[i].audience, mode)) setMode("all");
+    setSelected(i);
+    setQ("");
+  };
+  pickRef.current = pick;
   const reset = () => (setSelected(-1), setGroup(null), setQ(""), setMode("all"), scene3d.current?.reset());
+  const triggerSampleMcp = async () => {
+    if (testingMcp) return;
+    setTestingMcp(true);
+    try {
+      const args =
+        mode === "dev"
+          ? { question: "ยอดคงเหลือสินค้า แยกตามคลังสินค้า", audience: "dev" }
+          : mode === "user"
+            ? { question: "เช็คเด้งต้องทำอย่างไร", audience: "user" }
+            : { question: "ภาษีมูลค่าเพิ่ม ภ.พ.30 รายงานภาษีซื้อขาย", audience: "all" };
+      await fetch("/mcp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method: "tools/call",
+          params: { name: "ask_brain", arguments: args },
+        }),
+      });
+    } finally {
+      setTestingMcp(false);
+    }
+  };
   const sel = selected >= 0 ? nodes[selected] : null;
   const modeQuery = mode !== "all" ? `?mode=${mode}` : "";
   const searchPlaceholder =
@@ -679,7 +800,94 @@ export default function Brain3D({ nodes, links, rels, children }: Props) {
         </aside>
       )}
 
+      {termOpen && (
+        <aside className="mcp-term" data-burst={termBurst ? "true" : "false"} aria-label="MCP Terminal แบบเรียลไทม์">
+          <div className="mcp-term-head">
+            <div className="mcp-term-title">
+              <span className="mcp-dots" aria-hidden="true">
+                <i className="d-red" />
+                <i className="d-amber" />
+                <i className="d-green" />
+              </span>
+              <b>MCP LIVE</b>
+              <span className={`mcp-status${termLive ? " online" : ""}`}>
+                {termLive ? "เชื่อมต่อแล้ว" : "กำลังเชื่อม…"}
+              </span>
+            </div>
+            <div className="mcp-term-actions">
+              <button type="button" className="mcp-mini-btn" onClick={triggerSampleMcp} disabled={testingMcp}>
+                {testingMcp ? "กำลังยิง…" : "ยิงทดสอบ"}
+              </button>
+              <button type="button" className="mcp-mini-btn" onClick={() => setMcpLogs([])}>
+                ล้าง
+              </button>
+              <button
+                type="button"
+                className="mcp-mini-btn"
+                onClick={() => setTermOpen(false)}
+                aria-label="ย่อหน้าต่าง Terminal"
+                title="ย่อหน้าต่าง"
+              >
+                —
+              </button>
+            </div>
+          </div>
+          <div className="mcp-term-body" ref={termBodyRef} role="log" aria-live="polite">
+            {mcpLogs.length === 0 ? (
+              <p className="mcp-empty">
+                <span className="mcp-prompt">$</span> รอรับคำสั่งจาก AI ที่เรียก <code>/mcp</code> แบบสด... (กด &ldquo;ยิงทดสอบ&rdquo; เพื่อจำลองได้)
+              </p>
+            ) : (
+              mcpLogs.map((ev) => (
+                <div className="mcp-entry" key={ev.id}>
+                  <div className="mcp-cmd">
+                    <span className="mcp-time">{ev.time}</span>
+                    <span className="mcp-prompt">$</span>
+                    <code className="mcp-tool">{ev.tool}</code>
+                    <span className={`mcp-aud aud-${ev.audience}`}>{ev.audience}</span>
+                    <span className="mcp-arg">&ldquo;{ev.arg}&rdquo;</span>
+                    <span className="mcp-ms">{ev.ms} ms</span>
+                  </div>
+                  <div className="mcp-out">
+                    <span className="mcp-arrow">↳</span>
+                    <span className="mcp-found">
+                      {ev.totalHits > 0 ? `พบ ${ev.totalHits} โน้ต` : "ไม่พบโน้ตที่ตรง"}
+                    </span>
+                    {ev.hits.map((h) => {
+                      const idx = slugIndex.get(h.slug);
+                      return (
+                        <button
+                          key={h.slug}
+                          type="button"
+                          className="mcp-hit-btn"
+                          style={{ color: groupOf(h.folder).color }}
+                          onClick={() => idx !== undefined && pickRef.current(idx)}
+                          title={`ไปที่เซลล์: ${h.title} (${h.slug})`}
+                        >
+                          <i className="dot" />
+                          <span>{h.title}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </aside>
+      )}
+
       <div className="brain-ctrl">
+        <button
+          type="button"
+          className={`btn mcp-toggle${termOpen ? " is-open" : ""}`}
+          aria-pressed={termOpen}
+          onClick={() => setTermOpen((v) => !v)}
+        >
+          <i className={`mcp-led${termLive ? " on" : ""}`} />
+          <span>MCP Terminal</span>
+          {mcpLogs.length > 0 && <span className="mcp-count">{mcpLogs.length}</span>}
+        </button>
         <button className="btn" onClick={() => setSpinning(!spinning)}>
           {spinning ? "หยุดหมุน" : "หมุนต่อ"}
         </button>

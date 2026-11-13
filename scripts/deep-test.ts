@@ -31,6 +31,7 @@ const {
   traverseGraph,
   vault,
 } = await import("../lib/vault.ts");
+const { emitMcpEvent, recentMcpEvents, sanitizeMcpArg, subscribeMcpEvents } = await import("../lib/mcp-events.ts");
 type AudienceFilter = import("../lib/groups.ts").AudienceFilter;
 
 const tStart = performance.now();
@@ -303,7 +304,35 @@ assert.equal(getNote("definitely-not-a-note-slug"), undefined);
 assert.equal(traverseGraph({ slug: "definitely-not-a-note-slug", audience: "all" }).start, null);
 assert.ok(excerpt("intro\n## Sec 1\nabc\n## Sec 2\ndef", ["sec"], 0).length > 0);
 assert.ok(excerpt("short", ["short"], 1000) === "short");
-console.log("[DIM 5] Fuzz & Boundary Edge Cases OK");
+
+const mockKey = ["sk", "dummy1234567890abcdef12"].join("-");
+const mockMail = ["user", "example.com"].join("@");
+const mockIp = ["203.0", "113.5"].join(".");
+const mockTel = ["081", "2345678"].join("");
+const sanitized = sanitizeMcpArg(`test ${mockKey} email ${mockMail} ip ${mockIp} tel ${mockTel}`);
+assert.ok(!sanitized.includes(mockKey), "DIM5 sanitizeMcpArg redacts key");
+assert.ok(!sanitized.includes(mockMail), "DIM5 sanitizeMcpArg redacts email");
+assert.ok(!sanitized.includes(mockIp), "DIM5 sanitizeMcpArg redacts IP");
+assert.ok(!sanitized.includes(mockTel), "DIM5 sanitizeMcpArg redacts phone");
+assert.ok(sanitizeMcpArg("ก".repeat(140)).length <= 97, "DIM5 sanitizeMcpArg truncates >96 chars");
+
+const receivedEvents: string[] = [];
+const unsub = subscribeMcpEvents((ev) => receivedEvents.push(ev.tool));
+for (let i = 0; i < 45; i++) {
+  emitMcpEvent({
+    tool: "search_brain",
+    audience: "dev",
+    rawArg: `query-${i}`,
+    hits: [{ slug: "sql-ic-stock-balance", title: "ยอดคงเหลือสินค้า", folder: "queries" }],
+    totalHits: 1,
+    ms: 1.2,
+  });
+}
+unsub();
+assert.equal(receivedEvents.length, 45, "DIM5 subscribeMcpEvents receives live events");
+assert.equal(recentMcpEvents(100).length, 40, "DIM5 recentMcpEvents caps buffer at 40");
+
+console.log("[DIM 5] Fuzz, MCP Event Bus & Boundary Edge Cases OK");
 
 // ============================================================
 // 6. High-Resolution Throughput Benchmarks

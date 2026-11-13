@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 import { RELATION_TYPES } from "@/lib/groups";
+import { emitMcpEvent, type McpEventHit, type McpToolName } from "@/lib/mcp-events";
 import {
   connectedNeighbors,
   excerpt,
@@ -96,7 +97,18 @@ function buildServer() {
 Knowledge last updated: ${updatedAt} (Thai time).`,
     },
   );
-  const log = (tool: string) => console.log(`[mcp] tool=${tool}`);
+  const emit = (
+    tool: McpToolName,
+    audience: "all" | "user" | "dev",
+    rawArg: string,
+    hits: McpEventHit[],
+    totalHits: number,
+    t0: number,
+  ) => {
+    const ms = performance.now() - t0;
+    console.log(`[mcp] tool=${tool} audience=${audience} hits=${totalHits} ms=${ms.toFixed(1)}`);
+    emitMcpEvent({ tool, audience, rawArg, hits, totalHits, ms });
+  };
   const folders =
     vaultFolders().join(", ") ||
     "root, playbook, start, howto, troubleshoot, faq, reports, systems, glossary, sales, dev-playbook, schema, queries, api, doctypes, architecture";
@@ -111,10 +123,11 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
       annotations: ANNOTATIONS,
     },
     async ({ question, audience }) => {
-      log("ask_brain");
+      const t0 = performance.now();
       const filter = audience ?? "all";
       const hits = search(question, 4, filter);
       if (!hits.length) {
+        emit("ask_brain", filter, question, [], 0, t0);
         return text(`No matching notes (audience=${filter}). Try other keywords (Thai or SQL/API identifiers) or list_notes.`);
       }
       const ts = terms(question);
@@ -133,6 +146,14 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
             .map((g) => `- [${g.rel}] ${g.slug} (${g.folder}) — ${g.title} (via ${g.via})`)
             .join("\n")}`
         : "";
+      emit(
+        "ask_brain",
+        filter,
+        question,
+        hits.map((h) => ({ slug: h.slug, title: h.title, folder: h.folder })),
+        hits.length,
+        t0,
+      );
       return text(`Top ${hits.length} notes (audience=${filter}) for: ${question}\n\n${parts.join("\n\n---\n\n")}${ctxBlock}`);
     },
   );
@@ -147,8 +168,18 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
       annotations: ANNOTATIONS,
     },
     async ({ query, limit, audience }) => {
-      log("search_brain");
-      return text(JSON.stringify(search(query, limit ?? 8, audience ?? "all"), null, 1));
+      const t0 = performance.now();
+      const filter = audience ?? "all";
+      const hits = search(query, limit ?? 8, filter);
+      emit(
+        "search_brain",
+        filter,
+        query,
+        hits.slice(0, 6).map((h) => ({ slug: h.slug, title: h.title, folder: h.folder })),
+        hits.length,
+        t0,
+      );
+      return text(JSON.stringify(hits, null, 1));
     },
   );
 
@@ -162,16 +193,27 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
       annotations: ANNOTATIONS,
     },
     async ({ slug, to_slug, depth, direction, relation, folder, limit, audience }) => {
-      log("traverse_brain");
+      const t0 = performance.now();
       const filter = audience ?? "all";
+      const rawArg = to_slug ? `${slug} → ${to_slug}` : `${slug} (depth=${depth ?? 2}${relation ? `, ${relation}` : ""})`;
       const res = traverseGraph({ slug, toSlug: to_slug, depth, direction, relation, folder, limit, audience: filter });
       if (!res.start) {
+        emit("traverse_brain", filter, rawArg, [], 0, t0);
         return text(`Start note "${slug}" not found in audience=${filter}.`);
       }
+      const stepHits = (res.mode === "path" ? (res.path ?? []) : res.neighbors)
+        .slice(0, 5)
+        .map((s) => ({ slug: s.slug, title: s.title, folder: s.folder }));
+      const eventHits = [{ slug: res.start.slug, title: res.start.title, folder: res.start.folder }, ...stepHits];
+      const totalHits = res.mode === "path" ? (res.path?.length ?? 0) : res.neighbors.length;
       const header = `# Traverse from ${res.start.slug} | audience: ${filter} | ${res.start.title}`;
       if (res.mode === "path") {
-        if (!res.target) return text(`${header}\nTarget note "${to_slug}" not found in audience=${filter}.`);
+        if (!res.target) {
+          emit("traverse_brain", filter, rawArg, [{ slug: res.start.slug, title: res.start.title, folder: res.start.folder }], 0, t0);
+          return text(`${header}\nTarget note "${to_slug}" not found in audience=${filter}.`);
+        }
         if (!res.path?.length) {
+          emit("traverse_brain", filter, rawArg, [{ slug: res.start.slug, title: res.start.title, folder: res.start.folder }], 0, t0);
           return text(
             res.start.slug === res.target.slug
               ? `${header}\nSame note (0 hops).`
@@ -185,10 +227,12 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
         const lines = res.path.map(
           (s) => `${s.hop}. ${s.slug} | ${s.folder} | ${s.audience} | [${s.rel}] via ${s.via} — ${s.title}`,
         );
+        emit("traverse_brain", filter, rawArg, eventHits, totalHits, t0);
         return text(`${header}\nPath (${res.path.length} hops): ${chain}\n\n${lines.join("\n")}`);
       }
 
       if (!res.neighbors.length) {
+        emit("traverse_brain", filter, rawArg, [{ slug: res.start.slug, title: res.start.title, folder: res.start.folder }], 0, t0);
         return text(`${header}\nNo matching connected notes (depth=${depth ?? 2}, audience=${filter}).`);
       }
       const grouped = new Map<number, typeof res.neighbors>();
@@ -201,6 +245,7 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
               .map((s) => `- ${s.slug} | ${s.folder} | ${s.audience} | [${s.rel} ${s.direction} via ${s.via}] ${s.title}`)
               .join("\n")}`,
         );
+      emit("traverse_brain", filter, rawArg, eventHits, totalHits, t0);
       return text(`${header}\n\n${sections.join("\n\n")}`);
     },
   );
@@ -214,9 +259,20 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
       annotations: ANNOTATIONS,
     },
     async ({ slug }) => {
-      log("read_note");
+      const t0 = performance.now();
       const n = getNote(slug);
-      if (n) return text(noteText(n));
+      if (n) {
+        emit(
+          "read_note",
+          n.audience === "both" ? "all" : n.audience,
+          slug,
+          [{ slug: n.slug, title: n.title, folder: n.folder }],
+          1,
+          t0,
+        );
+        return text(noteText(n));
+      }
+      emit("read_note", "all", slug, [], 0, t0);
       const near = search(slug.replace(/[-_]/g, " "), 5).map((h) => h.slug);
       return text(`Note "${slug}" not found.${near.length ? ` Closest: ${near.join(", ")}.` : ""} Use search_brain or list_notes.`);
     },
@@ -231,13 +287,21 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
       annotations: ANNOTATIONS,
     },
     async ({ folder, tag, audience }) => {
-      log("list_notes");
+      const t0 = performance.now();
       const f = folder?.toLowerCase();
       const t = tag?.toLowerCase();
       const filter = audience ?? "all";
-      const rows = listVaultRows(filter)
-        .filter((n) => (!f || n.folder === f) && (!t || n.tags.some((x) => x.toLowerCase() === t)))
-        .map((n) => `${n.slug} | ${n.folder} | ${n.audience} | ${n.title} | ${n.tags.join(",")}`);
+      const matched = listVaultRows(filter).filter((n) => (!f || n.folder === f) && (!t || n.tags.some((x) => x.toLowerCase() === t)));
+      const rawArg = [folder ? `folder=${folder}` : "", tag ? `tag=${tag}` : ""].filter(Boolean).join(" ") || "*";
+      emit(
+        "list_notes",
+        filter,
+        rawArg,
+        matched.slice(0, 5).map((n) => ({ slug: n.slug, title: n.title, folder: n.folder })),
+        matched.length,
+        t0,
+      );
+      const rows = matched.map((n) => `${n.slug} | ${n.folder} | ${n.audience} | ${n.title} | ${n.tags.join(",")}`);
       return text(rows.join("\n") || "No notes match.");
     },
   );

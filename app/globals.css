@@ -90,9 +90,14 @@ input:focus-visible, .btn:focus-visible, .mode-btn:focus-visible, .mode-pill:foc
 .brain-suggest button:hover, .brain-suggest a:hover, .brain-card li button:hover { background: rgba(255, 255, 255, 0.08); text-decoration: none; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex: none; }
 .brain-card {
-  position: absolute; right: clamp(12px, 3vw, 32px); top: 76px; z-index: 2; width: min(340px, calc(100% - 24px)); max-height: calc(100% - 240px);
+  position: absolute; right: clamp(12px, 3vw, 32px); top: 72px; z-index: 2; width: min(340px, calc(100% - 24px)); max-height: calc(100% - 240px);
   overflow-y: auto; padding: 18px 16px 12px; background: rgba(18, 12, 44, 0.92); border: 1px solid var(--line);
   border-radius: var(--radius); backdrop-filter: blur(10px); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  scrollbar-width: thin; scrollbar-color: rgba(185, 162, 255, 0.3) transparent;
+}
+.home:has(.mcp-term) .brain-card { max-height: max(180px, calc(100% - 536px)); }
+@media (min-width: 861px) {
+  .home:has(.mcp-term) .brain-stream { max-width: min(460px, calc(100vw - 590px)); }
 }
 .brain-card h2 { margin: 4px 36px 14px 0; font-size: 21px; }
 .brain-card h3 { margin: 18px 0 4px; font-size: 13px; font-weight: 400; color: var(--muted); }
@@ -102,8 +107,95 @@ input:focus-visible, .btn:focus-visible, .mode-btn:focus-visible, .mode-pill:foc
   position: absolute; right: 10px; top: 10px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
   border-radius: 50%; border: 1px solid var(--line); background: none; color: var(--text); font-size: 20px; line-height: 1; cursor: pointer;
 }
-.brain-ctrl { position: absolute; right: clamp(12px, 3vw, 32px); top: 20px; z-index: 2; display: flex; align-items: center; gap: 8px; }
+.brain-ctrl { position: absolute; right: clamp(12px, 3vw, 32px); top: 20px; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .brain-ctrl .btn { height: 38px; padding: 0 14px; font-size: 14px; background: rgba(18, 12, 44, 0.75); }
+.mcp-toggle { gap: 7px; }
+.mcp-toggle.is-open { border-color: var(--mint); box-shadow: 0 0 18px rgba(126, 240, 200, 0.22); }
+.mcp-led { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.mcp-led.on { background: var(--mint); box-shadow: 0 0 10px var(--mint); animation: beat 1.8s ease-out infinite; }
+.mcp-count {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 999px; background: rgba(126, 240, 200, 0.16); color: var(--mint); font-size: 11px; line-height: 1; font-weight: 700;
+}
+
+.mcp-term {
+  position: absolute; right: clamp(12px, 3vw, 32px); bottom: 166px; z-index: 3;
+  display: flex; flex-direction: column; width: min(520px, calc(100vw - 24px)); max-height: min(280px, 35vh);
+  background: rgba(8, 6, 22, 0.92); border: 1px solid rgba(126, 240, 200, 0.35); border-radius: var(--radius);
+  backdrop-filter: blur(12px); box-shadow: 0 16px 44px rgba(0, 0, 0, 0.6); overflow: hidden;
+  animation: term-in 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.mcp-term[data-burst="true"] {
+  border-color: var(--mint);
+  box-shadow: 0 0 0 3px rgba(126, 240, 200, 0.18), 0 18px 48px rgba(0, 0, 0, 0.65);
+}
+.mcp-term-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none;
+  height: 40px; padding: 0 12px; background: rgba(23, 18, 56, 0.78); border-bottom: 1px solid var(--line);
+}
+.mcp-term-title, .mcp-term-actions { display: inline-flex; align-items: center; gap: 7px; line-height: 1; }
+.mcp-term-title b { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12px; letter-spacing: 0.06em; color: var(--mint); }
+.mcp-dots { display: inline-flex; align-items: center; gap: 5px; }
+.mcp-dots i { width: 9px; height: 9px; border-radius: 50%; display: block; }
+.mcp-dots .d-red { background: #ff5f57; }
+.mcp-dots .d-amber { background: #febc2e; }
+.mcp-dots .d-green { background: #28c840; }
+.mcp-status {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px;
+  font-size: 11px; line-height: 1; border: 1px solid var(--line); color: var(--muted);
+}
+.mcp-status.online { color: var(--mint); border-color: rgba(126, 240, 200, 0.4); background: rgba(126, 240, 200, 0.1); }
+.mcp-mini-btn {
+  display: inline-flex; align-items: center; justify-content: center; height: 26px; padding: 0 10px;
+  border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06);
+  color: var(--text); font: inherit; font-size: 12px; line-height: 1; cursor: pointer; white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.mcp-mini-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); border-color: var(--mint); }
+.mcp-mini-btn:disabled { opacity: 0.55; cursor: progress; }
+.mcp-mini-btn:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+
+.mcp-term-body {
+  overflow-y: auto; padding: 10px 12px; display: grid; gap: 10px;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12.5px; line-height: 1.45;
+  scrollbar-width: thin; scrollbar-color: rgba(126, 240, 200, 0.3) transparent;
+}
+.mcp-term-body::-webkit-scrollbar, .brain-card::-webkit-scrollbar { width: 6px; }
+.mcp-term-body::-webkit-scrollbar-track, .brain-card::-webkit-scrollbar-track { background: transparent; }
+.mcp-term-body::-webkit-scrollbar-thumb, .brain-card::-webkit-scrollbar-thumb {
+  background: rgba(185, 162, 255, 0.28); border-radius: 999px;
+}
+.mcp-term-body::-webkit-scrollbar-thumb:hover, .brain-card::-webkit-scrollbar-thumb:hover {
+  background: rgba(126, 240, 200, 0.48);
+}
+.mcp-empty { margin: 0; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mcp-entry { display: grid; gap: 5px; padding-bottom: 8px; border-bottom: 1px dashed rgba(185, 162, 255, 0.14); animation: drop 0.2s ease-out backwards; }
+.mcp-entry:last-child { padding-bottom: 0; border-bottom: 0; }
+.mcp-cmd, .mcp-out { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mcp-time { color: var(--muted); font-size: 11px; }
+.mcp-prompt { color: var(--mint); font-weight: 700; }
+.mcp-tool { color: #ffd6ec; font-weight: 700; background: rgba(255, 143, 199, 0.12); padding: 1px 6px; border-radius: 6px; }
+.mcp-aud {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 999px;
+  font-size: 11px; line-height: 1; border: 1px solid var(--line); color: var(--muted);
+}
+.mcp-aud.aud-user { color: #7ef0c8; border-color: rgba(126, 240, 200, 0.4); }
+.mcp-aud.aud-dev { color: #c4a7ff; border-color: rgba(196, 167, 255, 0.45); }
+.mcp-arg { color: var(--text); word-break: break-word; }
+.mcp-ms { margin-left: auto; color: var(--lav); font-size: 11px; }
+.mcp-out { padding-left: 14px; color: var(--muted); font-size: 12px; }
+.mcp-arrow { color: var(--pink); }
+.mcp-found { color: var(--muted); }
+.mcp-hit-btn {
+  display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px;
+  border-radius: 999px; border: 1px solid rgba(185, 162, 255, 0.24); background: rgba(255, 255, 255, 0.05);
+  font-family: var(--font-body), sans-serif; font-size: 11.5px; line-height: 1; cursor: pointer;
+  max-width: 240px; transition: background 0.15s, border-color 0.15s;
+}
+.mcp-hit-btn span { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mcp-hit-btn:hover { background: rgba(255, 255, 255, 0.12); border-color: currentColor; }
+@keyframes term-in { from { opacity: 0; transform: translateY(20px) scale(0.98); } }
 .brain-bottom { position: absolute; left: 0; right: 0; bottom: 14px; display: grid; justify-items: center; gap: 8px; padding: 0 12px; pointer-events: none; }
 .brain-groups { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 1120px; pointer-events: auto; }
 .brain-groups button {
@@ -118,6 +210,7 @@ input:focus-visible, .btn:focus-visible, .mode-btn:focus-visible, .mode-pill:foc
   .brain-groups { flex-wrap: nowrap; justify-content: flex-start; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
   .brain-card { top: auto; bottom: 0; right: 0; z-index: 4; width: 100%; max-height: 55%; border-radius: var(--radius) var(--radius) 0 0; }
   .brain-ctrl { top: auto; bottom: 96px; }
+  .mcp-term { left: 12px; right: 12px; bottom: 144px; width: auto; max-height: 36vh; }
   .brain-card { animation-name: sheet-in; }
   .hero { right: clamp(20px, 5vw, 64px); } /* absolute + left only ran the search box into the screen edge */
   .hint { display: none; }
