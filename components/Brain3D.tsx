@@ -29,6 +29,21 @@ type BrainNode = {
 };
 type Props = { nodes: BrainNode[]; links: [number, number][]; rels?: RelationType[]; children?: ReactNode };
 type Scene3D = { select(i: number): void; emphasize(set: Set<number> | null): void; pulse(indices: number[]): void; reset(): void; spin(on: boolean): void };
+type TermRect = { x: number; y: number; w: number; h: number };
+type ResizeDir = "n" | "s" | "e" | "w" | "nw" | "ne" | "sw" | "se";
+
+const TERM_STORAGE_KEY = "bc_mcp_term_rect_v1";
+const RESIZE_DIRS: ResizeDir[] = ["n", "s", "e", "w", "nw", "ne", "sw", "se"];
+
+function clampTermRect(r: TermRect, vw: number, vh: number): TermRect {
+  const minW = Math.min(340, Math.max(260, vw - 16));
+  const minH = Math.min(170, Math.max(140, vh - 16));
+  const w = Math.round(Math.min(Math.max(r.w, minW), vw - 16));
+  const h = Math.round(Math.min(Math.max(r.h, minH), vh - 16));
+  const x = Math.round(Math.min(Math.max(r.x, 8), vw - w - 8));
+  const y = Math.round(Math.min(Math.max(r.y, 8), vh - h - 8));
+  return { x, y, w, h };
+}
 
 const R = new THREE.Vector3(6.2, 4.8, 7.4); // brain ellipsoid radii: x left-right, y up, z front-back
 
@@ -161,6 +176,9 @@ export default function Brain3D({ nodes, links, rels, children }: Props) {
   const [termLive, setTermLive] = useState(false);
   const [termBurst, setTermBurst] = useState(false);
   const [testingMcp, setTestingMcp] = useState(false);
+  const [termRect, setTermRect] = useState<TermRect | null>(null);
+  const [termDragging, setTermDragging] = useState(false);
+  const termRef = useRef<HTMLElement>(null);
   const termBodyRef = useRef<HTMLDivElement>(null);
   const pickRef = useRef<(i: number) => void>(() => {});
 
@@ -170,6 +188,22 @@ export default function Brain3D({ nodes, links, rels, children }: Props) {
     const param = new URLSearchParams(window.location.search).get("mode");
     const initial = normalizeAudienceFilter(param);
     if (initial !== "all") setMode(initial);
+    try {
+      const raw = localStorage.getItem(TERM_STORAGE_KEY);
+      if (raw) {
+        const p = JSON.parse(raw) as Partial<TermRect>;
+        if ([p.x, p.y, p.w, p.h].every((v) => typeof v === "number" && Number.isFinite(v))) {
+          setTermRect(clampTermRect(p as TermRect, window.innerWidth, window.innerHeight));
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    const onWinResize = () => {
+      setTermRect((prev) => (prev ? clampTermRect(prev, window.innerWidth, window.innerHeight) : null));
+    };
+    window.addEventListener("resize", onWinResize);
+    return () => window.removeEventListener("resize", onWinResize);
   }, []);
 
   const neighbors = useMemo(() => {
@@ -663,6 +697,84 @@ export default function Brain3D({ nodes, links, rels, children }: Props) {
   };
   pickRef.current = pick;
   const reset = () => (setSelected(-1), setGroup(null), setQ(""), setMode("all"), scene3d.current?.reset());
+  const resetTermRect = () => {
+    setTermRect(null);
+    try {
+      localStorage.removeItem(TERM_STORAGE_KEY);
+    } catch {
+      // ignore storage errors
+    }
+  };
+  const startTermInteract = (modeType: "move" | ResizeDir, e: React.PointerEvent<HTMLElement>) => {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    if (modeType === "move" && (e.target as HTMLElement).closest("button")) return;
+    const termEl = termRef.current;
+    const hostEl = mount.current?.parentElement;
+    if (!termEl || !hostEl) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const hostBox = hostEl.getBoundingClientRect();
+    const box = termEl.getBoundingClientRect();
+    const vw = hostBox.width;
+    const vh = hostBox.height;
+    const minW = Math.min(340, Math.max(260, vw - 16));
+    const minH = Math.min(170, Math.max(140, vh - 16));
+    const orig: TermRect = termRect ?? {
+      x: Math.round(box.left - hostBox.left),
+      y: Math.round(box.top - hostBox.top),
+      w: Math.round(box.width),
+      h: Math.round(box.height),
+    };
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let latest = orig;
+    setTermRect(orig);
+    setTermDragging(true);
+
+    const target = e.currentTarget;
+    target.setPointerCapture(e.pointerId);
+
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (modeType === "move") {
+        latest = clampTermRect({ x: orig.x + dx, y: orig.y + dy, w: orig.w, h: orig.h }, vw, vh);
+      } else {
+        let left = orig.x;
+        let right = orig.x + orig.w;
+        let top = orig.y;
+        let bottom = orig.y + orig.h;
+        if (modeType.includes("e")) right = Math.min(vw - 8, Math.max(left + minW, orig.x + orig.w + dx));
+        if (modeType.includes("w")) left = Math.max(8, Math.min(right - minW, orig.x + dx));
+        if (modeType.includes("s")) bottom = Math.min(vh - 8, Math.max(top + minH, orig.y + orig.h + dy));
+        if (modeType.includes("n")) top = Math.max(8, Math.min(bottom - minH, orig.y + dy));
+        latest = {
+          x: Math.round(left),
+          y: Math.round(top),
+          w: Math.round(right - left),
+          h: Math.round(bottom - top),
+        };
+      }
+      setTermRect(latest);
+    };
+
+    const onEnd = () => {
+      target.removeEventListener("pointermove", onMove);
+      target.removeEventListener("pointerup", onEnd);
+      target.removeEventListener("pointercancel", onEnd);
+      setTermDragging(false);
+      try {
+        localStorage.setItem(TERM_STORAGE_KEY, JSON.stringify(latest));
+      } catch {
+        // ignore storage errors
+      }
+    };
+
+    target.addEventListener("pointermove", onMove);
+    target.addEventListener("pointerup", onEnd);
+    target.addEventListener("pointercancel", onEnd);
+  };
   const triggerSampleMcp = async () => {
     if (testingMcp) return;
     setTestingMcp(true);
@@ -801,8 +913,31 @@ export default function Brain3D({ nodes, links, rels, children }: Props) {
       )}
 
       {termOpen && (
-        <aside className="mcp-term" data-burst={termBurst ? "true" : "false"} aria-label="MCP Terminal แบบเรียลไทม์">
-          <div className="mcp-term-head">
+        <aside
+          ref={termRef}
+          className={`mcp-term${termRect ? " is-custom" : ""}${termDragging ? " is-dragging" : ""}`}
+          style={
+            termRect
+              ? { left: termRect.x, top: termRect.y, width: termRect.w, height: termRect.h }
+              : undefined
+          }
+          data-burst={termBurst ? "true" : "false"}
+          aria-label="MCP Terminal แบบเรียลไทม์ (ลากย้ายและปรับขนาดได้)"
+        >
+          {RESIZE_DIRS.map((dir) => (
+            <span
+              key={dir}
+              className={`mcp-rz rz-${dir}`}
+              aria-hidden="true"
+              onPointerDown={(e) => startTermInteract(dir, e)}
+            />
+          ))}
+          <div
+            className="mcp-term-head"
+            onPointerDown={(e) => startTermInteract("move", e)}
+            onDoubleClick={resetTermRect}
+            title="ลากเพื่อย้ายหน้าต่าง · ดับเบิลคลิกเพื่อคืนตำแหน่งเดิม"
+          >
             <div className="mcp-term-title">
               <span className="mcp-dots" aria-hidden="true">
                 <i className="d-red" />
@@ -821,6 +956,17 @@ export default function Brain3D({ nodes, links, rels, children }: Props) {
               <button type="button" className="mcp-mini-btn" onClick={() => setMcpLogs([])}>
                 ล้าง
               </button>
+              {termRect && (
+                <button
+                  type="button"
+                  className="mcp-mini-btn"
+                  onClick={resetTermRect}
+                  aria-label="คืนตำแหน่งและขนาดเริ่มต้น"
+                  title="คืนตำแหน่งและขนาดเริ่มต้น"
+                >
+                  ↺
+                </button>
+              )}
               <button
                 type="button"
                 className="mcp-mini-btn"
