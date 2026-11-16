@@ -13,7 +13,7 @@ sources:
   - "frontend/account/tabs/transMenuMap.ts:56-2465"
   - "backend/internal/application/process/docs.go:25-115"
   - "backend/internal/application/process/doc_cancel.go:30-112"
-  - "backend/internal/application/process/gl_template_rules.go:20-80"
+  - "backend/internal/application/process/gl_template_rules_apar.go:18-95"
   - "backend/internal/application/process/service.go:1782-1798"
   - "backend/internal/application/process/fa_depreciation.go:35-45"
   - "backend/internal/application/process/cheque.go:19-41"

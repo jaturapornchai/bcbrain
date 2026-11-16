@@ -11,7 +11,7 @@ aliases:
   - "ลงบัญชีรับชำระหนี้ จ่ายชำระหนี้"
 sources:
   - "backend/internal/application/process/gl_template_defaults.json:1-6028"
-  - "backend/internal/application/process/gl_template_rules.go:2552-6180"
+  - "backend/internal/application/process/gl_template_rules_apar.go:1-2185"
   - "backend/internal/application/process/service.go:2030-2480"
 ---
 

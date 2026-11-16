@@ -1,8 +1,8 @@
 # สมอง BC (BC Brain)
 
 ## Objective
-คลังความรู้ระบบ **BC Ai Account** และระบบในชุด BC สกัดจากซอร์สโค้ดจริงใน `d:\bcaiaccount` (อ่านอย่างเดียว) รวม **313 โน้ต ใน 16 โฟลเดอร์** รองรับ 2 กลุ่มเป้าหมายในระบบเดียว:
-1. **โซนผู้ใช้ทั่วไป (`audience: "user"` — 9 โฟลเดอร์, 183 โน้ต)**: คู่มือภาษาไทยที่คนทั่วไปอ่านเข้าใจ (`playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`) สำหรับเจ้าของกิจการ พนักงานบัญชี Call Center และฝ่ายขาย (ไม่มีศัพท์โค้ดปน)
+คลังความรู้ระบบ **BC Ai Account** และระบบในชุด BC สกัดจากซอร์สโค้ดจริงใน `d:\bcaiaccount` (อ่านอย่างเดียว) รวม **330 โน้ต ใน 16 โฟลเดอร์** รองรับ 2 กลุ่มเป้าหมายในระบบเดียว:
+1. **โซนผู้ใช้ทั่วไป (`audience: "user"` — 9 โฟลเดอร์, 200 โน้ต)**: คู่มือภาษาไทยที่คนทั่วไปอ่านเข้าใจ (`playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`) สำหรับเจ้าของกิจการ พนักงานบัญชี Call Center และฝ่ายขาย ครบทั้งสารบัญรหัสเมนู 4 หลักทั้ง 734 หน้าจอ (`1001`–`9070`), คีย์ลัด/ปุ่มสูตร/เมนูคลิกขวา, ขั้นตอนวิธีใช้งาน และคู่มือแก้ปัญหาหน้างาน (ไม่มีศัพท์โค้ดปน)
 2. **โซนนักพัฒนา (`audience: "dev"` — 6 โฟลเดอร์, 129 โน้ต)**: เอกสารเทคนิคสำหรับนักพัฒนาและ AI เขียนโค้ดต่อยอด (`dev-playbook`, `schema`, `queries`, `api`, `doctypes`, `architecture`) ครอบคลุม Data Dictionary, คำสั่ง PostgreSQL `SELECT`/`WITH`, รหัส `trans_flag`, ผังบัญชี Dr/Cr, API/MCP Contract และสถาปัตยกรรมระบบ (พร้อมหน้าดัชนีกลาง `root` `index` = `both` อีก 1 โน้ต)
 
 เปิดสาธารณะ 3 ช่องทางพร้อมรองรับ Google SEO & AI Search (GEO/AEO):
@@ -50,12 +50,12 @@ npm install
 npm run dev            # http://localhost:3000
 npx tsc --noEmit       # ตรวจ TypeScript
 npm test               # selftest: groups, isolation, ตัดคำไทย, BM25, กัน XSS, ตัวสแกนความลับ
-npm run test:deep      # deep-test: 6 มิติ (ตัดคำ/คำพ้อง 25 ข้อ, ค้นหา 80 เคส, แยกโซน 313 โน้ต, กราฟ 3D/XSS/PNG, fuzz, throughput)
+npm run test:deep      # deep-test: 6 มิติ (ตัดคำ/คำพ้อง 27 ข้อ, ค้นหา 95 เคส, แยกโซน 330 โน้ต, กราฟ 3D/XSS/PNG, fuzz, throughput)
 npm run check          # ตรวจโน้ตใน vault (ส่ง path ของ bcaiaccount และ --strict เพื่อตรวจเข้มงวด)
 npm run check:drift    # ตรวจโน้ตแบบ --strict พร้อมรายงานโน้ตที่ไฟล์โค้ดใน D:/bcaiaccount แก้ใหม่กว่าโน้ต (--fail-on-drift เพื่อบังคับ exit 1)
 npm run scan           # สแกนความลับใน vault และไฟล์ skill
-node scripts/mcp-eval.mjs http://localhost:3000/mcp         # ประเมิน MCP 31 เคส (ทั้งโหมด user และ dev) บนเครื่อง
-node scripts/mcp-eval.mjs https://brain.bcsmethai.com/mcp   # ประเมิน MCP 31 เคส บน Production จริง
+node scripts/mcp-eval.mjs http://localhost:3000/mcp         # ประเมิน MCP 37 เคส (ทั้งโหมด user/Call Center และ dev) บนเครื่อง
+node scripts/mcp-eval.mjs https://brain.bcsmethai.com/mcp   # ประเมิน MCP 37 เคส บน Production จริง
 BC_DEPLOY_HOST=root@<server> bash deploy/deploy.sh          # deploy ขึ้น brain.bcsmethai.com
 ```
 

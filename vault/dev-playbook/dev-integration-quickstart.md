@@ -3,7 +3,7 @@ title: "คู่มือเริ่มต้นเชื่อมต่อแ
 audience: dev
 tags: [dev-playbook, quickstart, integration, auth, mcp, api]
 aliases: ["เริ่มต้นเชื่อม API BC", "Quickstart Dev BC", "วิธีเชื่อมต่อ BC Ai Account", "สร้าง Token MCP", "การ Auth BC API"]
-sources: ["backend/internal/adapter/inbound/http/router.go:60-396", "backend/internal/adapter/inbound/http/identity/handler.go:1-259", "backend/internal/adapter/inbound/http/mcp/token.go:1-281", "backend/internal/adapter/inbound/http/mcp/gateway.go:520-660", "backend/internal/adapter/inbound/http/pos/sync.go:24-175"]
+sources: ["backend/internal/adapter/inbound/http/router.go:60-385", "backend/internal/adapter/inbound/http/identity/handler.go:1-259", "backend/internal/adapter/inbound/http/mcp/token.go:1-281", "backend/internal/adapter/inbound/http/mcp/gateway.go:520-660", "backend/internal/adapter/inbound/http/pos/sync.go:24-175"]
 ---
 
 เอกสารนี้สรุปขั้นตอนตั้งต้นสำหรับนักพัฒนาที่ต้องการเชื่อม **BC Ai Account** จาก AI Client, ระบบ BI/Dashboard, แอปหน้าร้าน/มือถือ หรือ Webhook ภายนอก

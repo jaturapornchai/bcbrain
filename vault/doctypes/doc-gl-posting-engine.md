@@ -12,7 +12,7 @@ aliases:
 sources:
   - "backend/internal/application/process/gl_template.go:18-1174"
   - "backend/internal/application/process/gl_template_defaults.go:15-234"
-  - "backend/internal/application/process/gl_template_rules.go:20-165"
+  - "backend/internal/application/process/gl_template_rules_apar.go:18-95"
   - "backend/internal/application/process/service.go:509-556"
   - "backend/internal/application/process/service.go:1343-2600"
 ---

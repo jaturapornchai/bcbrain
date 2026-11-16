@@ -3,7 +3,7 @@ title: "สเปก MCP Gateway 11 Read-Only Tools & Token Workflow"
 audience: dev
 tags: [api, mcp, ai, readonly, jsonrpc]
 aliases: ["MCP Gateway", "11 MCP Tools", "bc_query_readonly", "bc_run_report", "bc_financial_summary", "bcmcp_ro", "MCP Server BC"]
-sources: ["backend/internal/adapter/inbound/http/mcp/gateway.go:1-2267", "backend/internal/adapter/inbound/http/mcp/token.go:1-281", "backend/internal/adapter/inbound/http/mcp/compact.go:1-254", "backend/internal/adapter/inbound/http/router.go:383-395"]
+sources: ["backend/internal/adapter/inbound/http/mcp/gateway.go:1-2267", "backend/internal/adapter/inbound/http/mcp/token.go:1-281", "backend/internal/adapter/inbound/http/mcp/compact.go:1-254", "backend/internal/adapter/inbound/http/router.go:370-385"]
 ---
 
 **BC Ai Account MCP Gateway** เปิดให้บริการโปรโตคอล Model Context Protocol แบบ **Read-Only 100%** ผ่าน Streamable HTTP JSON-RPC 2.0 เพื่อให้ AI Assistant ภายนอก (เช่น Claude Desktop, Cursor, ChatGPT, LangChain หรือ Agent ภายใน) ค้นคว้าโครงสร้างฐานข้อมูล คิวรี SQL ตรวจสอบเอกสาร 360° และรันงบการเงิน/รายงานได้โดยไม่กระทบข้อมูลจริง

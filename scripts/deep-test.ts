@@ -54,6 +54,8 @@ const tokCases: [string, (got: string[]) => boolean, string][] = [
   ["ic_trans_detail.wh_code", (g) => g.includes("ic_trans_detail") && g.includes("wh_code") && g.includes("wh"), "dotted SQL ident extracts both parts"],
   ["bc_mcp_tokens", (g) => g.includes("bc_mcp_tokens") && g.includes("mcp"), "SQL underscore identifier preserves parts"],
   ["เครมยาง", (g) => g.includes("เคลม") && g.includes("ยาง"), "Thai เครม normalizes to เคลม"],
+  ["รหัสเมนู 7.15.4", (g) => g.includes("7.15.4") && !g.includes("15"), "dotted menu code stays intact without noisy digit split"],
+  ["คีย์ลัด Ctrl + S และ Alt+N", (g) => g.includes("ctrl_s") && g.includes("alt_n"), "keyboard shortcut combinations normalize cleanly"],
 ];
 for (const [input, pred, msg] of tokCases) {
   const got = terms(input);
@@ -150,6 +152,23 @@ const CASES: [AudienceFilter, string, ...string[]][] = [
   ["user", "ขายปลีก มินิมาร์ท ใช้ฟีเจอร์อะไร", "sales-by-business-retail"],
   ["user", "จำกัดวงเงินเครดิตลูกค้า ขออนุมัติ", "ts-sale-credit-limit", "howto-sale-credit-approve"],
   ["user", "พิมพ์รายงาน CSV PDF ออกแบบรายงาน", "rpt-print-export", "rpt-designer-custom"],
+
+  // Call Center 4-digit menu codes, legacy dotted codes, shortcuts & frontline troubleshooting
+  ["user", "รหัสเมนูทั้งหมด สารบัญเมนู 4 หลัก", "menu-catalog-overview"],
+  ["user", "เมนู 1003 กำหนดรายละเอียดบริษัท", "start-company-options", "menu-catalog-overview", "menu-cat-1-setup"],
+  ["user", "รหัสเมนู 2050 คำนวณยอดสต็อกใหม่", "ts-stock-cost-mismatch-rebuild", "howto-stock-costing-recalc", "menu-cat-2-stock"],
+  ["user", "เมนู 3040 รายงานค้างรับสินค้าตามใบสั่งซื้อ", "menu-cat-3-purchase", "rpt-buy-po"],
+  ["user", "รหัสเมนู 4013 ขายสินค้า ออกใบกำกับ", "howto-sale-invoice", "menu-cat-4-sales", "menu-catalog-overview"],
+  ["user", "เมนู 5017 AI อ่านใบกำกับภาษีซื้อ 3 ทาง", "howto-ap-payment", "menu-cat-5-ap", "menu-catalog-overview"],
+  ["user", "รหัสเมนู 6023 รับชำระหนี้ ออกใบเสร็จ", "howto-ar-receipt-fifo", "ts-arap-balance-recalc", "menu-cat-6-ar"],
+  ["user", "รหัสเมนู 7.15.4 บันทึกเช็คผ่าน", "menu-cat-7-cash-bank", "howto-cheque-received"],
+  ["user", "เมนู 8005 สัญญาเช่าซื้อ ลีสซิ่งรถยนต์", "menu-cat-8-fixed-assets", "howto-asset-hire-purchase"],
+  ["user", "เมนู 9026 ส่งออกไฟล์ RD Prep 50 ทวิ", "ts-etax-wht-bank-reconcile", "howto-tax-wht-and-rd-export", "menu-cat-9-gl"],
+  ["user", "หาเมนูไม่เจอ เมนูบัญชีหายไปไหน", "ts-menu-missing-switchboard"],
+  ["user", "คีย์ลัด Ctrl+S ปุ่มสูตรส่วนลด คลิกขวาตารางสินค้า", "howto-screen-shortcuts-workbench"],
+  ["user", "หน้าจัดการระบบ เปลี่ยนรหัสผ่าน เพิ่มผู้ใช้ สร้างฐานข้อมูล", "howto-admin-system-management"],
+  ["user", "พิมพ์ใบกำกับภาษีไม่ออก วันที่เป็น ค.ศ. อยากเปลี่ยนเป็น พ.ศ.", "ts-print-form-date-format"],
+  ["user", "ดึงบิลวางบิลไม่ขึ้น ดึงบิลรับชำระหนี้ไม่เจอ", "ts-arap-balance-recalc"],
 
   ["dev", "query ยอดคงเหลือสินค้า แยกตามคลังสินค้า", "sql-ic-stock-balance"],
   ["dev", "sql สต็อกการ์ด ต้นทุนย้อนหลัง lot", "sql-ic-stock-card-cost"],

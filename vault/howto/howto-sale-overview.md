@@ -32,7 +32,7 @@ sources:
 
 - **คุมวงเงินเครดิตและรหัสผ่านอนุมัติ** -> [[howto-sale-credit-approve]]
 - **ระบบขายหน้าร้าน POS**: อยู่ในเมนู "ขาย > ระบบขายหน้าร้าน POS" (สร้างคูปองแบบเร็ว, บันทึกรับเงินทอน, บันทึกส่งเงิน, รายการใบกำกับภาษีอย่างย่อ และออกใบกำกับภาษีอย่างเต็มแทนอย่างย่อ) — ดูภาพรวมระบบ POS เพิ่มเติมได้ที่ [[sales-overview]] และ [[sys-overview]]
-- **ส่งข้อมูล e-Tax Invoice & e-Withholding Tax (e-WHT)**: อยู่ในเมนู "ขาย > ส่งข้อมูล e-Tax Invoice & e-Withholding Tax (e-WHT)" -> ดูรายละเอียดภาษีที่ [[howto-tax-overview]]
+- **ส่งข้อมูล e-Tax Invoice & e-Withholding Tax (e-WHT)**: อยู่ในเมนู "ขาย > ส่งข้อมูล e-Tax Invoice & e-Withholding Tax (e-WHT)" (รหัสเมนู **4017**) -> ดูรายละเอียดภาษีที่ [[howto-tax-overview]]
 - **บันทึกรูปภาพและไฟล์แนบเอกสารขาย** -> [[howto-doc-attachments]]
 - **ยกเลิกเอกสารขายและเงินมัดจำรับ** -> [[howto-doc-edit-cancel-delete]]
 

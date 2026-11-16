@@ -3,7 +3,7 @@ title: "คู่มือ AI นักพัฒนา & สถาปัตย�
 audience: dev
 tags: [dev-playbook, ai-guide, architecture, standards]
 aliases: ["คู่มือนักพัฒนา BC", "Developer Playbook", "แนวทางพัฒนาต่อยอด BC Ai Account", "กฎพัฒนา BC", "กติกา dev และ AI"]
-sources: ["AGENTS.md:1-66", "backend/internal/adapter/inbound/http/router.go:1-399", "backend/internal/domain/query/query.go:1-521", "backend/internal/domain/query/write_policy.go:1-103", "backend/internal/application/process/service.go:108-645"]
+sources: ["AGENTS.md:1-66", "backend/internal/adapter/inbound/http/router.go:1-385", "backend/internal/domain/query/query.go:1-521", "backend/internal/domain/query/write_policy.go:1-103", "backend/internal/application/process/service.go:108-645"]
 ---
 
 คู่มือฉบับนี้เป็นจุดเริ่มต้นสำหรับ **นักพัฒนา (Developer) และ AI Coding Agent** ที่ต้องการดึงข้อมูล สร้างรายงาน เขียนแอปพลิเคชันเสริม LINE Bot BI Dashboard หรือเชื่อมต่อระบบภายนอกกับ **BC Ai Account**

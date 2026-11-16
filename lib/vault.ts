@@ -91,7 +91,13 @@ const normalizeText = (s: string) =>
     .replace(/แพ็คเกจ/g, "แพ็กเกจ")
     .replace(/พ\.ศ\./g, "พศ")
     .replace(/ค\.ศ\./g, "คศ")
-    .replace(/เครม/g, "เคลม");
+    .replace(/เครม/g, "เคลม")
+    .replace(/\be-tax\b/g, "etax")
+    .replace(/\be-wht\b/g, "ewht")
+    .replace(/\be-filing\b/g, "efiling")
+    .replace(/\be-pod\b/g, "epod")
+    .replace(/\b3-way\b/g, "3way")
+    .replace(/\b(ctrl|alt|shift)\s*\+\s*([a-z0-9]+)\b/g, "$1_$2");
 
 const asList = (v: unknown): string[] =>
   Array.isArray(v) ? v.map(String) : v == null ? [] : [String(v)];
@@ -581,7 +587,7 @@ function tokenizeNormalized(normText: string): string[] {
       }
     }
     words.push(raw);
-    if (raw.includes(".")) {
+    if (raw.includes(".") && !/^\d+(?:\.\d+)+$/.test(raw)) {
       for (const dotPart of raw.split(".")) {
         if (!dotPart) continue;
         words.push(dotPart);
@@ -681,6 +687,11 @@ const SYNONYM_GROUPS: string[][] = [
   ["บัตรคุม", "บัตรคุมสินค้า", "การ์ด", "สต็อกการ์ด"],
   ["sql", "query", "queries", "คิวรี"],
   ["สิทธิ์", "กำหนดสิทธิ์"],
+  ["รหัสเมนู", "เลขเมนู", "สารบัญเมนู", "ผังเมนู"],
+  ["คีย์ลัด", "ปุ่มลัด", "shortcut", "shortcuts"],
+  ["หาเมนูไม่เจอ", "เมนูหาย", "ซ่อนเมนู", "switchboard"],
+  ["สต็อกไม่ตรง", "สต็อกเพี้ยน", "คำนวณยอดสต็อกใหม่"],
+  ["พิมพ์ไม่ออก", "ปริ้นไม่ออก", "แบบฟอร์ม", "ตั้งค่าหน้ากระดาษ"],
 ];
 
 const SYNONYM_MAP = (() => {
@@ -885,6 +896,7 @@ export function search(q: string, limit = 8, filter: AudienceFilter = "all"): Se
   const phrase = normalizeText(q.trim());
   const chunks = phrase.split(/\s+/).filter((c) => c.length > 1);
   const identChunks = chunks.filter((c) => c.includes("_"));
+  const menuCodes = ts.filter((t) => /^[1-9]\d{3}$/.test(t) || /^[1-9](?:\.\d+){1,3}$/.test(t));
 
   const base = idx.baseBuf;
   const matched = idx.matchBuf;
@@ -919,6 +931,19 @@ export function search(q: string, limit = 8, filter: AudienceFilter = "all"): Se
     const weight = sp.idf * 0.3;
     for (let k = 0; k < pidx.length; k++) {
       base[pidx[k]] += praw[k] * weight;
+    }
+  }
+
+  // Exact 4-digit menu code (`1001`–`9070`) and legacy dotted menu code (`1.3.1`) boost via inverted index
+  for (let mi = 0; mi < menuCodes.length; mi++) {
+    const mp = getPosting(idx, menuCodes[mi]);
+    const pidx = mp.idx;
+    for (let k = 0; k < pidx.length; k++) {
+      const docId = pidx[k];
+      const slug = idx.notes[docId].slug;
+      if (slug === "index") continue;
+      const isCatalog = slug.startsWith("menu-cat");
+      base[docId] += (isCatalog ? 18 : 24) * bonus;
     }
   }
 
@@ -1200,7 +1225,10 @@ export function excerpt(body: string, ts: string[], budget: number): string {
   const hits = parts.map((p) => {
     const np = normalizeText(p);
     let h = 0;
-    for (let i = 0; i < ts.length; i++) h += count(np, ts[i]);
+    for (let i = 0; i < ts.length; i++) {
+      const w = /^[1-9]\d{3}$|^[1-9](?:\.\d+){1,3}$/.test(ts[i]) ? 20 : 1;
+      h += count(np, ts[i]) * w;
+    }
     return h;
   });
   const keep = new Set([0]);

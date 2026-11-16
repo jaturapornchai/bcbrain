@@ -10,9 +10,8 @@ aliases:
   - "glRule01 glRule12 glRule33 glRule58"
 sources:
   - "backend/internal/application/process/gl_template_defaults.json:1-6028"
-  - "backend/internal/application/process/gl_template_rules.go:166-2550"
-  - "backend/internal/application/process/gl_template_rules.go:3280-3416"
-  - "backend/internal/application/process/gl_template_rules.go:6184-6403"
+  - "backend/internal/application/process/gl_template_rules_cb_fa.go:1-2083"
+  - "backend/internal/application/process/gl_template_rules_ic.go:1-2179"
   - "backend/internal/application/process/fa_depreciation.go:716-752"
   - "backend/internal/application/process/fa_sale.go:160-218"
 ---

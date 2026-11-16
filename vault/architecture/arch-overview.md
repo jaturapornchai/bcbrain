@@ -3,7 +3,7 @@ title: "ภาพรวมสถาปัตยกรรมระบบ BC Ai Ac
 audience: dev
 tags: [architecture, overview, golang, nextjs, sidecar, postgresql]
 aliases: ["สถาปัตยกรรม BC", "System Architecture", "โครงสร้างระบบ BC Ai Account", "Clean Architecture Go"]
-sources: ["backend/internal/di/container.go:40-197", "backend/internal/adapter/inbound/http/router.go:55-399", "services/company-brain/src/server.ts:46-220", "backend/internal/platform/hybridllm/gateway.go:1-160", "AGENTS.md:1-66"]
+sources: ["backend/internal/di/container.go:40-197", "backend/internal/adapter/inbound/http/router.go:55-385", "services/company-brain/src/server.ts:46-220", "backend/internal/platform/hybridllm/gateway.go:1-160", "AGENTS.md:1-66"]
 ---
 
 **BC Ai Account** ออกแบบสถาปัตยกรรมแบบ **100% Backend-First** เพื่อรองรับการใช้งานร่วมกันทุกอุปกรณ์ (Desktop Web, Tablet, Mobile, POS Terminal และ External MCP Clients) โดยยึด Go API Server เป็นแกนกลางคำนวณบัญชี สต็อก และภาษีทั้งหมด

@@ -3,7 +3,7 @@ title: "ภาพรวม API และ Gateways ของ BC Ai Account"
 audience: dev
 tags: [api, overview, router, rest, mcp]
 aliases: ["API Overview BC", "เส้นทาง API ทั้งหมด", "Router BC Ai Account", "Endpoints BC", "REST API BC", "REST API Process Actions menuKey"]
-sources: ["backend/internal/adapter/inbound/http/router.go:55-399", "backend/internal/adapter/inbound/http/process/edition_guard.go:1-42", "backend/internal/adapter/inbound/http/identity/handler.go:1-259", "backend/internal/di/container.go:40-197"]
+sources: ["backend/internal/adapter/inbound/http/router.go:55-385", "backend/internal/adapter/inbound/http/process/edition_guard.go:1-42", "backend/internal/adapter/inbound/http/identity/handler.go:1-259", "backend/internal/di/container.go:40-197"]
 ---
 
 Backend ของ **BC Ai Account** พัฒนาด้วยภาษา Go ใช้ `chi` Router (`backend/internal/adapter/inbound/http/router.go`) โดยตั้ง Request Timeout มาตรฐานไว้ที่ `60s` พร้อม `RequestID`, `Recoverer`, `SecurityHeaders` และ `RequestLogger`

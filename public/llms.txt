@@ -17,7 +17,7 @@
   - `traverse_brain(slug, to_slug?, depth?, direction?, relation?, folder?, limit?, audience?)` — follow typed relations (`uses_table`, `writes_table`, `posts_rule`, `has_query`, `exposes_api`, `solves_issue`, etc.) 1–3 hops or find shortest paths
   - `read_note(slug)` — full markdown note with `audience`, typed outgoing links, and typed backlinks
   - `list_notes(folder?, tag?, audience?)` — index of notes filterable by `folder`, `tag`, and `audience`
-- **Call Center / Sales mode**: Read `read_note("playbook-call-center")` or `read_note("playbook-sales")` first, then ALWAYS pass `audience: "user"` and answer in plain Thai without code/SQL jargon. Prices, packages, contracts, and support hours are not in the notes: hand off to human sales staff.
+- **Call Center / Sales mode**: Read `read_note("playbook-call-center")` or `read_note("playbook-sales")` first, then ALWAYS pass `audience: "user"`, cite both exact Thai menu breadcrumb paths AND 4-digit menu codes (`1001`–`9070` across 734 screens via `menu-catalog-overview`), and answer in plain Thai without code/SQL jargon. Prices, packages, contracts, and support hours are not in the notes: hand off to human sales staff.
 - **Developer mode**: Read `read_note("playbook-dev")` first, then pass `audience: "dev"` (or `"all"` when business workflow context is also needed). Follow `dev-rules-accounting-sql` (`NUMERIC`, `COALESCE(last_status, 0) = 0`).
 - **Slash Skill (`/bcbrain`)**: Installable skill instructions at https://brain.bcsmethai.com/skills/bcbrain/SKILL.md (handles `/bcbrain`, `/bcbrain dev`, `/bcbrain all`, `/bcbrain setup`, and stateless HTTP JSON-RPC fallback).
 
@@ -29,6 +29,8 @@
 
 ## Canonical Entry Hubs
 - User / Call Center Playbook: https://brain.bcsmethai.com/n/playbook-call-center?mode=user
+- Full 4-Digit Menu Catalog (1001–9070, 734 screens): https://brain.bcsmethai.com/n/menu-catalog-overview?mode=user
+- Shortcuts, Right-Click Grid Tools & Troubleshooting Hub: https://brain.bcsmethai.com/n/howto-screen-shortcuts-workbench?mode=user | https://brain.bcsmethai.com/n/ts-overview?mode=user
 - User / Sales Playbook: https://brain.bcsmethai.com/n/playbook-sales?mode=user
 - User How-To (Sales, Purchasing, Stock, GL, Tax): https://brain.bcsmethai.com/n/howto-sale-overview?mode=user | https://brain.bcsmethai.com/n/howto-buy-overview?mode=user | https://brain.bcsmethai.com/n/howto-stock-overview?mode=user | https://brain.bcsmethai.com/n/howto-gl-overview?mode=user | https://brain.bcsmethai.com/n/howto-tax-overview?mode=user
 - Reports, Systems & FAQ: https://brain.bcsmethai.com/n/rpt-overview?mode=user | https://brain.bcsmethai.com/n/sys-overview?mode=user | https://brain.bcsmethai.com/n/faq-overview?mode=user
