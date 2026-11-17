@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
-import { RELATION_TYPES } from "@/lib/groups";
+import { RELATION_LABEL, RELATION_TYPES } from "@/lib/groups";
 import { emitMcpEvent, type McpEventHit, type McpToolName } from "@/lib/mcp-events";
 import {
   collectRelatedMedia,
@@ -209,11 +209,11 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
       const graphCtx = connectedNeighbors(
         hits.map((h) => h.slug),
         filter,
-        6,
+        8,
       );
       const ctxBlock = graphCtx.length
         ? `\n\n---\n\n## Connected Graph Context (1-hop — use read_note or traverse_brain to inspect)\n${graphCtx
-            .map((g) => `- [${g.rel}] ${g.slug} (${g.folder}) — ${g.title} (via ${g.via})`)
+            .map((g) => `- [${g.rel} · ${RELATION_LABEL[g.rel]}] ${g.slug} (${g.folder}) — ${g.title} (via ${g.via})`)
             .join("\n")}`
         : "";
       const mediaCtx =

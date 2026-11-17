@@ -98,3 +98,5 @@ flowchart TD
 - คำสั่ง SQL `SELECT` / `WITH` สำเร็จรูปสำหรับดึงยอดขาย ลูกหนี้ เจ้าหนี้ งบการเงิน และภาษี → [[sql-overview]]
 - การเรียกใช้งานผ่าน MCP Gateway และ Process/Report API → [[api-overview]] และ [[api-mcp-gateway]]
 - สถาปัตยกรรมระบบ Multi-Tenant และการพัฒนาต่อยอด → [[arch-overview]] และ [[dev-integration-quickstart]]
+- [[posts_rule::doc-price-engine-ref-import-calc]] — ลำดับการดึงราคาขาย 7 ขั้น สูตรส่วนลด การปัดเศษ การดึงเอกสารอ้างอิง และ Subledger Reconcile
+- [[posts_rule::doc-marketplace-payroll-dbd-evrt]] — กฎคำนวณและลงบัญชี GL ของ Marketplace, Payroll ม.33 (2569), DBD Taxonomy, e-VRT ภ.พ.10 และ Print Audit

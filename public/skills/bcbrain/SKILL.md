@@ -98,7 +98,7 @@ console.log(j.result?.content?.[0]?.text ?? JSON.stringify(j));
 2. โจทย์เป็นคำถามรวม → เรียก `ask_brain({ question, audience: "dev" })` (ได้โน้ตตรงจุดสูงสุด 4 เรื่องในรอบเดียว)
 3. รู้ชื่อตารางหรือคำเฉพาะ → เรียก `search_brain({ query, limit: 8, audience: "dev" })` แล้ว `read_note({ slug })` เฉพาะใบที่ใช้จริง หรือดูสารบัญรายหมวดด้วย `list_notes({ folder, audience: "dev" })`
    - โฟลเดอร์ฝั่ง dev: `dev-playbook`, `schema`, `queries`, `doctypes`, `api`, `architecture`
-4. ไล่สายสัมพันธ์หลายทอด / หาผลกระทบข้ามตาราง-เอกสาร → เรียก `traverse_brain({ slug, depth: 2, audience: "dev" })` หรือหาเส้นทางเชื่อมระหว่าง 2 เรื่องด้วย `traverse_brain({ slug, to_slug, audience: "dev" })` (กรอง `relation` เช่น `uses_table`, `writes_table`, `posts_rule`, `has_query` ได้)
+4. ไล่สายสัมพันธ์หลายทอด / หาผลกระทบข้ามหน้าจอ-โค้ด-ตาราง → เรียก `traverse_brain({ slug, depth: 2, audience: "dev" })` (หรือ `audience: "all"` เพื่อไล่ไซแนปส์ `bridges_zone` ข้ามจากหน้าจอผู้ใช้ไปยังไฟล์ Go/TS, ผังบัญชี Dr/Cr และตาราง SQL!) หรือหาเส้นทางสั้นสุดด้วย `traverse_brain({ slug, to_slug, audience })` (รองรับ 18 ชนิดความสัมพันธ์ เช่น `uses_table`, `writes_table`, `posts_rule`, `has_query`, `implements_code`, `bridges_zone`, `shares_menu`, `solves_issue`)
 
 ### โหมดผู้ใช้ทั่วไป / Call Center / ฝ่ายขาย (`audience: "user"`)
 1. เปิดบทสนทนาครั้งแรก อ่าน `read_note({ slug: "playbook-call-center" })` (วิธีใช้/แก้ปัญหา/ผังคัดกรองอาการด่วน) หรือ `read_note({ slug: "playbook-sales" })` (จุดเด่น/ตารางราคา 4 รุ่น/โครงการสำนักงานบัญชี Partner)

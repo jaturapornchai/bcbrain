@@ -1,7 +1,7 @@
 ---
 title: AR Contracts, Credit Groups, Commission, Retention & Marketplace — ตารางสัญญาและระบบต่อยอดลูกหนี้
 tags: [dev, schema, ar, contract, credit, commission, retention, marketplace, postgres]
-aliases: [ar_contract, ar_consignment_account, ar_credit_group, ar_commission_plan, ar_ap_retention_ledger, ar_marketplace_settlement, สัญญาขาย, ฝากขาย, ค่าคอมมิชชั่น]
+aliases: [ar_contract, ar_consignment_account, ar_credit_group, ar_commission_plan, ar_ap_retention_ledger, ar_marketplace_settlement, สัญญาขาย, ฝากขาย, ค่าคอมมิชชั่น, ar_marketplace_settlement_detail, ar_marketplace_daily_abb, ar_public_bill_link]
 sources:
   - scripts/sql/02_data_schema.sql:954-1013
   - backend/internal/application/process/ar_contract.go:40-158

@@ -56,3 +56,4 @@ sources:
 - [[start-first-day]] — กลับเช็กลิสต์ตั้งค่าวันแรก
 - [[start-account-period]] — กำหนดงวดบัญชี 12 งวด
 - [[howto-gl-overview]] — ภาพรวมระบบบัญชีแยกประเภทและปิดงวด
+- [[shares_menu::howto-gl-chart-of-accounts]] — การจัดการผังบัญชีและการจับคู่หมวดงบการเงิน (รหัสเมนู 9001)

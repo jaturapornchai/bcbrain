@@ -66,6 +66,9 @@ export const RELATION_TYPES = [
   "guides_howto",
   "in_system",
   "answers_faq",
+  "shares_menu",
+  "implements_code",
+  "bridges_zone",
   "hub_map",
   "related",
 ] as const;
@@ -86,6 +89,9 @@ export const RELATION_LABEL: Record<RelationType, string> = {
   guides_howto: "วิธีทำ",
   in_system: "ระบบงาน",
   answers_faq: "ถาม-ตอบ",
+  shares_menu: "รหัสเมนูเดียวกัน",
+  implements_code: "ใช้โค้ดชุดเดียวกัน",
+  bridges_zone: "เชื่อมหน้าจอ-โค้ด",
   hub_map: "แผนที่หลัก",
   related: "เชื่อมโยง",
 };

@@ -360,4 +360,20 @@ assert.ok(poMedia.items.some((x) => x.kind === "image" && x.url.startsWith("http
 const vidHits = search("วิดีโอสอนใช้งาน YouTube", 5, "user");
 assert.ok((vidHits[0]?.videos?.length ?? 0) > 0 && (vidHits[0]?.images?.length ?? 0) > 0, "search() attaches images & videos arrays to SearchHit");
 
+// 10. Deep D:\bcaiaccount coverage + Smart Neural Synapses (bridges_zone, implements_code, shares_menu)
+assert.ok(vault().size >= 365, "vault has >= 365 comprehensive notes");
+assert.ok(gAll.links.length >= 2000, "3D brain has >= 2000 neural synapses");
+const crossPath = traverseGraph({ slug: "howto-marketplace-shopee-lazada-tiktok", toSlug: "tbl-ar-contract-marketplace", audience: "all" });
+assert.ok(
+  crossPath.mode === "path" &&
+    (crossPath.path?.length ?? 0) >= 1 &&
+    crossPath.path!.length <= 3 &&
+    crossPath.path!.some((s) => s.rel === "bridges_zone"),
+  "bridges_zone connects User screen directly to Dev schema table in <= 3 hops without index hub",
+);
+const menuPeers = traverseGraph({ slug: "howto-stock-costing-recalc", depth: 1, relation: "shares_menu", audience: "user" });
+assert.ok(menuPeers.neighbors.some((s) => s.slug === "ts-stock-cost-mismatch-rebuild"), "shares_menu links Menu 2050 howto <-> troubleshoot");
+const codePeers = traverseGraph({ slug: "doc-marketplace-payroll-dbd-evrt", depth: 1, relation: "implements_code", audience: "dev" });
+assert.ok(codePeers.neighbors.length > 0 && codePeers.neighbors.every((s) => s.audience === "dev"), "implements_code links dev notes sharing Go handlers");
+
 console.log("selftest ok");

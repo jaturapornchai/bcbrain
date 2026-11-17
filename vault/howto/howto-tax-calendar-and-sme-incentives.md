@@ -63,3 +63,8 @@ sources:
 - [[howto-tax-overview]] — ภาพรวมระบบภาษีอากรในโปรแกรม
 - [[howto-tax-health-check]] — การตรวจสุขภาพภาษีก่อนยื่นสรรพากร (**9025**)
 - [[website-manual-and-blog-directory]] — รวมรายชื่อบทความภาษีและบัญชีทั้งหมดบน www.bcaccount.com
+
+---
+
+## ดูต่อที่เกี่ยวข้อง
+- [[shares_menu::ts-marketplace-payroll-dbd-print]] — แก้ปัญหากระทบยอดร้านค้าออนไลน์ ส่งงบ DBD ไม่ดุล เงินเดือนประกันสังคม สลิปออนไลน์ และพิมพ์ต้นฉบับซ้ำ (รหัสเมนู 7005)

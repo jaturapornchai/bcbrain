@@ -73,6 +73,9 @@ const VALID_RELATIONS = new Set([
   "guides_howto",
   "in_system",
   "answers_faq",
+  "shares_menu",
+  "implements_code",
+  "bridges_zone",
   "hub_map",
   "related",
 ]);
@@ -139,7 +142,7 @@ for (const file of files) {
     const checkText = [...aliasList, ...body.split("\n")];
     checkText.forEach((ln, i) => {
       // Strip external media/reference URLs before snake_case/jargon scan so asset filenames (e.g. portal_pos.webp) or YouTube IDs do not false-positive as SQL identifiers
-      const cleanedLn = ln.replace(/https?:\/\/[^\s)>\]"]+/g, "https://link");
+      const cleanedLn = ln.replace(/https?:\/\/[^\s)>\]"]+/g, "https://link").replace(/\[\[([a-z_]+)::/g, (m, r) => (VALID_RELATIONS.has(r) ? "[[" : m));
       for (const [re, why] of JARGON) {
         if (re.test(cleanedLn)) {
           const msg = `${rel}:${i < aliasList.length ? "alias" : i - aliasList.length + 1}: ${why}: ${ln.trim().slice(0, 90)}`;

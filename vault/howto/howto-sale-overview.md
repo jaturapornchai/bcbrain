@@ -49,3 +49,7 @@ sources:
 - [[howto-ar-overview]] — วางบิลและรับชำระหนี้หลังขายเชื่อ
 - [[howto-doc-flow-ref]] — วิธีดึงเอกสารอ้างอิงและตรวจผังเส้นทางเอกสาร
 - [[howto-stock-overview]] — ผลกระทบของเอกสารขายต่อสต็อกสินค้า
+- [[guides_howto::howto-price-center-discount-formula]] — ลำดับการดึงราคาขาย 7 ขั้น ปรับราคาสินค้า (2014) และตารางสูตรราคา
+- [[guides_howto::howto-line-modals-pack-replacement]] — สินค้าทดแทน (Ctrl+6) ทอนหน่วยแพ็ก และดึงเอกสารอ้างอิง
+- [[guides_howto::howto-tourist-vat-refund-evrt]] — การออกคำขอคืนภาษีนักท่องเที่ยว (ภ.พ.10 / e-VRT)
+- [[shares_menu::ts-etax-wht-bank-reconcile]] — แก้ปัญหาส่งข้อมูล e-Tax ส่งออกไฟล์หัก ณ ที่จ่าย RD Prep (50 ทวิ) และกระทบยอดธนาคาร/สลิปโอนไม่ผ่าน (รหัสเมนู 4017)

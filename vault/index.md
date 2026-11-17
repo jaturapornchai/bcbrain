@@ -103,3 +103,6 @@ sources:
 - [[api-mcp-gateway]] — แนวทางการเชื่อมต่อผู้ช่วย AI ผ่านช่องทางมาตรฐาน
 - [[doctypes-overview]] — ตารางรหัสประเภทเอกสารทั้งหมดและผลกระทบต่อสต็อกกับบัญชี
 - [[arch-overview]] — ภาพรวมสถาปัตยกรรมและการไหลของข้อมูลทั้งระบบ
+- [[guides_howto::start-erp-options-9-tabs]] — เจาะลึกกำหนดข้อเลือกพิเศษทั้ง 9 ส่วนครบทุกตัวเลือก (รหัสเมนู 1004)
+- [[part_of_arch::arch-company-brain-fusion-pipeline]] — สถาปัตยกรรมเชิงลึก Company Brain 5-Channel Fusion
+- [[exposes_api::api-inbound-handlers-workflows]] — แผนผัง HTTP Inbound Endpoints และ 57 Workflow Actions

@@ -63,3 +63,6 @@ sources:
 - การแก้ไข ยกเลิก และลบเอกสาร: ดู [[howto-doc-edit-cancel-delete]]
 - ตรวจรายงานสต็อกและจุดสั่งซื้อ: ดู [[rpt-overview]]
 - เมื่อบันทึกเอกสารแล้วติดแจ้งเตือนสิทธิ์ไม่พอ งวดปิด หรือสต็อกห้ามติดลบ: ดู [[ts-overview]] และ [[ts-common-no-permission]]
+- [[guides_howto::howto-price-center-discount-formula]] — ปรับราคาสินค้า (2014) และกำหนดส่วนลดตามบาร์โค้ด 5 ระดับ (2012, 2013)
+- [[guides_howto::howto-print-labels-barcode-audit]] — พิมพ์สติกเกอร์บาร์โค้ด A4 (2020) รูปภาพสินค้า (2005) และป้ายขนส่ง
+- [[guides_howto::howto-sysproc-reconcile-maintenance]] — ตรวจสอบความสมบูรณ์เอกสารสต็อก 29 รายการและกระทบยอดสต็อก

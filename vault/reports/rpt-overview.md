@@ -48,3 +48,4 @@ sources:
 ## เชื่อมโยงระบบที่เกี่ยวข้อง
 - ระบบหลัก BC Account: [[sys-account-overview]]
 - ผู้ช่วย AI สรุปรายงานเป็น A4 PDF และ CSV: [[sys-ai-copilot]]
+- [[has_report::rpt-employee-hierarchy-singha-edi]] — ระบบจัดกลุ่มรายงานหลายระดับชั้น การกรองช่วงรหัส รายงานพนักงาน และรายงานตัวแทนจำหน่าย

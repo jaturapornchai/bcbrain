@@ -62,3 +62,4 @@ sources:
 - ระบบหลัก BC Account: [[sys-account-overview]]
 - ผู้ช่วยถามตอบ AI (สร้างไฟล์ PDF/CSV): [[sys-ai-copilot]]
 - ระบบคลิกเจาะลึกจากรายงานไปเอกสารต้นทาง 2 จังหวะ: [[rpt-drilldown-2hop]]
+- [[guides_howto::howto-workmonitor-fraud-3d-alerts]] — ศูนย์บัญชาการผู้บริหารและปฏิทินผู้บริหารเชื่อมสมององค์กร

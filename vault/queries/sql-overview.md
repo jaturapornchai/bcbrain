@@ -100,3 +100,4 @@ sources:
 - [[sql-fa-disposal-and-leasing]] — รายงานกำไร/ขาดทุนจากการขายสินทรัพย์ (`1802`) และสัญญาเช่าซื้อ/ลีสซิ่ง (`fa_hire_purchase_contract`)
 
 *(สำหรับคำสั่ง SQL หมวดสต็อก POS หน้าร้าน AutoCare คลัง WMS ขนส่ง TMS และระบบเสริมอื่นๆ สามารถค้นหาได้ในโฟลเดอร์ `queries/` เดียวกันนี้ หรือผ่าน `search_brain` โดยระบุ `audience: "dev"`)*
+- [[has_query::sql-marketplace-payroll-subledger-audit]] — คิวรีกระทบยอด Marketplace Settlement, เงินเดือน ม.33, ตรวจประวัติพิมพ์ซ้ำ, กฎวางบิลอัตโนมัติ และสมุดเงินฝาก

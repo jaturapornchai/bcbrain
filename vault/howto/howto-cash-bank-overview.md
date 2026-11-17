@@ -47,3 +47,11 @@ sources:
 - พยากรณ์กระแสเงินสดล่วงหน้า 30/60/90 วัน: ดู [[howto-sme-cashflow-forecast]]
 - รับชำระหนี้ลูกหนี้ / จ่ายชำระหนี้เจ้าหนี้ด้วยหลายช่องทาง: ดู [[howto-ar-overview]] และ [[howto-ap-overview]]
 - เชื่อมโยงสมุดรายวันและการปิดงวดบัญชี: ดู [[howto-gl-overview]] และ [[howto-doc-edit-cancel-delete]]
+- [[guides_howto::howto-payroll-sso-pnd1-dbd-efiling]] — คำนวณเงินเดือน ประกันสังคม ม.33 และโอนเงินเดือนธนาคาร (รหัสเมนู 7005)
+- [[guides_howto::howto-sme-collaboration-public-bill-pay]] — กล่องรับสลิปค่าใช้จ่ายจาก LINE OA และมือถือ (รหัสเมนู 7021)
+- [[guides_howto::howto-master-party-employee-province]] — การผูกทำเนียบธนาคารและสมุดบัญชีเงินฝาก
+
+---
+
+## ดูต่อที่เกี่ยวข้อง
+- [[shares_menu::ts-marketplace-payroll-dbd-print]] — แก้ปัญหากระทบยอดร้านค้าออนไลน์ ส่งงบ DBD ไม่ดุล เงินเดือนประกันสังคม สลิปออนไลน์ และพิมพ์ต้นฉบับซ้ำ (รหัสเมนู 7005)

@@ -325,7 +325,7 @@ function load(): Map<string, Note> {
       haystack: {
         title: normalizeText(title),
         meta: normalizeText([slug, folder, ...tags, ...aliases].join(" ")),
-        body: normalizeText(body),
+        body: normalizeText(body.replace(/\[\[([a-z_]+)::/g, (_m, r) => (isRelationType(r) ? "[[" : _m))),
       },
     });
   }
@@ -376,7 +376,52 @@ function load(): Map<string, Note> {
       n.outEdges.push({ slug: targetSlug, rel, inferred: true });
       n.links.push(targetSlug);
       added++;
-      if (added >= 10) break;
+      if (added >= 16) break;
+    }
+  }
+
+  // 2b) Smart source-code synapses:
+  //     - implements_code: connects dev notes across different folders sharing focused module files (freq 2..8)
+  //     - bridges_zone: connects dev notes -> user notes sharing the exact same screen/process source file (freq 2..8)
+  const sourceIndex = new Map<string, string[]>();
+  for (const n of notes.values()) {
+    const uniqSrc = new Set<string>();
+    for (const raw of n.sources) {
+      const clean = raw.split(":")[0]?.replace(/\\/g, "/").trim() ?? "";
+      if (!clean.includes("/") || clean.startsWith("scripts/sql/") || clean.startsWith("bcaiwebsite-live/")) continue;
+      uniqSrc.add(clean);
+    }
+    for (const srcPath of uniqSrc) {
+      const bucket = sourceIndex.get(srcPath);
+      if (bucket) bucket.push(n.slug);
+      else sourceIndex.set(srcPath, [n.slug]);
+    }
+  }
+  for (const n of notes.values()) {
+    if (n.audience !== "dev") continue;
+    const existingTargets = new Set(n.links);
+    let addedCode = 0;
+    let addedBridge = 0;
+    for (const raw of n.sources) {
+      const clean = raw.split(":")[0]?.replace(/\\/g, "/").trim() ?? "";
+      const peers = sourceIndex.get(clean);
+      if (!peers || peers.length < 2 || peers.length > 8) continue;
+      for (const peerSlug of peers) {
+        if (peerSlug === n.slug || existingTargets.has(peerSlug)) continue;
+        const peer = notes.get(peerSlug);
+        if (!peer) continue;
+        if (peer.audience === "dev" && peer.folder !== n.folder && addedCode < 6) {
+          existingTargets.add(peerSlug);
+          n.outEdges.push({ slug: peerSlug, rel: "implements_code", inferred: true });
+          n.links.push(peerSlug);
+          addedCode++;
+        } else if (peer.audience === "user" && addedBridge < 8) {
+          existingTargets.add(peerSlug);
+          n.outEdges.push({ slug: peerSlug, rel: "bridges_zone", inferred: true });
+          n.links.push(peerSlug);
+          addedBridge++;
+        }
+      }
     }
   }
 
@@ -415,6 +460,7 @@ type SearchIndex = {
   metas: string[];
   aliasSets: Set<string>[];
   neighborIdx: Int32Array[];
+  neighborWeights: Float32Array[];
   isHub: Uint8Array;
   baseBuf: Float64Array;
   matchBuf: Int32Array;
@@ -846,6 +892,18 @@ const SYNONYM_GROUPS: string[][] = [
   ["วิดีโอ", "คลิป", "คลิปสอน", "ยูทูป", "ยูทูบ", "youtube", "สอนใช้งาน"],
   ["ราคา", "แพ็กเกจ", "ค่าบริการ", "ใบเสนอราคา", "ทดลองใช้", "pricing"],
   ["สำนักงานบัญชี", "พาร์ตเนอร์", "partner"],
+  ["ข้อเลือกพิเศษ", "ตั้งค่าพิเศษ", "erp_option", "1004"],
+  ["ปรับราคา", "ศูนย์ราคา", "ตารางสูตรราคา", "สูตรราคา", "ic_inventory_price"],
+  ["shopee", "lazada", "tiktok", "ช้อปปี้", "ลาซาด้า", "ติ๊กต็อก", "marketplace", "ใบกำกับอย่างย่อ", "abb", "ar_marketplace_settlement"],
+  ["เงินเดือน", "ประกันสังคม", "สปส", "ภงด1", "payroll", "erp_payroll_run"],
+  ["dbd", "efiling", "สบช3", "taxonomy", "ส่งงบ", "กรมพัฒนาธุรกิจ", "gl_dbd_taxonomy_map"],
+  ["นักท่องเที่ยว", "ภพ10", "evrt", "vrt", "คืนภาษีนักท่องเที่ยว"],
+  ["สองภาษา", "แปลภาษา", "ภาษาอังกฤษ", "bilingual", "i18n", "bc_language"],
+  ["ประวัติการพิมพ์", "พิมพ์ซ้ำ", "ต้นฉบับ", "สำเนา", "erp_print_audit_log"],
+  ["บัญชีย่อย", "กระทบยอดบัญชีย่อย", "subledger"],
+  ["พักบิล", "ปิดกะ", "ลิ้นชัก", "จอลูกค้า", "เครื่องพิมพ์ใบเสร็จ", "objectbox"],
+  ["ทุจริต", "เฝ้าระวัง", "จอพนักงาน", "fraud", "workmonitor"],
+  ["ป้ายขนส่ง", "ป้ายชื่อขนส่ง", "สติกเกอร์บาร์โค้ด"],
 ];
 
 const SYNONYM_MAP = (() => {
@@ -950,20 +1008,43 @@ function getSearchIndex(b: VaultBundle, filter: AudienceFilter): SearchIndex {
     });
   }
 
-  const neighborIdx = notes.map((n, i) => {
-    const set = new Set<number>();
-    for (const s of n.links) {
-      if (s === "index") continue;
-      const j = slugToIdx.get(s);
-      if (j !== undefined && j !== i) set.add(j);
+  const STRONG_REL = new Set<RelationType>([
+    "follows_rule",
+    "uses_table",
+    "writes_table",
+    "posts_rule",
+    "solves_issue",
+    "shares_menu",
+    "implements_code",
+    "bridges_zone",
+    "has_query",
+    "exposes_api",
+    "has_report",
+  ]);
+  const nbIdxList: Int32Array[] = [];
+  const nbWeightList: Float32Array[] = [];
+  for (let i = 0; i < N; i++) {
+    const n = notes[i];
+    const wMap = new Map<number, number>();
+    for (const e of n.outEdges) {
+      if (e.slug === "index") continue;
+      const j = slugToIdx.get(e.slug);
+      if (j === undefined || j === i) continue;
+      const w = STRONG_REL.has(e.rel) ? 1.15 : 0.9;
+      if (w > (wMap.get(j) ?? 0)) wMap.set(j, w);
     }
-    for (const s of n.backlinks) {
-      if (s === "index") continue;
-      const j = slugToIdx.get(s);
-      if (j !== undefined && j !== i) set.add(j);
+    for (const e of n.inEdges) {
+      if (e.slug === "index") continue;
+      const j = slugToIdx.get(e.slug);
+      if (j === undefined || j === i) continue;
+      const w = STRONG_REL.has(e.rel) ? 1.15 : 0.9;
+      if (w > (wMap.get(j) ?? 0)) wMap.set(j, w);
     }
-    return Int32Array.from(set);
-  });
+    nbIdxList.push(Int32Array.from(wMap.keys()));
+    nbWeightList.push(Float32Array.from(wMap.values()));
+  }
+  const neighborIdx = nbIdxList;
+  const neighborWeights = nbWeightList;
 
   const isHub = new Uint8Array(N);
   for (let i = 0; i < N; i++) {
@@ -982,6 +1063,7 @@ function getSearchIndex(b: VaultBundle, filter: AudienceFilter): SearchIndex {
     metas,
     aliasSets,
     neighborIdx,
+    neighborWeights,
     isHub,
     baseBuf: new Float64Array(N),
     matchBuf: new Int32Array(N),
@@ -1102,9 +1184,9 @@ export function search(q: string, limit = 8, filter: AudienceFilter = "all"): Se
   }
 
   // Exact alias match, SQL table-name identifier match, and gated phrase scan
-  const checkPhrase = phrase.length > 3 && phrase.length <= 48 && chunks.length <= 4;
+  const checkPhrase = phrase.length > 3 && phrase.length <= 48 && chunks.length <= 4 && ts.length > 1;
   const checkAliasChunks = chunks.length > 1;
-  const minPhraseMatch = Math.min(2, ts.length);
+  const minPhraseMatch = ts.length;
   for (let i = 0; i < N; i++) {
     let sc = base[i];
     const hasBase = sc > 0;
@@ -1138,14 +1220,16 @@ export function search(q: string, limit = 8, filter: AudienceFilter = "all"): Se
     const sc = base[i];
     if (sc <= 0) continue;
     const nbs = idx.neighborIdx[i];
+    const nbW = idx.neighborWeights[i];
     let t1 = 0;
     let t2 = 0;
     let t3 = 0;
     let activeCount = 0;
     for (let ni = 0; ni < nbs.length; ni++) {
-      const nbScore = base[nbs[ni]];
-      if (nbScore <= 0) continue;
+      const rawNb = base[nbs[ni]];
+      if (rawNb <= 0) continue;
       activeCount++;
+      const nbScore = rawNb * nbW[ni];
       if (nbScore >= t1) {
         t3 = t2;
         t2 = t1;
@@ -1323,11 +1407,14 @@ const REL_PRIORITY: Partial<Record<RelationType, number>> = {
   follows_rule: 6,
   uses_table: 5,
   writes_table: 5,
-  posts_rule: 4,
-  solves_issue: 4,
+  posts_rule: 5,
+  solves_issue: 5,
+  shares_menu: 4,
+  implements_code: 4,
+  bridges_zone: 4,
   has_query: 3,
   exposes_api: 3,
-  has_report: 2,
+  has_report: 3,
   guides_howto: 2,
 };
 

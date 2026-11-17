@@ -57,3 +57,4 @@ Backend ของ **BC Ai Account** พัฒนาด้วยภาษา Go �
 1. **Menu Rights Enforcement (`RequireRight`)**: `/process/*` และ `/api/v1/process/*` ทุกตัวตรวจสิทธิ์ตามเมทริกซ์เมนูของผู้ใช้ (`process/permission.go`) และ `/query/exec`, `/query/execBatch`, `/blob/insert` ตรวจ `QueryRequiredRight` เพิ่มเติม (`router.go:88-112`)
 2. **Client Write Policy (`WritePolicy`)**: ห้ามเขียนตรงเข้าตารางการเงิน/สต็อก/บัญชีผ่าน Query Gateway ต้องผ่าน Process Engine เท่านั้น — ดู [[dev-rules-accounting-sql]]
 3. **Company Brain Automatic Sync**: การบันทึกข้อมูลหลักผ่าน `/process/master*` และ `/query/exec` ใน 12 ตาราง Master (`brainMasterTables`) จะส่งสัญญาณ `NudgeSync` แบบ non-blocking เพื่ออัปเดตกราฟความสัมพันธ์ของ Company Brain ทันที (`container.go`, `query/handler.go:123`)
+- [[exposes_api::api-inbound-handlers-workflows]] — แผนผัง HTTP Inbound Endpoints ทั้งหมดและ 57 Workflow Actions (`/process/workflow/*`, `/stocktools/*`, `/print-audit/*`)

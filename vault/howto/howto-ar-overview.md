@@ -44,3 +44,7 @@ sources:
 - [[howto-sale-overview]] — ต้นทางยอดขายเชื่อที่ส่งมาตั้งลูกหนี้
 - [[howto-cash-bank-overview]] — เช็ครับ เงินโอน และการนำฝากธนาคารหลังรับชำระหนี้
 - [[rpt-overview]] — รายงานอายุลูกหนี้ ใบวางบิล และยอดค้างชำระ
+- [[guides_howto::howto-marketplace-shopee-lazada-tiktok]] — กระทบยอดขาย Shopee / TikTok Shop / Lazada และใบกำกับอย่างย่อรายวัน (รหัสเมนู 6024)
+- [[guides_howto::howto-sme-collaboration-public-bill-pay]] — ออกบิลด่วนมือถือและลิงก์แจ้งหนี้ PromptPay QR (รหัสเมนู 6026)
+- [[guides_howto::howto-crm-collection-campaign-inbox]] — ศูนย์ติดตามหนี้ค้างและทวงถามใบ 50 ทวิ ผ่าน LINE
+- [[shares_menu::ts-marketplace-payroll-dbd-print]] — แก้ปัญหากระทบยอดร้านค้าออนไลน์ ส่งงบ DBD ไม่ดุล เงินเดือนประกันสังคม สลิปออนไลน์ และพิมพ์ต้นฉบับซ้ำ (รหัสเมนู 6024)

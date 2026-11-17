@@ -7,7 +7,7 @@ const TOOLS = [
   ["ask_brain", "ถามเป็นภาษาคนหรือคำถาม Dev (กรอง audience: user/dev/all) ได้โน้ตเต็มๆ พร้อมลิงก์รูปภาพ & YouTube อัตโนมัติ และบริบทกราฟ 1 ทอด"],
   ["search_brain", "ค้นคำ (ตัดคำไทย + คำพ้องไทย-SQL + รหัสเมนู 4 หลัก + BM25) พร้อมแนบอาร์เรย์ images และ videos ในผลลัพธ์"],
   ["find_media", "ดึงลิงก์รูปภาพหน้าจอจริง (bcaccount.com), คลิปสอน YouTube (PLO9P7tPZLXB0 พร้อม thumbnail/embed) และหน้าเว็บอ้างอิงพร้อมแชร์"],
-  ["traverse_brain", "ไล่สายสัมพันธ์หลายทอด 1–3 hops (uses_table, writes_table, posts_rule) หรือหาเส้นทางสั้นสุดระหว่าง 2 โน้ต"],
+  ["traverse_brain", "ไล่ไซแนปส์อัจฉริยะ 18 ชนิด 1–3 hops (shares_menu, bridges_zone, implements_code, uses_table, writes_table) หรือหาเส้นทางเชื่อมหน้าจอ ↔ โค้ด ↔ ตาราง"],
   ["read_note", "อ่านโน้ตเต็มตาม slug พร้อมกลุ่ม โซน audience ลิงก์สื่อ (youtube_videos / images / web_pages) และลิงก์ไป-กลับ"],
   ["list_notes", "สารบัญโน้ตทั้งหมด กรองตาม folder, tag หรือ audience ('all' | 'user' | 'dev') ได้"],
 ];

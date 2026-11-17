@@ -37,3 +37,4 @@ sources:
 - วิธีบริหารกระดานดีล เช็กอิน GPS ทวงหนี้-ใบ 50 ทวิ และตรวจกลุ่มลูกค้า: [[howto-crm-pipeline-followup]]
 - ระบบแชท LINE OA เชื่อมข้อมูล ERP: [[sys-lineoa-chat]]
 - รายงานลูกหนี้ วงเงิน และอายุหนี้: [[rpt-ar-ap]]
+- [[guides_howto::howto-crm-collection-campaign-inbox]] — เจาะลึกศูนย์ติดตามหนี้ค้าง กล่องแชทรวมช่องทาง และแคมเปญเงินคืนคู่ค้า

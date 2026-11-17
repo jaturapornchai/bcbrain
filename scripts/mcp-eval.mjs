@@ -77,6 +77,26 @@ check(!travPath.isError && travPath.text.includes("Path (") && travPath.text.inc
 const travIso = await call("traverse_brain", { slug: "sql-ic-stock-balance", depth: 2, audience: "user" });
 check(travIso.text.includes("not found in audience=user"), "traverse_brain blocks dev slug when audience=user");
 
+const travBridge = await call("traverse_brain", {
+  slug: "howto-marketplace-shopee-lazada-tiktok",
+  to_slug: "tbl-ar-contract-marketplace",
+  audience: "all",
+});
+check(
+  !travBridge.isError && travBridge.text.includes("bridges_zone") && travBridge.text.includes("tbl-ar-contract-marketplace"),
+  "traverse_brain(all) bridges User screen -> Dev SQL table via bridges_zone synapse",
+);
+const travSharesMenu = await call("traverse_brain", {
+  slug: "howto-stock-costing-recalc",
+  depth: 1,
+  relation: "shares_menu",
+  audience: "user",
+});
+check(
+  !travSharesMenu.isError && travSharesMenu.text.includes("ts-stock-cost-mismatch-rebuild"),
+  "traverse_brain(user) follows shares_menu synapse on Menu 2050",
+);
+
 // ---- media connectors for external AI agents (find_media + ask_brain + search_brain + read_note) ----
 const fm = JSON.parse((await call("find_media", { query: "สมองของกิจการ", kind: "all", audience: "user" })).text || "{}");
 check(
@@ -147,6 +167,16 @@ const CASES = [
   ["dev", "REST API Process Actions menuKey", "api-overview"],
   ["dev", "รหัส trans_flag Document Flow ผังบัญชี Dr Cr", "doctypes-overview"],
   ["dev", "สถาปัตยกรรม Multi-Tenant Feature Switchboard Company Brain", "arch-overview"],
+  ["user", "ข้อเลือกพิเศษ 9 ส่วน เมนู 1004 ตั้งค่าห้ามขายต่ำกว่าทุน", "start-erp-options-9-tabs", "start-company-options"],
+  ["user", "ปรับราคาสินค้า เมนู 2014 ส่วนลดบาร์โค้ด 2012 ลำดับดึงราคาขาย", "howto-price-center-discount-formula"],
+  ["user", "กระทบยอดขาย Shopee TikTok Shop Lazada เมนู 6024 ใบกำกับอย่างย่อ", "howto-marketplace-shopee-lazada-tiktok"],
+  ["user", "คำนวณเงินเดือน ประกันสังคม 2569 ภ.ง.ด.1 ส่งงบ DBD สบช.3 เมนู 9029", "howto-payroll-sso-pnd1-dbd-efiling"],
+  ["user", "คืนภาษีนักท่องเที่ยว ภ.พ.10 e-VRT ขั้นต่ำ 2000 บาท", "howto-tourist-vat-refund-evrt"],
+  ["user", "พิมพ์บาร์โค้ด A4 เมนู 2020 ป้ายขนส่ง 6006 ประวัติการพิมพ์ต้นฉบับ", "howto-print-labels-barcode-audit"],
+  ["user", "จอลูกค้าใบที่ 2 POS เครื่องพิมพ์ความร้อน พักบิล เตะลิ้นชัก", "howto-pos-hardware-display-promo"],
+  ["dev", "findSalePrice bcRound TransRefImport ReconcileSubledger", "doc-price-engine-ref-import-calc"],
+  ["dev", "ObjectBox SyncEngine ThermalPrinterService TIS-620 Flutter POS", "arch-pos-flutter-objectbox-sync"],
+  ["dev", "TwoStageBrainExecutor evidenceFusionEngine 5-Channel Company Brain", "arch-company-brain-fusion-pipeline"],
 ];
 
 let top1 = 0,

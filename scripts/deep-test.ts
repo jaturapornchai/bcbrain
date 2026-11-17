@@ -200,6 +200,22 @@ const CASES: [AudienceFilter, string, ...string[]][] = [
   ["dev", "คำนวณ VAT ส่วนลด ฐานภาษี doctype", "doc-calc-vat-discount"],
   ["dev", "ลงบัญชีอัตโนมัติ ซื้อขาย AR AP templates", "doc-gl-templates-trade-apar", "doc-gl-posting-engine"],
   ["dev", "Multi-Tenant Dependency Injection Context", "arch-multi-tenant-di"],
+
+  // Deep D:\bcaiaccount coverage: Menu 1004 9 tabs, Pricing, Marketplace, Payroll/DBD, Tourist VAT, Print Audit, POS ObjectBox, Company Brain Fusion
+  ["user", "ข้อเลือกพิเศษ 9 ส่วน เมนู 1004 ห้ามขายต่ำกว่าทุน ห้ามติดลบ", "start-erp-options-9-tabs", "start-company-options"],
+  ["user", "ปรับราคาสินค้า เมนู 2014 กำหนดส่วนลดตามบาร์โค้ด 2012 ลำดับดึงราคา", "howto-price-center-discount-formula"],
+  ["user", "สินค้าทดแทน Ctrl+6 ทอนหน่วยใหญ่หน่วยย่อย หมายเหตุรายการ Ctrl+E", "howto-line-modals-pack-replacement"],
+  ["user", "กระทบยอดขาย Shopee TikTok Shop Lazada เมนู 6024 ใบกำกับอย่างย่อ", "howto-marketplace-shopee-lazada-tiktok"],
+  ["user", "คำนวณเงินเดือน ประกันสังคม 2569 เพดาน 875 ภ.ง.ด.1 ส่งงบ DBD สบช.3 เมนู 9029", "howto-payroll-sso-pnd1-dbd-efiling"],
+  ["user", "กล่องรับสลิป LINE เมนู 7021 ตามบิล 50 ทวิ ขาด 9030 ออกบิลด่วน 6026", "howto-sme-collaboration-public-bill-pay"],
+  ["user", "คืนภาษีนักท่องเที่ยว ภ.พ.10 e-VRT ขั้นต่ำ 2000 บาท", "howto-tourist-vat-refund-evrt"],
+  ["user", "พิมพ์สติกเกอร์บาร์โค้ด A4 เมนู 2020 ป้ายชื่อขนส่ง 6006 ประวัติการพิมพ์ต้นฉบับสำเนา", "howto-print-labels-barcode-audit"],
+  ["user", "กระทบยอดบัญชีย่อยเทียบแยกประเภท 5 หมวด ตรวจเอกสารสต็อก 29 รายการ", "howto-sysproc-reconcile-maintenance"],
+  ["user", "สลับสองภาษา ไทย อังกฤษ ปรับแต่งคอลัมน์ตาราง แพ้ยา ปักหมุดแผนที่", "howto-global-ui-bilingual-datalist-tools"],
+  ["user", "จอลูกค้าใบที่ 2 POS เครื่องพิมพ์ความร้อน 80 มม. พักบิล เตะลิ้นชัก", "howto-pos-hardware-display-promo"],
+  ["dev", "ObjectBox 13 entities SyncEngine ThermalPrinterService TIS-620 POS", "arch-pos-flutter-objectbox-sync"],
+  ["dev", "TwoStageBrainExecutor evidenceFusionEngine 5-Channel RRF Company Brain", "arch-company-brain-fusion-pipeline"],
+  ["dev", "SQL erp_print_audit_log ar_marketplace_settlement erp_payroll_run cb_book_bank", "sql-marketplace-payroll-subledger-audit"],
 ];
 
 // Pre-build search indexes once (without polluting CASES keys) to measure pure uncached query time

@@ -100,3 +100,6 @@ WHERE COALESCE(d.last_status, 0) = 0
   AND d.item_type NOT IN (3, 5)
 GROUP BY d.item_code, i.name_1, d.wh_code, d.shelf_code;
 ```
+- [[uses_table::tbl-cb-bank-book-master]] — ตารางทำเนียบธนาคาร สาขา และสมุดบัญชีเงินฝาก (`cb_bank`, `cb_bank_branch`, `cb_book_bank`)
+- [[uses_table::tbl-auto-bill-and-print-audit]] — ตารางกฎวางบิลอัตโนมัติ ประวัติการพิมพ์ Hash Chain รูปเอกสาร และพนักงาน (`ar_auto_bill_rule`, `erp_print_audit_log`, `erp_doc_picture`, `erp_user`)
+- [[uses_table::tbl-tenant-workspace-governance]] — ตารางทะเบียนฐานข้อมูลบริษัท กลุ่มผู้ใช้ สิทธิ์เมนู และภาษา (`bc_database_list`, `bc_group_list`, `bc_permission_links`, `bc_language`)

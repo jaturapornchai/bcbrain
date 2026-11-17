@@ -1,0 +1,46 @@
+---
+title: สถาปัตยกรรม Schema-Driven Forms (erpOption 9 Tabs), Field Help, ระบบสองภาษา DOM, Report Hierarchy และ 3D Telemetry
+tags: [architecture, schema-form, i18n, field-help, report-hierarchy, workmonitor, frontend]
+aliases: [SchemaForm, bcFieldHelpCatalog, GlobalLanguageTranslator, bcI18n, buildReportMultiLevelHierarchy, WorkstationTelemetryAgent]
+sources:
+  - frontend/account/form/SchemaForm.tsx:1-397
+  - frontend/account/form/FieldControl.tsx:1-335
+  - frontend/src/config/schemas/erpOption/index.ts:1-61
+  - frontend/src/config/help/bcFieldHelpCatalog.ts:1-579
+  - frontend/src/config/i18n/bcI18n.tsx:1-1004
+  - frontend/shared/components/GlobalLanguageTranslator.tsx:1-368
+  - backend/internal/application/process/report_hierarchy.go:1-663
+  - frontend/workmonitor/WorkstationTelemetryAgent.tsx:1-1676
+---
+
+# สถาปัตยกรรม Schema-Driven Forms, Field Help, ระบบสองภาษา DOM, Report Hierarchy และ 3D Telemetry
+
+สรุปกลไก Global Shared Engine ฝั่ง Frontend และระบบรายงานหลายระดับชั้นที่ทำให้ทุกหน้าจอของ BC Ai Account ทำงานเป็นมาตรฐานเดียวกันทั้งหมด
+
+---
+
+## 1. Schema-Driven Forms & Edition Field Filtering (`SchemaForm.tsx`, `erpOption/*`)
+
+- `SchemaForm.tsx` และ `FieldControl.tsx` เรนเดอร์ฟอร์มมาตรฐานจากนิยามสคีมา (`frontend/src/config/schemas/*`) รองรับชนิดช่องกรอกครบชุด (`code`, `textarea`, `checkbox`, `radio`, `select`, `lookup`, `number`, `date`, `image`, `label`)
+- กรองซ่อนช่องกรอกตามรุ่นผลิตภัณฑ์อัตโนมัติ (`STARTER_HIDDEN_GL_FIELDS`, `STARTER_HIDDEN_BRANCH_DEPT_FIELDS`, `PRO_ONLY_SCHEMA_FIELDS`)
+- สำหรับเมนู `1004` (`erpOption/index.ts`) ตัวแปลง prefix กระจายค่าลง 4 ตารางอัตโนมัติ: ไม่มี prefix → `erp_option`, `thaiqr.*` → `erp_thai_qr_config`, `etax.*` → `erp_option_etax_inet`, `mobillyst.*` → `erp_option_mobillyst`
+
+---
+
+## 2. Contextual Field Help & WeakMap Bilingual Translator (`bcFieldHelpCatalog.ts`, `bcI18n.tsx`, `GlobalLanguageTranslator.tsx`)
+
+- **Field Help**: `bcFieldHelpCatalog.ts` จับคู่ช่องกรอก ปุ่ม แท็บ และคอลัมน์เข้ากับคลังคำอธิบายภาษาไทยใน `frontend/src/config/help/data/*.json` (`bc_fields.json`, `bc_phrases.json`, `ar_ap.json`, `ic.json`, `gl_tax.json`, `trans.json`) และ endpoint `/api/v1/help`
+- **Bilingual DOM Engine**: `GlobalLanguageTranslator.tsx` เดิน DOM ด้วย `WeakMap` เก็บข้อความต้นฉบับ แปลเฉพาะป้ายกำกับ UI ผ่านพจนานุกรม `TH_TO_EN_EXACT` + `Intl.Segmenter` (`bcI18n.tsx`, `bcThaiWordDict.ts`) โดยข้ามเซลล์ข้อมูลธุรกิจจริง (`isDataCellTextNode`) เพื่อไม่ให้ชื่อลูกค้าหรือชื่อสินค้าถูกแปลเพี้ยน
+
+---
+
+## 3. Multi-Level Report Hierarchy (`report_hierarchy.go`) & 3D Workstation Telemetry
+
+- **`buildReportMultiLevelHierarchy`**: คำนวณยอดรวมย่อยหลายชั้นด้วย `*math/big.Rat` และแยกคอลัมน์ยอดคงเหลือสะสม (`isRunningBalanceReport`: `ยอดคงเหลือ`, `มูลค่าคงเหลือ`, `ยอดคงค้าง`, `ต้นทุนเฉลี่ย`) ให้ดึงค่าบรรทัดสุดท้ายของกลุ่มแทนการบวกซ้ำ
+- **`WorkstationTelemetryAgent.tsx`**: จับสถานะแท็บที่เปิดและเหตุการณ์หน้างาน (บันทึก/แก้ไข/ยกเลิก/ปิดโดยไม่บันทึก/สลับออกนอกหน้าต่าง) โดยกรองไม่เก็บค่ารหัสผ่านหรือข้อมูลลับ ส่งเข้า `fraudWarningData.ts` (7 แผนก) เพื่อแสดงบนโต๊ะ 3 มิติ
+
+---
+
+## ดูต่อที่เกี่ยวข้อง
+- [[part_of_arch::arch-ui-grid-report-standard]] · [[part_of_arch::arch-feature-switchboard]]
+- [[uses_table::tbl-erp-option]] · [[uses_table::tbl-tenant-workspace-governance]]
