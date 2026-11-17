@@ -1,4 +1,8 @@
-# สมอง BC (BC Brain)
+# <img src="app/icon.png" width="32" height="32" alt="BC Brain Icon" valign="middle" /> สมอง BC (BC Brain)
+
+**เว็บไซต์สมอง 3D:** [brain.bcsmethai.com](https://brain.bcsmethai.com) · **MCP Endpoint:** `https://brain.bcsmethai.com/mcp` · **Skill (`/bcbrain`):** [SKILL.md](https://brain.bcsmethai.com/skills/bcbrain/SKILL.md) · **เว็บไซต์หลัก:** [bcaccount.com](https://bcaccount.com) · **YouTube Playlist:** [BC Ai Account](https://www.youtube.com/playlist?list=PLO9P7tPZLXB0)
+
+[![สมอง BC — 365 เซลล์ความรู้ · 2,264 ไซแนปส์](docs/images/brain-3d-overview.png)](https://brain.bcsmethai.com)
 
 ## Objective
 คลังความรู้ระบบ **BC Ai Account** และระบบในชุด BC สกัดจากซอร์สโค้ดจริงใน `d:\bcaiaccount` ควบคู่กับข้อมูลเว็บไซต์หลัก `d:\bcaiwebsite-live` (`www.bcaccount.com`) และเพลย์ลิสต์วิดีโอสอนใช้งาน YouTube (`PLO9P7tPZLXB0`) รวม **365 โน้ต · 2,264 ไซแนปส์ (18 ชนิดความสัมพันธ์) ใน 16 โฟลเดอร์** รองรับ 2 กลุ่มเป้าหมายในระบบเดียว:
@@ -9,6 +13,12 @@
 - **หน้าแรก (`/`)**: สมอง 3 มิติพร้อมตัวสลับโหมด (`ทั้งหมด` · `ผู้ใช้ทั่วไป` · `นักพัฒนา (Dev)`)
 - **หน้าคลังโน้ต (`/n`, `/n/[slug]`)**: ค้นหาและอ่านรายโน้ต รองรับ `?mode=all|user|dev` และ `?q=...` พร้อม JSON-LD (`Organization`, `WebSite`, `SoftwareApplication`, `CollectionPage`, `BreadcrumbList`, `TechArticle`), OpenGraph/Twitter Card (`/icon.png`, `/opengraph-image.png`), `/robots.txt`, `/sitemap.xml` และ `/llms.txt`
 - **MCP Server (`/mcp`)**: Streamable HTTP MCP รองรับตัวกรอง `audience` และ CORS สำหรับเชื่อม AI ทุกค่าย
+
+| หน้าต่าง MCP LIVE Terminal แบบเรียลไทม์ (ลากย้าย & ปรับขนาดได้) | คลังความรู้แยกโซน (`ทั้งหมด` · `ผู้ใช้ทั่วไป` · `นักพัฒนา`) |
+|---|---|
+| ![MCP LIVE Terminal](docs/images/mcp-live-terminal.png) | ![คลังความรู้แยกโซน](docs/images/vault-zones-index.png) |
+| **ตัวเชื่อมวิดีโอ YouTube, ภาพหน้าจอจริง & ไซแนปส์เชื่อมโยงไป-กลับ** | **โครงข่ายประสาทสมอง BC (OpenGraph Neural Map)** |
+| ![หน้ารายละเอียดโน้ตพร้อมสื่อและไซแนปส์](docs/images/note-media-synapses.png) | ![BC Brain Neural Network](app/opengraph-image.png) |
 
 ## Workflow
 1. สกัดความรู้จาก `d:\bcaiaccount` → เขียนโน้ตลง `vault/<โฟลเดอร์>/<slug>.md` ตามกติกาใน `docs/extract-brief.md` (frontmatter `title`, `tags`, `aliases`, `sources` — `sources` เก็บ `path:start-end` เพื่อตรวจภายใน ไม่แสดงบนหน้าเว็บและ MCP)
