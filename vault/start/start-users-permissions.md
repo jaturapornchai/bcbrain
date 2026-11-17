@@ -16,6 +16,13 @@ sources:
 
 ---
 
+
+## ภาพหน้าจอเลือกกลุ่มกิจการและวิดีโอสอนกำหนดสิทธิ์พนักงาน
+
+![หน้าเลือกกลุ่มกิจการและบริษัทตามสิทธิ์ผู้ใช้งานใน BC Ai Account](https://bcaccount.com/manual/images/02-holding-select-group.png)
+
+[🎬 EP.7 สอน BC Ai Account โอนคลัง ตรวจนับสต็อก เพิ่มรหัสพนักงานกำหนดสิทธิ์ และสำรองข้อมูล](https://www.youtube.com/watch?v=oQecsSdSEi8&list=PLO9P7tPZLXB0)
+
 ## 1. สองบทบาทหลักของผู้ใช้งาน
 
 1. **ผู้ดูแลระบบ (Admin)**:

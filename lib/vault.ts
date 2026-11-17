@@ -19,6 +19,43 @@ export type Edge = {
   inferred?: boolean;
 };
 
+export type ImageMedia = {
+  alt: string;
+  url: string;
+};
+
+export type VideoMedia = {
+  title: string;
+  url: string;
+  videoId?: string;
+  listId?: string;
+  thumbnailUrl?: string;
+  embedUrl: string;
+};
+
+export type WebPageLink = {
+  title: string;
+  url: string;
+};
+
+export type NoteMedia = {
+  images: ImageMedia[];
+  videos: VideoMedia[];
+  webPages: WebPageLink[];
+};
+
+export type MediaItem = {
+  kind: "youtube" | "image" | "webpage";
+  title: string;
+  url: string;
+  videoId?: string;
+  listId?: string;
+  thumbnailUrl?: string;
+  embedUrl?: string;
+  noteSlug: string;
+  noteTitle: string;
+};
+
 export type Note = {
   slug: string;
   folder: string;
@@ -32,6 +69,7 @@ export type Note = {
   backlinks: string[];
   outEdges: Edge[];
   inEdges: Edge[];
+  media?: NoteMedia;
   haystack: { title: string; meta: string; body: string };
 };
 
@@ -43,6 +81,8 @@ export type SearchHit = {
   tags: string[];
   score: number;
   snippet: string;
+  images?: ImageMedia[];
+  videos?: VideoMedia[];
 };
 
 export type TraverseStep = {
@@ -119,6 +159,115 @@ function walk(dir: string): string[] {
 
 const linkTarget = (raw: string) => path.basename(raw.trim()).toLowerCase();
 
+const ALLOWED_IMAGE_HOST = /^https:\/\/(?:www\.)?bcaccount\.com\/|^https:\/\/qr-official\.line\.me\/|^\//i;
+const YT_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+const YT_LIST_RE = /^[A-Za-z0-9_-]{10,40}$/;
+const MD_IMAGE_RE = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+const MD_LINK_RE = /(?<!!)\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+const ASSET_EXT_RE = /\.(?:png|jpe?g|webp|gif|svg|ico|pdf)(?:$|\?)/i;
+
+export function resolveBcImageUrl(rawHref: string): string | null {
+  const trimmed = rawHref.trim();
+  if (!ALLOWED_IMAGE_HOST.test(trimmed)) return null;
+  // www.bcaccount.com returns 404 on /manual/images/* while apex https://bcaccount.com/* serves all 58 live assets with 200 OK
+  return trimmed.replace(/^https:\/\/www\.bcaccount\.com\//i, "https://bcaccount.com/");
+}
+
+export function parseYouTubeUrl(rawHref: string): { videoId?: string; listId?: string; embedUrl: string; watchUrl: string; thumbnailUrl?: string } | null {
+  let u: URL;
+  try {
+    u = new URL(rawHref.trim());
+  } catch {
+    return null;
+  }
+  const host = u.hostname.toLowerCase().replace(/^www\./, "");
+  let videoId: string | undefined;
+  let listId: string | undefined;
+  const listParam = u.searchParams.get("list") ?? undefined;
+  if (listParam && YT_LIST_RE.test(listParam)) listId = listParam;
+
+  if (host === "youtu.be") {
+    const seg = u.pathname.split("/").filter(Boolean)[0];
+    if (seg && YT_ID_RE.test(seg)) videoId = seg;
+  } else if (host === "youtube.com" || host === "m.youtube.com" || host === "youtube-nocookie.com") {
+    if (u.pathname === "/watch") {
+      const v = u.searchParams.get("v") ?? undefined;
+      if (v && YT_ID_RE.test(v)) videoId = v;
+    } else if (u.pathname.startsWith("/embed/") || u.pathname.startsWith("/shorts/")) {
+      const seg = u.pathname.split("/")[2];
+      if (seg && YT_ID_RE.test(seg)) videoId = seg;
+    }
+  } else {
+    return null;
+  }
+
+  if (!videoId && !listId) return null;
+  const embedUrl = videoId
+    ? `https://www.youtube-nocookie.com/embed/${videoId}${listId ? `?list=${listId}&rel=0` : "?rel=0"}`
+    : `https://www.youtube-nocookie.com/embed/videoseries?list=${listId}`;
+  const watchUrl = videoId
+    ? `https://www.youtube.com/watch?v=${videoId}${listId ? `&list=${listId}` : ""}`
+    : `https://www.youtube.com/playlist?list=${listId}`;
+  const thumbnailUrl = videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : undefined;
+  return { videoId, listId, embedUrl, watchUrl, thumbnailUrl };
+}
+
+export function extractNoteMedia(body: string, noteTitle = ""): NoteMedia {
+  const images: ImageMedia[] = [];
+  const videos: VideoMedia[] = [];
+  const webPages: WebPageLink[] = [];
+  const seenImg = new Set<string>();
+  const seenVid = new Set<string>();
+  const seenWeb = new Set<string>();
+
+  for (const m of body.matchAll(MD_IMAGE_RE)) {
+    const resolved = resolveBcImageUrl(m[2] ?? "");
+    if (!resolved) continue;
+    const fullUrl = resolved.startsWith("/") ? `https://brain.bcsmethai.com${resolved}` : resolved;
+    if (seenImg.has(fullUrl)) continue;
+    seenImg.add(fullUrl);
+    images.push({ alt: (m[1] || noteTitle || "ภาพประกอบหน้าจอ BC Ai Account").trim(), url: fullUrl });
+  }
+
+  for (const line of body.split("\n")) {
+    for (const m of line.matchAll(MD_LINK_RE)) {
+      const rawLabel = (m[1] ?? "").replace(/^(?:🎬|▶)\s*/, "").trim();
+      const rawUrl = (m[2] ?? "").trim();
+      const yt = parseYouTubeUrl(rawUrl);
+      if (yt) {
+        if (seenVid.has(yt.watchUrl)) continue;
+        seenVid.add(yt.watchUrl);
+        // If link is inside a markdown table row with generic label like "ดูคลิป YouTube", extract the row's descriptive cell
+        let title = rawLabel;
+        if ((!title || /^ดูคลิป|^รับชม|^youtube$/i.test(title)) && line.trim().startsWith("|")) {
+          const cells = line
+            .split("|")
+            .map((c) => c.replace(/\*\*/g, "").trim())
+            .filter(Boolean);
+          if (cells[1]) title = cells[1].split("—")[0].trim();
+        }
+        videos.push({
+          title: title || noteTitle || "วิดีโอสอนใช้งาน BC Ai Account",
+          url: yt.watchUrl,
+          videoId: yt.videoId,
+          listId: yt.listId,
+          thumbnailUrl: yt.thumbnailUrl,
+          embedUrl: yt.embedUrl,
+        });
+        continue;
+      }
+      if (/^https:\/\/(?:www\.)?bcaccount\.com\b/i.test(rawUrl) && !ASSET_EXT_RE.test(rawUrl)) {
+        const canonical = rawUrl.replace(/^https:\/\/www\.bcaccount\.com/i, "https://bcaccount.com");
+        if (seenWeb.has(canonical)) continue;
+        seenWeb.add(canonical);
+        webPages.push({ title: rawLabel || canonical, url: canonical });
+      }
+    }
+  }
+
+  return { images, videos, webPages };
+}
+
 function load(): Map<string, Note> {
   const notes = new Map<string, Note>();
   const rawLinks = new Map<string, { target: string; explicitRel?: RelationType }[]>();
@@ -172,6 +321,7 @@ function load(): Map<string, Note> {
       backlinks: [],
       outEdges: [],
       inEdges: [],
+      media: extractNoteMedia(body, title),
       haystack: {
         title: normalizeText(title),
         meta: normalizeText([slug, folder, ...tags, ...aliases].join(" ")),
@@ -660,8 +810,9 @@ function snippetFromLines(lines: { raw: string; norm: string }[], ts: string[]):
 }
 
 export function noteDescription(n: Note): string {
-  const first = linesForNote(getBundle(), n)[0]?.raw ?? n.title;
-  return first.replace(/[*_`>|[\]]/g, "").slice(0, 160);
+  const lines = linesForNote(getBundle(), n);
+  const prose = lines.find((l) => !/^!\[|^\[(?:🎬|▶)|^https?:\/\//.test(l.raw)) ?? lines[0];
+  return (prose?.raw ?? n.title).replace(/[*_`>|[\]]/g, "").slice(0, 160);
 }
 
 export function snippet(body: string, ts: string[]): string {
@@ -692,6 +843,9 @@ const SYNONYM_GROUPS: string[][] = [
   ["หาเมนูไม่เจอ", "เมนูหาย", "ซ่อนเมนู", "switchboard"],
   ["สต็อกไม่ตรง", "สต็อกเพี้ยน", "คำนวณยอดสต็อกใหม่"],
   ["พิมพ์ไม่ออก", "ปริ้นไม่ออก", "แบบฟอร์ม", "ตั้งค่าหน้ากระดาษ"],
+  ["วิดีโอ", "คลิป", "คลิปสอน", "ยูทูป", "ยูทูบ", "youtube", "สอนใช้งาน"],
+  ["ราคา", "แพ็กเกจ", "ค่าบริการ", "ใบเสนอราคา", "ทดลองใช้", "pricing"],
+  ["สำนักงานบัญชี", "พาร์ตเนอร์", "partner"],
 ];
 
 const SYNONYM_MAP = (() => {
@@ -948,7 +1102,7 @@ export function search(q: string, limit = 8, filter: AudienceFilter = "all"): Se
   }
 
   // Exact alias match, SQL table-name identifier match, and gated phrase scan
-  const checkPhrase = phrase.length > 3;
+  const checkPhrase = phrase.length > 3 && phrase.length <= 48 && chunks.length <= 4;
   const checkAliasChunks = chunks.length > 1;
   const minPhraseMatch = Math.min(2, ts.length);
   for (let i = 0; i < N; i++) {
@@ -1014,7 +1168,7 @@ export function search(q: string, limit = 8, filter: AudienceFilter = "all"): Se
   ranked.sort((a, b2) => b2.score - a.score);
   const result = ranked.slice(0, limit).map(({ idx: docId, score }) => {
     const note = idx.notes[docId];
-    return {
+    const hit: SearchHit = {
       slug: note.slug,
       title: note.title,
       folder: note.folder,
@@ -1023,6 +1177,9 @@ export function search(q: string, limit = 8, filter: AudienceFilter = "all"): Se
       score: Math.round(score),
       snippet: snippetFromLines(linesForNote(b, note), ts),
     };
+    if (note.media?.images.length) hit.images = note.media.images.slice(0, 3);
+    if (note.media?.videos.length) hit.videos = note.media.videos.slice(0, 3);
+    return hit;
   });
   if (b.searches.size >= 256) {
     const oldest = b.searches.keys().next().value;
@@ -1242,16 +1399,229 @@ export function excerpt(body: string, ts: string[], budget: number): string {
   return `${cut}\n\n[excerpt — ${omitted.length ? `omitted sections: ${omitted.join(" | ")}. ` : ""}read_note for the full note]`;
 }
 
-// ---------- render ----------
+// ---------- Media Graph Aggregation & Lookup for MCP AI Agents ----------
+const BROAD_MEDIA_HUBS = new Set(["index", "video-visual-tutorials", "website-manual-and-blog-directory"]);
+
+export function collectRelatedMedia(
+  seedSlugs: string[],
+  filter: AudienceFilter = "all",
+  maxImages = 5,
+  maxVideos = 5,
+  maxPages = 5,
+): NoteMedia {
+  const all = vault();
+  const images: ImageMedia[] = [];
+  const videos: VideoMedia[] = [];
+  const webPages: WebPageLink[] = [];
+  const seenImg = new Set<string>();
+  const seenVid = new Set<string>();
+  const seenWeb = new Set<string>();
+
+  const pushFromNote = (n: Note) => {
+    const m = n.media;
+    if (!m) return;
+    for (const img of m.images) {
+      if (images.length >= maxImages || seenImg.has(img.url)) continue;
+      seenImg.add(img.url);
+      images.push(img);
+    }
+    for (const vid of m.videos) {
+      if (videos.length >= maxVideos || seenVid.has(vid.url)) continue;
+      seenVid.add(vid.url);
+      videos.push(vid);
+    }
+    for (const wp of m.webPages) {
+      if (webPages.length >= maxPages || seenWeb.has(wp.url)) continue;
+      seenWeb.add(wp.url);
+      webPages.push(wp);
+    }
+  };
+
+  for (const s of seedSlugs) {
+    const n = all.get(s);
+    if (n && matchesAudience(n.audience, filter)) pushFromNote(n);
+  }
+
+  // If direct hits lacked either images or videos, hop 1 step to focused topic neighbors (skipping broad directory hubs so media stays on-topic)
+  if (images.length === 0 || videos.length === 0) {
+    const visited = new Set<string>(seedSlugs);
+    for (const s of seedSlugs) {
+      const seed = all.get(s);
+      if (!seed || !matchesAudience(seed.audience, filter)) continue;
+      for (const e of edgeListFor(seed, "both")) {
+        if (visited.has(e.slug) || BROAD_MEDIA_HUBS.has(e.slug)) continue;
+        visited.add(e.slug);
+        const nb = all.get(e.slug);
+        if (!nb || !matchesAudience(nb.audience, filter)) continue;
+        pushFromNote(nb);
+        if (images.length >= maxImages && videos.length >= maxVideos) break;
+      }
+    }
+  }
+
+  return { images, videos, webPages };
+}
+
+export function findMedia(opts: {
+  query?: string;
+  kind?: "all" | "image" | "youtube" | "webpage";
+  audience?: AudienceFilter;
+  limit?: number;
+}): { items: MediaItem[]; matchedNotes: { slug: string; title: string; folder: string }[] } {
+  const filter = opts.audience ?? "user";
+  const kind = opts.kind ?? "all";
+  const maxLimit = Math.min(40, Math.max(1, opts.limit ?? 12));
+  const q = opts.query?.trim() ?? "";
+  const all = vault();
+
+  const candidateNotes: Note[] = [];
+  if (q && q !== "*") {
+    const hits = search(q, 10, filter);
+    const seenSlugs = new Set<string>();
+    for (const h of hits) {
+      const n = all.get(h.slug);
+      if (n) {
+        candidateNotes.push(n);
+        seenSlugs.add(n.slug);
+      }
+    }
+    // Also append focused 1-hop neighbors so queries hitting a sub-note still surface its module's screenshot & YouTube video
+    for (const h of hits.slice(0, 4)) {
+      const seed = all.get(h.slug);
+      if (!seed) continue;
+      for (const e of edgeListFor(seed, "both")) {
+        if (seenSlugs.has(e.slug) || BROAD_MEDIA_HUBS.has(e.slug)) continue;
+        const nb = all.get(e.slug);
+        if (nb && matchesAudience(nb.audience, filter)) {
+          seenSlugs.add(nb.slug);
+          candidateNotes.push(nb);
+        }
+      }
+    }
+  } else {
+    // Full catalog scan: prioritize video-visual-tutorials & website-manual-and-blog-directory first
+    for (const hubSlug of ["video-visual-tutorials", "website-manual-and-blog-directory"]) {
+      const hn = all.get(hubSlug);
+      if (hn && matchesAudience(hn.audience, filter)) candidateNotes.push(hn);
+    }
+    for (const n of all.values()) {
+      if (matchesAudience(n.audience, filter) && !BROAD_MEDIA_HUBS.has(n.slug)) candidateNotes.push(n);
+    }
+  }
+
+  const items: MediaItem[] = [];
+  const seenUrl = new Set<string>();
+  const usedNotes = new Map<string, { slug: string; title: string; folder: string }>();
+
+  for (const n of candidateNotes) {
+    const m = n.media;
+    if (!m) continue;
+    if (kind === "all" || kind === "youtube") {
+      for (const v of m.videos) {
+        if (items.length >= maxLimit) break;
+        if (seenUrl.has(v.url)) continue;
+        seenUrl.add(v.url);
+        items.push({
+          kind: "youtube",
+          title: v.title,
+          url: v.url,
+          videoId: v.videoId,
+          listId: v.listId,
+          thumbnailUrl: v.thumbnailUrl,
+          embedUrl: v.embedUrl,
+          noteSlug: n.slug,
+          noteTitle: n.title,
+        });
+        usedNotes.set(n.slug, { slug: n.slug, title: n.title, folder: n.folder });
+      }
+    }
+    if (kind === "all" || kind === "image") {
+      for (const img of m.images) {
+        if (items.length >= maxLimit) break;
+        if (seenUrl.has(img.url)) continue;
+        seenUrl.add(img.url);
+        items.push({
+          kind: "image",
+          title: img.alt,
+          url: img.url,
+          noteSlug: n.slug,
+          noteTitle: n.title,
+        });
+        usedNotes.set(n.slug, { slug: n.slug, title: n.title, folder: n.folder });
+      }
+    }
+    if (kind === "all" || kind === "webpage") {
+      for (const wp of m.webPages) {
+        if (items.length >= maxLimit) break;
+        if (seenUrl.has(wp.url)) continue;
+        seenUrl.add(wp.url);
+        items.push({
+          kind: "webpage",
+          title: wp.title,
+          url: wp.url,
+          noteSlug: n.slug,
+          noteTitle: n.title,
+        });
+        usedNotes.set(n.slug, { slug: n.slug, title: n.title, folder: n.folder });
+      }
+    }
+    if (items.length >= maxLimit) break;
+  }
+
+  return { items, matchedNotes: [...usedNotes.values()] };
+}
+
+// ---------- render (with www.bcaccount.com image connector & YouTube video/playlist connector) ----------
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+function renderYouTubeCard(yt: NonNullable<ReturnType<typeof parseYouTubeUrl>>, label: string): string {
+  const safeTitle = escapeHtml(label.replace(/^(?:🎬|▶)\s*/, "").trim() || "วิดีโอสอนใช้งาน BC Ai Account");
+  const bgStyle = yt.videoId
+    ? ` style="background:#070514 url('https://i.ytimg.com/vi/${escapeHtml(yt.videoId)}/hqdefault.jpg') center/cover no-repeat"`
+    : "";
+  const playlistLink = yt.listId
+    ? `<a href="https://www.youtube.com/playlist?list=${escapeHtml(yt.listId)}" target="_blank" rel="noopener noreferrer">เพลย์ลิสต์เต็ม ↗</a>`
+    : "";
+  return `<div class="yt-card"><div class="yt-frame"${bgStyle}><iframe src="${escapeHtml(yt.embedUrl)}" title="${safeTitle}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div><div class="yt-bar"><span class="yt-badge">▶ YouTube</span><span class="yt-title" title="${safeTitle}">${safeTitle}</span><span class="yt-links"><a href="${escapeHtml(yt.watchUrl)}" target="_blank" rel="noopener noreferrer">ดูบน YouTube ↗</a>${playlistLink}</span></div></div>`;
+}
 
 marked.use({
   gfm: true,
   // raw HTML in notes is shown, never executed; HTML comments (e.g. secret-scan pragmas) are dropped
-  renderer: { html: ({ text }) => (/^\s*<!--[\s\S]*-->\s*$/.test(text) ? "" : escapeHtml(text)) },
+  renderer: {
+    html: ({ text }) => (/^\s*<!--[\s\S]*-->\s*$/.test(text) ? "" : escapeHtml(text)),
+    image({ href, title, text }) {
+      const resolved = resolveBcImageUrl(href ?? "");
+      const safeAlt = escapeHtml(text || title || "ภาพประกอบหน้าจอ BC Ai Account");
+      if (!resolved) return `<span class="muted">[ภาพประกอบ: ${safeAlt}]</span>`;
+      const safeSrc = escapeHtml(resolved);
+      const isBcSite = /^https:\/\/bcaccount\.com\//i.test(resolved);
+      const sourceBadge = isBcSite
+        ? `<a href="${safeSrc}" target="_blank" rel="noopener noreferrer">www.bcaccount.com ↗</a>`
+        : `<a href="${safeSrc}" target="_blank" rel="noopener noreferrer">เปิดภาพเต็ม ↗</a>`;
+      return `<figure class="md-fig"><a class="md-fig-link" href="${safeSrc}" target="_blank" rel="noopener noreferrer"><img src="${safeSrc}" alt="${safeAlt}" loading="lazy" decoding="async" /></a><figcaption class="md-fig-cap"><span>${safeAlt}</span>${sourceBadge}</figcaption></figure>`;
+    },
+    link({ href, title, tokens }) {
+      const text = this.parser.parseInline(tokens);
+      const safeHref = escapeHtml(href ?? "#");
+      const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+      if (/^https?:\/\//i.test(href ?? "")) {
+        return `<a href="${safeHref}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
+      }
+      return `<a href="${safeHref}"${titleAttr}>${text}</a>`;
+    },
+    paragraph({ tokens }) {
+      if (tokens.length === 1 && tokens[0].type === "link") {
+        const lk = tokens[0] as { href?: string; text?: string };
+        const yt = lk.href ? parseYouTubeUrl(lk.href) : null;
+        if (yt) return renderYouTubeCard(yt, lk.text ?? "");
+      }
+      return `<p>${this.parser.parseInline(tokens)}</p>\n`;
+    },
+  },
   walkTokens(t) {
-    if (t.type === "link" && /^\s*(javascript|data|vbscript):/i.test(t.href)) t.href = "#";
+    if ((t.type === "link" || t.type === "image") && /^\s*(javascript|data|vbscript):/i.test(t.href)) t.href = "#";
   },
 });
 

@@ -30,7 +30,7 @@ const instr = init.result?.instructions ?? "";
 check(instr.includes("playbook-dev") && instr.includes("playbook-call-center") && instr.includes("audience"), "initialize instructions cover both modes");
 
 const listedTools = (await rpc("tools/list")).result?.tools ?? [];
-for (const t of ["ask_brain", "search_brain", "traverse_brain", "read_note", "list_notes"]) {
+for (const t of ["ask_brain", "search_brain", "find_media", "traverse_brain", "read_note", "list_notes"]) {
   const tool = listedTools.find((x) => x.name === t);
   check(!!tool, `tools/list has ${t}`);
   if (t !== "read_note") check(!!tool?.inputSchema?.properties?.audience, `${t} exposes audience param`);
@@ -77,6 +77,33 @@ check(!travPath.isError && travPath.text.includes("Path (") && travPath.text.inc
 const travIso = await call("traverse_brain", { slug: "sql-ic-stock-balance", depth: 2, audience: "user" });
 check(travIso.text.includes("not found in audience=user"), "traverse_brain blocks dev slug when audience=user");
 
+// ---- media connectors for external AI agents (find_media + ask_brain + search_brain + read_note) ----
+const fm = JSON.parse((await call("find_media", { query: "สมองของกิจการ", kind: "all", audience: "user" })).text || "{}");
+check(
+  fm.playlistUrl === "https://www.youtube.com/playlist?list=PLO9P7tPZLXB0" &&
+    Array.isArray(fm.items) &&
+    fm.items.some((x) => x.kind === "youtube" && x.videoId === "_DattZyKqDA" && x.thumbnailUrl) &&
+    fm.items.some((x) => x.kind === "image" && x.url.startsWith("https://bcaccount.com/")),
+  "find_media returns YouTube video (_DattZyKqDA + PLO9P7tPZLXB0 + thumbnailUrl) and bcaccount.com screenshot",
+);
+const askQuote = (await call("ask_brain", { question: "ทำใบเสนอราคาขายยังไง", audience: "user" })).text;
+check(
+  askQuote.includes("## Media & Reference Links") &&
+    askQuote.includes("https://www.youtube.com/watch?v=") &&
+    askQuote.includes("https://bcaccount.com/"),
+  "ask_brain(user) appends ready-to-share YouTube & bcaccount.com links even on sub-note queries",
+);
+const mediaHits = JSON.parse((await call("search_brain", { query: "วิดีโอสอนใช้งาน YouTube คลิปสอน", limit: 3, audience: "user" })).text || "[]");
+check(
+  Array.isArray(mediaHits[0]?.videos) && mediaHits[0].videos.length > 0 && Array.isArray(mediaHits[0]?.images) && mediaHits[0].images.length > 0,
+  "search_brain attaches videos and images arrays on media-bearing notes",
+);
+const readMediaNote = (await call("read_note", { slug: "howto-sale-overview" })).text;
+check(
+  readMediaNote.includes("youtube_videos:") && readMediaNote.includes("images: ") && readMediaNote.includes("https://bcaccount.com/"),
+  "read_note appends youtube_videos and images summary lines",
+);
+
 // ---- retrieval: [audience, query, ...acceptable canonical hub slugs]; hit = any expected slug in top 5 ----
 const CASES = [
   ["all", "สารบัญ แผนที่สมอง BC", "index"],
@@ -107,6 +134,10 @@ const CASES = [
   ["user", "หาเมนูไม่เจอ เมนูบัญชีหายไปไหน", "ts-menu-missing-switchboard"],
   ["user", "คีย์ลัด Ctrl+S ปุ่มสูตรส่วนลด คลิกขวาตารางสินค้า", "howto-screen-shortcuts-workbench"],
   ["user", "ดึงบิลวางบิลไม่ขึ้น ดึงบิลรับชำระหนี้ไม่เจอ", "ts-arap-balance-recalc"],
+  ["user", "วิดีโอสอนใช้งาน YouTube คลิปสอน EP.1 ถึง EP.8", "video-visual-tutorials"],
+  ["user", "ตารางราคา 4 รุ่น Concurrent Users Starter ฟรี 0 บาท", "sales-pricing-packages"],
+  ["user", "โครงการพาร์ตเนอร์สำนักงานบัญชี ใช้ฟรี 0 บาท แยก Server", "sales-accounting-partner"],
+  ["user", "เบอร์โทร LINE @bcaccount เวลาทำการ ซัพพอร์ต บริการวางระบบ", "sales-support-implementation-contact"],
   ["dev", "คู่มือ AI นักพัฒนา เขียนโค้ดต่อยอด", "playbook-dev"],
   ["dev", "กฎเหล็ก SQL บัญชี NUMERIC last_status", "dev-rules-accounting-sql"],
   ["dev", "เริ่มต้นเชื่อมต่อระบบ API quickstart", "dev-integration-quickstart"],

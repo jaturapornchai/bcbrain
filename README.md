@@ -1,8 +1,8 @@
 # สมอง BC (BC Brain)
 
 ## Objective
-คลังความรู้ระบบ **BC Ai Account** และระบบในชุด BC สกัดจากซอร์สโค้ดจริงใน `d:\bcaiaccount` (อ่านอย่างเดียว) รวม **330 โน้ต ใน 16 โฟลเดอร์** รองรับ 2 กลุ่มเป้าหมายในระบบเดียว:
-1. **โซนผู้ใช้ทั่วไป (`audience: "user"` — 9 โฟลเดอร์, 200 โน้ต)**: คู่มือภาษาไทยที่คนทั่วไปอ่านเข้าใจ (`playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`) สำหรับเจ้าของกิจการ พนักงานบัญชี Call Center และฝ่ายขาย ครบทั้งสารบัญรหัสเมนู 4 หลักทั้ง 734 หน้าจอ (`1001`–`9070`), คีย์ลัด/ปุ่มสูตร/เมนูคลิกขวา, ขั้นตอนวิธีใช้งาน และคู่มือแก้ปัญหาหน้างาน (ไม่มีศัพท์โค้ดปน)
+คลังความรู้ระบบ **BC Ai Account** และระบบในชุด BC สกัดจากซอร์สโค้ดจริงใน `d:\bcaiaccount` ควบคู่กับข้อมูลเว็บไซต์หลัก `d:\bcaiwebsite-live` (`www.bcaccount.com`) และเพลย์ลิสต์วิดีโอสอนใช้งาน YouTube (`PLO9P7tPZLXB0`) รวม **338 โน้ต ใน 16 โฟลเดอร์** รองรับ 2 กลุ่มเป้าหมายในระบบเดียว:
+1. **โซนผู้ใช้ทั่วไป (`audience: "user"` — 9 โฟลเดอร์, 208 โน้ต)**: คู่มือภาษาไทยที่คนทั่วไปอ่านเข้าใจ (`playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`) สำหรับเจ้าของกิจการ พนักงานบัญชี Call Center และฝ่ายขาย ครบทั้งสารบัญรหัสเมนู 4 หลักทั้ง 734 หน้าจอ (`1001`–`9070`), ตารางราคา 4 รุ่นและโครงการสำนักงานบัญชี Partner, ตัวเชื่อมรูปภาพหน้าจอจริงจาก `www.bcaccount.com` และการ์ดวิดีโอ YouTube (`PLO9P7tPZLXB0`), คีย์ลัด/เมนูคลิกขวา, ปฏิทินภาษี/บทความความรู้ และคู่มือแก้ปัญหาหน้างาน (ไม่มีศัพท์โค้ดปน)
 2. **โซนนักพัฒนา (`audience: "dev"` — 6 โฟลเดอร์, 129 โน้ต)**: เอกสารเทคนิคสำหรับนักพัฒนาและ AI เขียนโค้ดต่อยอด (`dev-playbook`, `schema`, `queries`, `api`, `doctypes`, `architecture`) ครอบคลุม Data Dictionary, คำสั่ง PostgreSQL `SELECT`/`WITH`, รหัส `trans_flag`, ผังบัญชี Dr/Cr, API/MCP Contract และสถาปัตยกรรมระบบ (พร้อมหน้าดัชนีกลาง `root` `index` = `both` อีก 1 โน้ต)
 
 เปิดสาธารณะ 3 ช่องทางพร้อมรองรับ Google SEO & AI Search (GEO/AEO):
@@ -22,7 +22,7 @@
 - `lib/groups.ts` — นิยาม 16 โฟลเดอร์ (`root` = `both`, 9 โฟลเดอร์โซน `user`, 6 โฟลเดอร์โซน `dev`), สี, ชื่อภาษาไทย, `groupOf()`, `matchesAudience()`, `RelationType`, `RELATION_LABEL`, `inferRelation()`
 - `lib/vault.ts` — Lean In-Memory GraphRAG: โหลด `vault/` แบบ atomic `VaultBundle`, คำนวณ typed edges + implicit SQL table synapses, อินเด็กซ์กลับด้าน (`Int32Array`/`Float32Array` postings), ปรับรูปคำไทย/ภาษี (`ภ.ง.ด.`, `ภ.พ.`, `สต็อก` ฯลฯ) + ตัดคำไทยด้วย `Intl.Segmenter` + คำพ้องไทย-SQL + BM25 + hub/canonical boost + 1-hop graph boost, พิกัดสมอง 3D ล่วงหน้าบนเซิร์ฟเวอร์ (`computeBrainLayout()`), แคชผลค้นหาและ HTML ที่เรนเดอร์แล้ว (กัน XSS), และ `traverseGraph()` (multi-hop 1–3 ทอด & shortest path)
 - `lib/mcp-events.ts`, `app/mcp/events/route.ts` — Bus เหตุการณ์และสตรีม SSE (`/mcp/events`) สำหรับแสดง Terminal สดและปล่อยสัญญาณแสงบนสมอง 3D ทันทีเมื่อ `/mcp` ถูกเรียก (กรองความลับ/อีเมล/IP/เบอร์โทรอัตโนมัติ)
-- `app/mcp/route.ts` — Stateless Streamable HTTP MCP 5 tools (`ask_brain`, `search_brain`, `traverse_brain`, `read_note`, `list_notes`) พร้อมตัวกรอง `audience: "all" | "user" | "dev"`, Connected Graph Context 1 ทอด, CORS (`OPTIONS`), จำกัดขนาดคำขอ 32 KB (`413`) และจำกัดอัตราเรียก 180 ครั้ง/นาทีต่อ IP (`429`)
+- `app/mcp/route.ts` — Stateless Streamable HTTP MCP 6 tools (`ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `read_note`, `list_notes`) พร้อมตัวกรอง `audience: "all" | "user" | "dev"`, แนบลิงก์รูปภาพหน้าจอ (`https://bcaccount.com/...`) และคลิป YouTube (`PLO9P7tPZLXB0` พร้อม `thumbnailUrl`/`embedUrl`) อัตโนมัติ, Connected Graph Context 1 ทอด, CORS (`OPTIONS`), จำกัดขนาดคำขอ 32 KB (`413`) และจำกัดอัตราเรียก 180 ครั้ง/นาทีต่อ IP (`429`)
 - `components/Brain3D.tsx`, `components/Shell.tsx`, `app/page.tsx`, `app/n/page.tsx`, `app/n/[slug]/page.tsx` — หน้าเว็บสมอง 3 มิติ (ใช้พิกัดที่คำนวณจากเซิร์ฟเวอร์ทันที) และหน้าคลังโน้ตพร้อมตัวสลับโหมด 3 ปุ่ม
 - `app/layout.tsx`, `app/robots.ts`, `app/sitemap.ts`, `public/llms.txt`, `app/icon.png`, `app/opengraph-image.png`, `next.config.ts` — โครงสร้าง Metadata, OpenGraph/Twitter Image, Sitemap/Robots/LLMs index และ HTTP Security & `Cache-Control` headers
 - `.agents/skills/bcbrain/SKILL.md`, `public/skills/bcbrain/SKILL.md` — Skill `/bcbrain` สำหรับเชื่อมและเรียกใช้สมอง BC ผ่าน MCP (หรือ HTTP JSON-RPC fallback) ดาวน์โหลดได้ที่ `/skills/bcbrain/SKILL.md`
@@ -50,12 +50,12 @@ npm install
 npm run dev            # http://localhost:3000
 npx tsc --noEmit       # ตรวจ TypeScript
 npm test               # selftest: groups, isolation, ตัดคำไทย, BM25, กัน XSS, ตัวสแกนความลับ
-npm run test:deep      # deep-test: 6 มิติ (ตัดคำ/คำพ้อง 27 ข้อ, ค้นหา 95 เคส, แยกโซน 330 โน้ต, กราฟ 3D/XSS/PNG, fuzz, throughput)
+npm run test:deep      # deep-test: 6 มิติ (ตัดคำ/คำพ้อง 27 ข้อ, ค้นหา 102 เคส, แยกโซน 338 โน้ต, กราฟ 3D/XSS/PNG, fuzz, throughput)
 npm run check          # ตรวจโน้ตใน vault (ส่ง path ของ bcaiaccount และ --strict เพื่อตรวจเข้มงวด)
 npm run check:drift    # ตรวจโน้ตแบบ --strict พร้อมรายงานโน้ตที่ไฟล์โค้ดใน D:/bcaiaccount แก้ใหม่กว่าโน้ต (--fail-on-drift เพื่อบังคับ exit 1)
 npm run scan           # สแกนความลับใน vault และไฟล์ skill
-node scripts/mcp-eval.mjs http://localhost:3000/mcp         # ประเมิน MCP 37 เคส (ทั้งโหมด user/Call Center และ dev) บนเครื่อง
-node scripts/mcp-eval.mjs https://brain.bcsmethai.com/mcp   # ประเมิน MCP 37 เคส บน Production จริง
+node scripts/mcp-eval.mjs http://localhost:3000/mcp         # ประเมิน MCP 41 เคส (ทั้งโหมด user/Call Center/Sales และ dev) บนเครื่อง
+node scripts/mcp-eval.mjs https://brain.bcsmethai.com/mcp   # ประเมิน MCP 41 เคส บน Production จริง
 BC_DEPLOY_HOST=root@<server> bash deploy/deploy.sh          # deploy ขึ้น brain.bcsmethai.com
 ```
 
@@ -63,11 +63,12 @@ BC_DEPLOY_HOST=root@<server> bash deploy/deploy.sh          # deploy ขึ้�
 ```bash
 claude mcp add --transport http bcbrain https://brain.bcsmethai.com/mcp
 ```
-Tools:
-- `ask_brain(question, audience?)` — `audience`: `"all" | "user" | "dev"` (แนบกติกาตามโซน + เนื้อหาโน้ตหลัก + Connected Graph Context 1 ทอดท้ายคำตอบ)
-- `search_brain(query, limit?, audience?)` — อินเด็กซ์กลับด้าน + BM25 + คำพ้องไทย-SQL + 1-hop graph boost
+Tools (6 tools):
+- `ask_brain(question, audience?)` — `audience`: `"all" | "user" | "dev"` (คืนเนื้อหาโน้ตหลัก + `Media & Reference Links` รวมลิงก์รูปภาพ & YouTube ในหัวข้อเดียวกันอัตโนมัติ + Connected Graph Context 1 ทอด)
+- `search_brain(query, limit?, audience?)` — อินเด็กซ์กลับด้าน + BM25 + รหัสเมนู 4 หลัก + คำพ้องไทย-SQL พร้อมแนบอาร์เรย์ `images` และ `videos` ในผลลัพธ์
+- `find_media(query?, kind?, limit?, audience?)` — ดึงลิงก์รูปภาพหน้าจอ (`https://bcaccount.com/...`), วิดีโอ YouTube (`PLO9P7tPZLXB0` พร้อม `thumbnailUrl`/`embedUrl`) และหน้าเว็บอ้างอิงในรูปแบบ JSON พร้อมแชร์
 - `traverse_brain(slug, to_slug?, depth?, direction?, relation?, folder?, limit?, audience?)` — เดินกราฟ 1–3 ทอดหรือหาเส้นทางสั้นสุดระหว่าง 2 โน้ต
-- `read_note(slug)` — อ่านโน้ตเต็มตาม `slug`
+- `read_note(slug)` — อ่านโน้ตเต็มตาม `slug` พร้อมสรุปลิงก์สื่อ `youtube_videos` / `images` / `web_pages`
 - `list_notes(folder?, tag?, audience?)` — แสดงรายชื่อโน้ตกรองตามโฟลเดอร์ แท็ก หรือ `audience`
 
 ติดตั้งและใช้งาน Skill `/bcbrain`:
@@ -81,7 +82,7 @@ mkdir -p ~/.claude/skills/bcbrain && curl -fsSL https://brain.bcsmethai.com/skil
 ## Limitation
 - ค้นหาแบบอินเด็กซ์กลับด้าน + BM25 length normalization + คำพ้องไทย-SQL + 1-hop graph boost (ไม่ใช่ vector embedding) — หากคลังเกิน ~1,500 โน้ตควรพิจารณา hybrid/embedding เพิ่มเติม
 - โน้ตเป็นภาพถ่ายโค้ด ณ วันที่สกัด หากโค้ดใน `d:\bcaiaccount` เดินหน้าไปแล้วให้รัน `npm run check:drift` เพื่อตรวจจุดที่ต้องอัปเดตโน้ตตาม และยึดโค้ดจริงเป็นหลักเสมอ
-- ขอบเขตจำกัดเฉพาะระบบใน `d:\bcaiaccount` เท่านั้น ไม่อ้างอิงระบบภายนอก
+- ขอบเขตจำกัดเฉพาะระบบใน `d:\bcaiaccount` และเว็บไซต์ทางการ `d:\bcaiwebsite-live` (`bcaccount.com`) เท่านั้น
 - MCP เปิดสาธารณะแบบอ่านอย่างเดียว จำกัดขนาดคำขอ 32 KB และจำกัดอัตราเรียก 180 ครั้ง/นาทีต่อ IP ในหน่วยความจำของโปรเซส พร้อมรองรับ CORS
-- โซนผู้ใช้ทั่วไปไม่มีราคา แพ็กเกจ หรือเงื่อนไขสัญญา AI ถูกสั่งให้ส่งต่อฝ่ายขายที่เป็นคน
+- โซนผู้ใช้ทั่วไปอ้างอิงเฉพาะตารางราคามาตรฐาน 4 รุ่นจาก `sales-pricing-packages` และโครงการสำนักงานบัญชีจาก `sales-accounting-partner` เท่านั้น ห้าม AI แต่งส่วนลดพิเศษหรือเงื่อนไขสัญญานอกตารางเอง (ส่งต่อ `https://bcaccount.com/quotation` หรือ LINE `@bcaccount`)
 - ชื่อไฟล์ (`slug`) ต้องเป็น ascii kebab-case ตัวเล็กและไม่ซ้ำกันทั้ง `vault/`

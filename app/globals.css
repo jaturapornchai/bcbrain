@@ -286,6 +286,41 @@ pre { overflow-x: auto; padding: 14px 16px; border-radius: 12px; background: #12
 .md :not(pre) > code { padding: 1px 6px; border-radius: 6px; background: rgba(185, 162, 255, 0.12); color: #ffd6ec; }
 .md blockquote { margin: 12px 0; padding: 4px 16px; border-left: 3px solid var(--pink); color: var(--muted); }
 .md a[href="#missing"] { color: var(--muted); border-bottom: 1px dashed var(--muted); pointer-events: none; text-decoration: none; }
+.md-fig {
+  margin: 18px 0; border-radius: var(--radius); overflow: hidden;
+  border: 1px solid rgba(185, 162, 255, 0.28); background: rgba(16, 11, 40, 0.82);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.38);
+}
+.md-fig-link { display: block; background: rgba(8, 6, 22, 0.7); line-height: 0; }
+.md-fig img { display: block; width: 100%; max-height: 520px; object-fit: contain; margin: 0 auto; }
+.md-fig-cap {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 14px; font-size: 13px; line-height: 1.4; color: var(--muted); border-top: 1px solid var(--line);
+}
+.md-fig-cap a { font-size: 12px; color: var(--mint) !important; white-space: nowrap; }
+.yt-card {
+  margin: 18px 0; border-radius: var(--radius); overflow: hidden;
+  border: 1px solid rgba(255, 143, 199, 0.34); background: rgba(16, 11, 40, 0.88);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+}
+.yt-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #070514; }
+.yt-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.yt-bar {
+  display: flex; align-items: center; gap: 10px; height: 42px;
+  padding: 0 14px; border-top: 1px solid var(--line); font-size: 13.5px; line-height: 1;
+}
+.yt-badge {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; flex: none;
+  background: rgba(255, 78, 106, 0.18); border: 1px solid rgba(255, 111, 145, 0.45);
+  color: #ffb3c6; font-size: 11.5px; font-weight: 700; line-height: 1; white-space: nowrap;
+}
+.yt-title { flex: 1; min-width: 0; color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
+.yt-links { display: inline-flex; align-items: center; gap: 12px; flex: none; margin-left: auto; font-size: 12.5px; line-height: 1; }
+.yt-links a { display: inline-flex; align-items: center; height: 22px; color: var(--mint) !important; white-space: nowrap; }
+@media (max-width: 640px) {
+  .yt-bar { flex-wrap: wrap; height: auto; padding: 9px 12px; }
+  .yt-title { flex-basis: calc(100% - 100px); }
+}
 
 .groups { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
 .groups h2 { display: flex; align-items: center; gap: 8px; font-size: 19px; margin: 0 0 6px; }

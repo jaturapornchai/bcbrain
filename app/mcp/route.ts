@@ -4,8 +4,10 @@ import { z } from "zod";
 import { RELATION_TYPES } from "@/lib/groups";
 import { emitMcpEvent, type McpEventHit, type McpToolName } from "@/lib/mcp-events";
 import {
+  collectRelatedMedia,
   connectedNeighbors,
   excerpt,
+  findMedia,
   getNote,
   listVaultRows,
   search,
@@ -14,6 +16,7 @@ import {
   updatedAt,
   vaultFolders,
   type Note,
+  type NoteMedia,
 } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
@@ -30,9 +33,9 @@ Choose the mode that matches the caller's role before answering:
     - First call read_note("playbook-call-center") for usage/support or read_note("playbook-sales") for pre-sale questions, and follow it.
     - ALWAYS pass audience: "user" to ask_brain, search_brain, traverse_brain, and list_notes.
     - For menu lookups or 4-digit menu codes (1001–9070 across 734 screens) or legacy dotted codes (e.g. 1.3.1, 4.13), check menu-catalog-overview and menu-cat-1-setup .. menu-cat-9-gl (or search the 4-digit/dotted code directly).
-    - Answer in plain, easy-to-understand Thai step by step without code, SQL, table names, or developer jargon. Always state BOTH the exact Thai menu breadcrumb path AND its 4-digit menu code (e.g. "เริ่มต้น > ตั้งค่าองค์กร พนักงาน และเอกสาร > กำหนดรายละเอียดบริษัท" (รหัสเมนู 1003)), exact button names, keyboard shortcuts (howto-screen-shortcuts-workbench), and on-screen messages.
+    - Answer in plain, easy-to-understand Thai step by step without code, SQL, table names, or developer jargon. Always state BOTH the exact Thai menu breadcrumb path AND its 4-digit menu code (e.g. "เริ่มต้น > ตั้งค่าองค์กร พนักงาน และเอกสาร > กำหนดรายละเอียดบริษัท" (รหัสเมนู 1003)), exact button names, keyboard shortcuts (howto-screen-shortcuts-workbench), on-screen messages, and ALWAYS share the ready-to-open screenshot URLs (https://bcaccount.com/...) and YouTube tutorial URLs (playlist PLO9P7tPZLXB0) provided in the response's Media & Reference Links section (or call find_media to look up screenshots and YouTube videos directly).
     - When a user cannot find a menu, check the 4 product editions (Starter, Standard, Professional, Enterprise), the Feature Switchboard (รหัสเมนู 1002), and user-group permissions (ts-menu-missing-switchboard, howto-admin-system-management).
-    - Never quote prices, packages, discounts, contracts, or support hours: hand off to the human sales team. For tax/legal interpretation, explain only what the system does and advise consulting the customer's auditor or the Revenue Department.
+    - For pricing, packages, accounting-firm partner program, support hours, or implementation services, cite only the verified official figures in sales-pricing-packages, sales-accounting-partner, and sales-support-implementation-contact (always noting prices exclude 7% VAT and external AI API costs, and never invent custom discounts or contract terms—direct formal quote requests to https://bcaccount.com/quotation or LINE @bcaccount / 089-922-3131). For tax/legal interpretation, explain only what the system does and advise consulting the customer's auditor or the Revenue Department.
 
 General rules: answer only from note content; if the notes do not cover it, say so honestly without guessing. Never ask for or expose passwords, tokens, or secrets. Slugs are internal references; do not show them to general users unless asked.`;
 
@@ -43,15 +46,66 @@ const audienceSchema = z
 
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 
+function formatNoteMediaLines(m?: NoteMedia): string[] {
+  if (!m) return [];
+  const lines: string[] = [];
+  if (m.videos.length) {
+    lines.push(
+      `youtube_videos: ${m.videos
+        .slice(0, 6)
+        .map((v) => `${v.title} -> ${v.url}${v.thumbnailUrl ? ` (thumbnail: ${v.thumbnailUrl})` : ""}`)
+        .join(" | ")}`,
+    );
+  }
+  if (m.images.length) {
+    lines.push(`images: ${m.images.slice(0, 6).map((img) => `${img.alt} -> ${img.url}`).join(" | ")}`);
+  }
+  if (m.webPages.length) {
+    lines.push(`web_pages: ${m.webPages.slice(0, 6).map((wp) => `${wp.title} -> ${wp.url}`).join(" | ")}`);
+  }
+  return lines;
+}
+
+function formatAggregatedMediaBlock(m: NoteMedia): string {
+  if (!m.videos.length && !m.images.length && !m.webPages.length) return "";
+  const sections: string[] = ["## Media & Reference Links (Ready-to-share URLs for end users)"];
+  if (m.videos.length) {
+    sections.push(
+      "### YouTube Tutorials (Playlist: https://www.youtube.com/playlist?list=PLO9P7tPZLXB0)\n" +
+        m.videos
+          .map(
+            (v) =>
+              `- 🎬 ${v.title}: ${v.url}${v.thumbnailUrl ? ` | thumbnail: ${v.thumbnailUrl}` : ""} | embed: ${v.embedUrl}`,
+          )
+          .join("\n"),
+    );
+  }
+  if (m.images.length) {
+    sections.push(
+      "### Official Screenshots (bcaccount.com)\n" +
+        m.images.map((img) => `- 🖼️ ${img.alt}: ${img.url}`).join("\n"),
+    );
+  }
+  if (m.webPages.length) {
+    sections.push(
+      "### Official Website Pages (bcaccount.com)\n" +
+        m.webPages.map((wp) => `- 🔗 ${wp.title}: ${wp.url}`).join("\n"),
+    );
+  }
+  return `\n\n---\n\n${sections.join("\n\n")}`;
+}
+
 function noteText(n: Note, body = n.body): string {
   const out = n.outEdges.map((e) => `[[${e.slug}]] (${e.rel})`).join(" ") || "-";
   const inn = n.inEdges.map((e) => `[[${e.slug}]] (${e.rel})`).join(" ") || "-";
+  const mediaLines = formatNoteMediaLines(n.media);
   return [
     `# ${n.title}`,
     `slug: ${n.slug} | folder: ${n.folder} | audience: ${n.audience} | tags: ${n.tags.join(", ")}`,
     "",
     body.trim(),
     "",
+    ...mediaLines,
     `links: ${out}`,
     `backlinks: ${inn}`,
   ].join("\n");
@@ -88,6 +142,20 @@ const READ_INPUT = {
 const LIST_INPUT = {
   folder: z.string().max(40).optional(),
   tag: z.string().max(40).optional(),
+  audience: audienceSchema,
+};
+
+const FIND_MEDIA_INPUT = {
+  query: z
+    .string()
+    .max(300)
+    .optional()
+    .describe("Optional Thai/English topic or 4-digit menu code (e.g. 'ใบสั่งซื้อ', '4013', 'ผังบัญชี'). Omit or pass '*' to list canonical media."),
+  kind: z
+    .enum(["all", "image", "youtube", "webpage"])
+    .optional()
+    .describe("Filter media type: 'youtube' (videos/playlists), 'image' (bcaccount.com screenshots), 'webpage' (bcaccount.com pages), or 'all' (default)."),
+  limit: z.number().int().min(1).max(40).optional(),
   audience: audienceSchema,
 };
 
@@ -148,6 +216,8 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
             .map((g) => `- [${g.rel}] ${g.slug} (${g.folder}) — ${g.title} (via ${g.via})`)
             .join("\n")}`
         : "";
+      const mediaCtx =
+        filter !== "dev" ? formatAggregatedMediaBlock(collectRelatedMedia(hits.map((h) => h.slug), filter, 5, 5, 5)) : "";
       emit(
         "ask_brain",
         filter,
@@ -156,7 +226,7 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
         hits.length,
         t0,
       );
-      return text(`Top ${hits.length} notes (audience=${filter}) for: ${question}\n\n${parts.join("\n\n---\n\n")}${ctxBlock}`);
+      return text(`Top ${hits.length} notes (audience=${filter}) for: ${question}\n\n${parts.join("\n\n---\n\n")}${mediaCtx}${ctxBlock}`);
     },
   );
 
@@ -305,6 +375,37 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
       );
       const rows = matched.map((n) => `${n.slug} | ${n.folder} | ${n.audience} | ${n.title} | ${n.tags.join(",")}`);
       return text(rows.join("\n") || "No notes match.");
+    },
+  );
+
+  server.registerTool(
+    "find_media",
+    {
+      title: "Find screenshots, YouTube videos & website links",
+      description:
+        "Retrieve ready-to-share official screenshot URLs (https://bcaccount.com/...), YouTube tutorial video/playlist URLs (playlist PLO9P7tPZLXB0 with thumbnailUrl and embedUrl), and website reference pages matching a topic or 4-digit menu code.",
+      inputSchema: FIND_MEDIA_INPUT,
+      annotations: ANNOTATIONS,
+    },
+    async ({ query, kind, limit, audience }) => {
+      const t0 = performance.now();
+      const filter = audience ?? "user";
+      const mediaKind = kind ?? "all";
+      const res = findMedia({ query, kind: mediaKind, limit: limit ?? 12, audience: filter });
+      const rawArg = [query?.trim() || "*", mediaKind !== "all" ? `kind=${mediaKind}` : ""].filter(Boolean).join(" ");
+      emit("find_media", filter, rawArg, res.matchedNotes.slice(0, 5), res.items.length, t0);
+      return text(
+        JSON.stringify(
+          {
+            playlistUrl: "https://www.youtube.com/playlist?list=PLO9P7tPZLXB0",
+            websiteUrl: "https://bcaccount.com",
+            count: res.items.length,
+            items: res.items,
+          },
+          null,
+          1,
+        ),
+      );
     },
   );
 

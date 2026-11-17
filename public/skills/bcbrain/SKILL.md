@@ -25,7 +25,7 @@ Skill สำหรับให้ AI เชื่อมต่อและดึ�
 ## 2. ลำดับการเชื่อมต่อ MCP (`https://brain.bcsmethai.com/mcp`)
 
 1. **ทางหลัก — เรียก MCP Tools ของ server `bcbrain` โดยตรง**
-   - Tools ที่มี: `ask_brain`, `search_brain`, `traverse_brain`, `read_note`, `list_notes` (ในบางเครื่องมืออาจขึ้นชื่อเป็น `mcp_bcbrain_<tool>`, `mcp__bcbrain__<tool>` หรือเรียกผ่าน `call_mcp_tool` ด้วย server `"bcbrain"`)
+   - Tools ที่มี (6 ตัว): `ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `read_note`, `list_notes` (ในบางเครื่องมืออาจขึ้นชื่อเป็น `mcp_bcbrain_<tool>`, `mcp__bcbrain__<tool>` หรือเรียกผ่าน `call_mcp_tool` ด้วย server `"bcbrain"`)
 2. **ทางสำรองทันที — Stateless HTTP JSON-RPC (เมื่อ session ปัจจุบันยังไม่ได้ผูก MCP `bcbrain`)**
    - Endpoint `https://brain.bcsmethai.com/mcp` เป็น Public Read-Only Stateless Streamable HTTP (ไม่ต้องใช้ API key) สามารถเรียกผ่าน Node.js one-liner ได้ทันที:
 
@@ -101,9 +101,13 @@ console.log(j.result?.content?.[0]?.text ?? JSON.stringify(j));
 4. ไล่สายสัมพันธ์หลายทอด / หาผลกระทบข้ามตาราง-เอกสาร → เรียก `traverse_brain({ slug, depth: 2, audience: "dev" })` หรือหาเส้นทางเชื่อมระหว่าง 2 เรื่องด้วย `traverse_brain({ slug, to_slug, audience: "dev" })` (กรอง `relation` เช่น `uses_table`, `writes_table`, `posts_rule`, `has_query` ได้)
 
 ### โหมดผู้ใช้ทั่วไป / Call Center / ฝ่ายขาย (`audience: "user"`)
-1. เปิดบทสนทนาครั้งแรก อ่าน `read_note({ slug: "playbook-call-center" })` (วิธีใช้/แก้ปัญหา/ผังคัดกรองอาการด่วน) หรือ `read_note({ slug: "playbook-sales" })` (จุดเด่นก่อนตัดสินใจซื้อ)
-2. ค้นหาชื่อเมนู รหัสเมนู 4 หลัก (`1001`–`9070` ครบ 734 หน้าจอ) หรือรหัสจุดเดิม (`1.3.1`, `4.13`) → เรียก `search_brain` / `ask_brain` ด้วยรหัสเมนูได้โดยตรง หรือดูสารบัญที่ `menu-catalog-overview` (`menu-cat-1-setup` ถึง `menu-cat-9-gl`), คีย์ลัดและเมนูคลิกขวาที่ `howto-screen-shortcuts-workbench`, และหน้าจัดการระบบที่ `howto-admin-system-management`
-3. ทุกครั้งที่เรียก `ask_brain`, `search_brain`, `traverse_brain`, `list_notes` **ต้องส่ง `audience: "user"` เสมอ**
+1. เปิดบทสนทนาครั้งแรก อ่าน `read_note({ slug: "playbook-call-center" })` (วิธีใช้/แก้ปัญหา/ผังคัดกรองอาการด่วน) หรือ `read_note({ slug: "playbook-sales" })` (จุดเด่น/ตารางราคา 4 รุ่น/โครงการสำนักงานบัญชี Partner)
+2. ค้นหาชื่อเมนู รหัสเมนู 4 หลัก (`1001`–`9070` ครบ 734 หน้าจอ) หรือรหัสจุดเดิม (`1.3.1`, `4.13`) → เรียก `search_brain` / `ask_brain` ด้วยรหัสเมนูได้โดยตรง หรือดูสารบัญที่ `menu-catalog-overview` (`menu-cat-1-setup` ถึง `menu-cat-9-gl`), คีย์ลัดและเมนูคลิกขวาที่ `howto-screen-shortcuts-workbench`, หน้าจัดการระบบที่ `howto-admin-system-management`, วิดีโอสอน YouTube (`PLO9P7tPZLXB0`) และรูปหน้าจอจริงที่ `video-visual-tutorials`, และแผนผังเว็บ/บทความทั้งหมดที่ `website-manual-and-blog-directory`
+3. การดึงลิงก์รูปภาพหน้าจอจริง (`https://bcaccount.com/...`) และคลิปวิดีโอสอน YouTube (`PLO9P7tPZLXB0` พร้อม `thumbnailUrl` / `embedUrl`):
+   - `ask_brain({ question, audience: "user" })` จะรวมส่วน `## Media & Reference Links` ไว้ท้ายคำตอบอัตโนมัติ (รวมจากโน้ตที่ค้นเจอและโน้ตในหัวข้อเดียวกันอีก 1 ทอด แม้ถามเรื่องย่อยก็ได้ลิงก์ภาพและคลิปครบ)
+   - `search_brain` คืนอาร์เรย์ `images` และ `videos` ในแต่ละผลลัพธ์ JSON และ `read_note` แสดงบรรทัด `youtube_videos:`, `images:`, `web_pages:`
+   - หากต้องการค้นหาเฉพาะสื่อเพื่อนำไปแสดงการ์ดรูปหรือส่งลิงก์คลิปให้ลูกค้าโดยตรง เรียก `find_media({ query, kind: "all" | "image" | "youtube" | "webpage", limit: 12, audience: "user" })`
+4. ทุกครั้งที่เรียก `ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `list_notes` **ต้องส่ง `audience: "user"` เสมอ**
    - โฟลเดอร์ฝั่ง user: `playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`
 
 ---
@@ -117,7 +121,7 @@ console.log(j.result?.content?.[0]?.text ?? JSON.stringify(j));
 - **ยึดซอร์สโค้ดจริงเมื่ออยู่หน้าโค้ด**: หากเปิด workspace ซอร์สโค้ด `BC Ai Account` ควบคู่กันอยู่ ให้ตรวจเทียบกับไฟล์จริงใน workspace และห้ามเดาชื่อคอลัมน์หรือ endpoint นอกเหนือจากที่ตรวจสอบพบ
 
 ### ฝั่ง User / Call Center / Sales (`audience: "user"`)
-- **ภาษาไทยเข้าใจง่าย ครบทั้งเส้นทางเมนูและรหัสเมนู 4 หลัก ไร้ศัพท์โค้ด**: ตอบเรียงเป็นขั้นตอน ระบุทั้งเส้นทางเมนูเต็มและรหัสเมนู 4 หลักเสมอ (เช่น `"เริ่มต้น > ตั้งค่าองค์กร พนักงาน และเอกสาร > กำหนดรายละเอียดบริษัท" (รหัสเมนู 1003)`), ชื่อปุ่มจริง คีย์ลัด และข้อความแจ้งเตือนตามโน้ตจริง ห้ามปนชื่อตาราง SQL ชื่อไฟล์ หรือศัพท์เทคนิค
+- **ภาษาไทยเข้าใจง่าย ครบทั้งเส้นทางเมนู รหัสเมนู 4 หลัก รูปหน้าจอ และคลิป YouTube**: ตอบเรียงเป็นขั้นตอน ระบุทั้งเส้นทางเมนูเต็มและรหัสเมนู 4 หลักเสมอ (เช่น `"เริ่มต้น > ตั้งค่าองค์กร พนักงาน และเอกสาร > กำหนดรายละเอียดบริษัท" (รหัสเมนู 1003)`), ชื่อปุ่มจริง คีย์ลัด ข้อความแจ้งเตือน และแนบลิงก์ภาพหน้าจอพร้อมเปิดดู (`https://bcaccount.com/...`) คู่กับคลิปสอน YouTube (`PLO9P7tPZLXB0`) จาก `Media & Reference Links` หรือ `find_media` เสมอเมื่อมีสื่อเกี่ยวข้อง ห้ามปนชื่อตาราง SQL ชื่อไฟล์ หรือศัพท์เทคนิค
 - **คัดกรองปัญหาหาเมนูไม่เจออย่างเป็นระบบ**: ตรวจสอบทั้ง 4 รุ่นผลิตภัณฑ์ (`Starter`, `Standard`, `Professional`, `Enterprise`), หน้าตั้งค่าเปิด-ปิดฟีเจอร์ตามประเภทธุรกิจ (`รหัสเมนู 1002`), และสิทธิ์กลุ่มผู้ใช้ (`ts-menu-missing-switchboard`)
-- **ไม่แต่งราคาและเวลาทำการ**: ราคา แพ็กเกจ ส่วนลด เงื่อนไขสัญญา และเวลาทำการทีมซัพพอร์ตไม่อยู่ในโน้ต ให้ส่งต่อฝ่ายขายหรือเจ้าหน้าที่ที่เป็นคน
-- **ไม่ตีความกฎหมายภาษีแทนผู้เชี่ยวชาญ**: คำถามตีความกฎหมายภาษีเฉพาะกรณี ให้อธิบายเฉพาะขั้นตอนการบันทึกในโปรแกรม และแนะนำตรวจยืนยันกับผู้สอบบัญชีหรือกรมสรรพากร
+- **ราคา แพ็กเกจ และเวลาทำการอ้างอิงตามตารางทางการเท่านั้น**: แจ้งราคาตามตาราง Concurrent Users ใน `sales-pricing-packages` (Starter ฟรี 0 บ./ด. ≤100 คน, Standard เริ่ม 199 บ./ด., Professional เริ่ม 499 บ./ด., Enterprise เริ่ม 999 บ./ด. · รายปีจ่าย 10 เดือน ฟรี 2 เดือน · โครงการสำนักงานบัญชี Partner ฟรี 0 บาท ใน `sales-accounting-partner` · **ยังไม่รวม VAT 7% และไม่รวมค่า AI ภายนอก**) และเวลาทำการจันทร์–ศุกร์ 08:30–17:00 น. (โทร `089-922-3131` / LINE `@bcaccount`) ห้ามแต่งส่วนลดพิเศษหรือเงื่อนไขสัญญาเอง ให้ส่งต่อหน้า `https://bcaccount.com/quotation` หรือฝ่ายขาย
+- **ไม่ตีความกฎหมายภาษีแทนผู้เชี่ยวชาญ**: คำถามตีความกฎหมายภาษีเฉพาะกรณี ให้อธิบายเฉพาะขั้นตอนการบันทึกในโปรแกรมและบทความอ้างอิง พร้อมแนะนำตรวจยืนยันกับผู้สอบบัญชีหรือกรมสรรพากร

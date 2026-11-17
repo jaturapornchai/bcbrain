@@ -12,7 +12,9 @@ const failOnDrift = args.includes("--fail-on-drift");
 const srcArg = args.find((a) => !a.startsWith("--"));
 const VAULT = path.join(process.cwd(), "vault");
 const SRC = srcArg ?? "D:/bcaiaccount";
+const WEB_SRC = process.env.BC_WEBSITE_SRC ?? "D:/bcaiwebsite-live";
 const hasSrc = fs.existsSync(SRC);
+const hasWebSrc = fs.existsSync(WEB_SRC);
 
 function walk(d) {
   if (!fs.existsSync(d)) return [];
@@ -136,8 +138,10 @@ for (const file of files) {
     const aliasList = Array.isArray(meta.aliases) ? meta.aliases.map(String) : [];
     const checkText = [...aliasList, ...body.split("\n")];
     checkText.forEach((ln, i) => {
+      // Strip external media/reference URLs before snake_case/jargon scan so asset filenames (e.g. portal_pos.webp) or YouTube IDs do not false-positive as SQL identifiers
+      const cleanedLn = ln.replace(/https?:\/\/[^\s)>\]"]+/g, "https://link");
       for (const [re, why] of JARGON) {
-        if (re.test(ln)) {
+        if (re.test(cleanedLn)) {
           const msg = `${rel}:${i < aliasList.length ? "alias" : i - aliasList.length + 1}: ${why}: ${ln.trim().slice(0, 90)}`;
           if (strictJargon) errors.push(msg);
           else warn.push(msg);
@@ -148,7 +152,7 @@ for (const file of files) {
 
   const sources = Array.isArray(meta.sources) ? meta.sources : [];
   if (!isPolicy && !sources.length) errors.push(`${rel}: empty sources`);
-  if (hasSrc) {
+  if (hasSrc || hasWebSrc) {
     const noteMtime = checkDrift ? fs.statSync(file).mtimeMs : 0;
     const staleSet = new Set();
     let maxLagHours = 0;
@@ -158,7 +162,10 @@ for (const file of files) {
         errors.push(`${rel}: invalid source format "${s}"`);
         continue;
       }
-      const f = path.join(SRC, m[1]);
+      const isWebSource = m[1].startsWith("bcaiwebsite-live/");
+      if (isWebSource && !hasWebSrc) continue;
+      if (!isWebSource && !hasSrc) continue;
+      const f = isWebSource ? path.join(WEB_SRC, m[1].slice("bcaiwebsite-live/".length)) : path.join(SRC, m[1]);
       if (!fs.existsSync(f)) {
         errors.push(`${rel}: source missing ${s}`);
         continue;

@@ -19,8 +19,10 @@ registerHooks({
 
 const { RELATION_TYPES } = await import("../lib/groups.ts");
 const {
+  collectRelatedMedia,
   excerpt,
   expandSynonyms,
+  findMedia,
   getNote,
   graph,
   groupedVaultNotes,
@@ -170,6 +172,15 @@ const CASES: [AudienceFilter, string, ...string[]][] = [
   ["user", "พิมพ์ใบกำกับภาษีไม่ออก วันที่เป็น ค.ศ. อยากเปลี่ยนเป็น พ.ศ.", "ts-print-form-date-format"],
   ["user", "ดึงบิลวางบิลไม่ขึ้น ดึงบิลรับชำระหนี้ไม่เจอ", "ts-arap-balance-recalc"],
 
+  // Website (www.bcaccount.com) pricing, partner, contact, tax calendar, AI chat & YouTube (PLO9P7tPZLXB0)
+  ["user", "วิดีโอสอนใช้งาน YouTube คลิปสอน EP.1 ถึง EP.8", "video-visual-tutorials"],
+  ["user", "ตารางราคา 4 รุ่น Concurrent Users Starter ฟรี 0 บาท", "sales-pricing-packages"],
+  ["user", "โครงการพาร์ตเนอร์สำนักงานบัญชี ใช้ฟรี 0 บาท แยก Server", "sales-accounting-partner"],
+  ["user", "เบอร์โทร LINE @bcaccount เวลาทำการ ซัพพอร์ต บริการวางระบบ", "sales-support-implementation-contact"],
+  ["user", "ระบบแชทบอทร้านค้า BC Ai Chat BCAiChatOA คูปอง Rich Menu", "sys-bc-ai-chat-oa"],
+  ["user", "ปฏิทินภาษี 2569 ซื้อซอฟต์แวร์หักรายจ่าย 2 เท่า ฉบับที่ 469", "howto-tax-calendar-and-sme-incentives"],
+  ["user", "แผนผังเว็บ bcaccount.com รวมบทความบัญชีภาษี", "website-manual-and-blog-directory"],
+
   ["dev", "query ยอดคงเหลือสินค้า แยกตามคลังสินค้า", "sql-ic-stock-balance"],
   ["dev", "sql สต็อกการ์ด ต้นทุนย้อนหลัง lot", "sql-ic-stock-card-cost"],
   ["dev", "sql อายุหนี้ AR aging ค้างชำระ", "sql-ar-aging-analysis"],
@@ -256,7 +267,7 @@ for (const q of ["ic_trans_detail gl_journal SELECT NUMERIC", "trans_flag Execut
 for (const q of ["ราคาเท่าไหร่ แพ็กเกจ จุดเด่น ขายปลีก", "เช็คเด้ง แก้ไขบิล ยกเลิก"]) {
   assert.ok(search(q, 20, "dev").every((h) => h.audience !== "user"), `DIM3 search(dev) leak for "${q}"`);
 }
-console.log(`[DIM 3] Exhaustive 313-Note Isolation Audit OK (${isoChecks} traversal audits, 0 leaks)`);
+console.log(`[DIM 3] Exhaustive ${allNotes.length}-Note Isolation Audit OK (${isoChecks} traversal audits, 0 leaks)`);
 
 // ============================================================
 // 4. Graph Integrity, Precomputed 3D Coordinates & Full Render Safety
@@ -290,6 +301,11 @@ for (const n of allNotes) {
   if (html.includes('href="#missing"')) missingLinkNotes++;
 }
 assert.equal(missingLinkNotes, 0, "DIM4 zero broken wikilinks across all notes");
+const allYt = findMedia({ query: "*", kind: "youtube", audience: "user", limit: 40 });
+const allImg = findMedia({ query: "*", kind: "image", audience: "user", limit: 40 });
+assert.ok(allYt.items.length >= 15 && allYt.items.every((v) => v.url.startsWith("https://www.youtube.com/")), "DIM4 YouTube catalog populated & canonical");
+assert.ok(allImg.items.length >= 25 && allImg.items.every((i) => i.url.startsWith("https://bcaccount.com/") || i.url.startsWith("https://qr-official.line.me/")), "DIM4 screenshot catalog populated & canonical");
+assert.equal(collectRelatedMedia(["sql-ic-stock-balance"], "dev").videos.length, 0, "DIM4 dev notes stay clean without user marketing media");
 
 for (const f of ["all", "user", "dev"] as AudienceFilter[]) {
   const grp = groupedVaultNotes(f);

@@ -1,0 +1,79 @@
+---
+title: "คลังวิดีโอสอนใช้งาน YouTube (เพลย์ลิสต์ BC Ai Account) และภาพหน้าจอจริงครบทุกขั้นตอน"
+tags: ["เริ่มต้นใช้งาน", "วิดีโอสอนใช้งาน", "youtube", "ภาพหน้าจอ", "call-center"]
+aliases:
+  - "วิดีโอสอนใช้งาน BC Ai Account"
+  - "คลิปสอนใช้งาน YouTube"
+  - "เพลย์ลิสต์สอนบัญชี"
+  - "คู่มือวิดีโอ EP.1 ถึง EP.8"
+  - "ดูคลิปสอนโปรแกรมบัญชี"
+  - "ภาพหน้าจอตัวอย่างโปรแกรม"
+sources:
+  - bcaiwebsite-live/manual/index.html:1-179
+  - bcaiwebsite-live/manual/getting-started.html:1-153
+  - bcaiwebsite-live/manual/main-menu.html:1-170
+  - bcaiwebsite-live/products/company-brain.html:1-200
+---
+
+# คลังวิดีโอสอนใช้งาน YouTube และคู่มือภาพหน้าจอจริง
+
+รวบรวมวิดีโอสอนใช้งานจริงจากช่องทางการ [YouTube บ้านเชียงซอฟท์ (@banchiangsoft)](https://www.youtube.com/@banchiangsoft) และเพลย์ลิสต์หลัก **[BC Ai Account](https://www.youtube.com/playlist?list=PLO9P7tPZLXB0)** คู่กับภาพหน้าจอจริงจากเว็บไซต์ [www.bcaccount.com](https://bcaccount.com/manual/) เพื่อให้ผู้ใช้งานใหม่และเจ้าหน้าที่ Call Center ส่งลิงก์คลิปพร้อมรหัสเมนูให้ลูกค้าดูทำตามได้ทันที
+
+[🎬 แนะนำ สมองของกิจการ ผู้ช่วย AI วิเคราะห์บัญชีแบบเรียลไทม์ ถามภาษาคน ตัวเลขตรงฐานข้อมูลจริง 100%](https://www.youtube.com/watch?v=_DattZyKqDA&list=PLO9P7tPZLXB0)
+
+![ภาพรวมเมนูหลักและแดชบอร์ดของระบบ BC Ai Account](https://bcaccount.com/manual/images/04-main-menu-dashboard.png)
+
+---
+
+## 1. เพลย์ลิสต์หลักสอนใช้งานครบวงจร 11 ตอน (Playlist: BC Ai Account)
+
+สามารถเปิดรับชมต่อเนื่องครบทั้งเพลย์ลิสต์ได้ที่ [เพลย์ลิสต์ YouTube: BC Ai Account](https://www.youtube.com/watch?v=_DattZyKqDA&list=PLO9P7tPZLXB0) หรือเลือกตอนที่ตรงกับงานที่กำลังทำอยู่:
+
+| ลำดับ | ชื่อตอนและเนื้อหาสำคัญ | รหัสเมนูที่สอนในคลิป | ความยาว | ลิงก์รับชมและคู่มือคู่กัน |
+|---|---|---|---|---|
+| **ไฮไลต์** | **แนะนำ "สมองของกิจการ" ผู้ช่วย AI วิเคราะห์บัญชีแบบเรียลไทม์** — ถามยอดขาย ภาษี ภ.พ.30 ค้นคู่ค้าจากเบอร์โทร เจาะลึกเปิดเอกสารจริง | สมององค์กร / **1001** | 06:55 | [ดูคลิป YouTube](https://www.youtube.com/watch?v=_DattZyKqDA&list=PLO9P7tPZLXB0) · [[sys-companybrain-briefing]] |
+| **ภาพรวม** | **ทำความรู้จัก BC Ai Account ระบบบัญชี ภาษี และคลังสินค้าบนเว็บ** — โครงสร้าง 9 หมวด สินค้าหลายหน่วยนับ เปิดบิลขายลงบัญชีอัตโนมัติ | **2001**, **4013** | 07:43 | [ดูคลิป YouTube](https://www.youtube.com/watch?v=i2ROtoH9O_4&list=PLO9P7tPZLXB0) · [[sales-overview]] |
+| **EP.1** | **ตั้งค่าเริ่มต้น ข้อมูลหลัก 7 ขั้นตอน จนเปิดบิลซื้อ-ขายใบแรก** — ล็อกอิน เลือกบริษัท ตั้งค่าบริษัท ผังบัญชี งวดบัญชี รูปแบบเอกสาร | **1003**, **1004**, **9001**, **1083**, **1014** | 10:20 | [ดูคลิป YouTube](https://www.youtube.com/watch?v=URFIztnbDUA&list=PLO9P7tPZLXB0) · [[start-first-day]] |
+| **EP.2** | **สอนบันทึกยอดยกมาต้นงวด** — สมุดเงินฝาก ยอดยกมาสต็อก ตั้งหนี้ยกมาเจ้าหนี้-ลูกหนี้ และเงินสด/เงินฝากยกมา | **2033**, **5007**, **6013**, **7001**, **7013** | 03:31 | [ดูคลิป YouTube](https://www.youtube.com/watch?v=gCK9OFeJFFc&list=PLO9P7tPZLXB0) · [[howto-stock-beginning-balance]] |
+| **EP.3** | **สอนใช้งานวงจรจัดซื้อเต็มระบบ** — ใบสั่งซื้อ จ่ายมัดจำ ดึงใบสั่งซื้อมารับของเข้าคลัง/ตั้งหนี้ และส่งคืนลดหนี้ | **3003**, **3009**, **3011**, **3012** | 03:21 | [ดูคลิป YouTube](https://www.youtube.com/watch?v=74csOGLdjJk&list=PLO9P7tPZLXB0) · [[howto-buy-overview]] |
+| **EP.4** | **ขายเต็มรูปแบบ BC Ai Account** — ใบเสนอราคา ใบสั่งขาย รับเงินมัดจำ เปิดบิลขายตัดสต็อกคิดภาษีอัตโนมัติ รับคืนลดหนี้ และดูกำไร | **4001**, **4005**, **4011**, **4013**, **4014** | 03:23 | [ดูคลิป YouTube](https://www.youtube.com/watch?v=4b7hW0pxf9Y&list=PLO9P7tPZLXB0) · [[howto-sale-overview]] |
+| **EP.5** | **บริหารลูกหนี้-เจ้าหนี้ครบวงจร** — รวมบิลวางบิล ออกใบเสร็จรับชำระหนี้ รับวางบิล จ่ายชำระหนี้หัก ณ ที่จ่าย และเช็กอายุหนี้ | **6021**, **6023**, **5014**, **5016** | 03:01 | [ดูคลิป YouTube](https://www.youtube.com/watch?v=iAFL_lK_BLg&list=PLO9P7tPZLXB0) · [[howto-ar-overview]] |
+| **EP.6** | **จัดการเงินสด ธนาคาร และทะเบียนเช็ค** — ค่าใช้จ่ายอื่น รายได้อื่น ฝาก-ถอน-โอนธนาคาร เช็ครับผ่าน/เช็คจ่ายผ่าน และดูยอดเงินฝาก | **7006**, **7009**, **7014**, **7015**, **7023**–**7025** | 03:36 | [ดูคลิป YouTube](https://www.youtube.com/watch?v=pfQZvN0lFFA&list=PLO9P7tPZLXB0) · [[howto-cash-bank-overview]] |
+| **EP.7** | **โอนคลัง เบิกใช้ ตรวจนับสต็อก เช็กยอดสด และดูแลระบบ** — โอนสินค้าระหว่างคลัง เบิกใช้ ตรวจนับปรับปรุงยอด เช็กสต็อกสด และสำรองข้อมูล | **2037**, **2040**, **2044**, **2046**, **1008** | 03:56 | [ดูคลิป YouTube](https://www.youtube.com/watch?v=oQecsSdSEi8&list=PLO9P7tPZLXB0) · [[howto-stock-overview]] |
+| **EP.8** | **รายงานภาษีรายเดือน สมุดรายวัน และออกงบการเงินครบวงจร** — ภ.พ.30 ภ.ง.ด.3/53 สมุดรายวัน ประมวลผลบัญชี งบทดลอง งบกำไรขาดทุน งบดุล | **9004**, **9012**, **9032**–**9049** | 03:44 | [ดูคลิป YouTube](https://www.youtube.com/watch?v=awlLvfPdwr4&list=PLO9P7tPZLXB0) · [[howto-gl-overview]] |
+| **AI CEO** | **BC Bot คืออะไร เอาไปใช้ทำอะไร** — พาดูสมองกลบริหารร้านและทีมพนักงานดิจิทัลเชื่อมข้อมูลบัญชีแบบอ่านอย่างเดียว | ระบบเสริม AI | 08:25 | [ดูคลิป YouTube](https://www.youtube.com/watch?v=wFD6j2wFWi0&list=PLO9P7tPZLXB0) · [[sys-ai-copilot]] |
+
+---
+
+## 2. วิดีโอเจาะลึกเฉพาะหน้าจอและกลุ่มธุรกิจเพิ่มเติม
+
+- **เริ่มต้นตั้งแต่ศูนย์สำหรับธุรกิจซื้อมาขายไป (12:29 นาที)** — พาเข้าสู่ระบบด้วยบัญชี Google สร้างบริษัทใหม่ และไล่ตั้งค่าครบ 8 ขั้นตอน: [ดูคลิป YouTube](https://www.youtube.com/watch?v=2q5ELxIXzuE)
+- **สอนใช้เมนู 2001 ข้อมูลสินค้าอย่างละเอียด (11:27 นาที)** — เพิ่มสินค้าตัวแรก สินค้าหลายหน่วยนับ (ซอง/ลัง) บาร์โค้ด ราคา คลัง และการค้นหา: [ดูคลิป YouTube](https://www.youtube.com/watch?v=Dz-f4G1O1M4) · คู่มือ [[howto-stock-item-master]]
+- **สอนใช้งานผังบัญชี รหัสเมนู 9001 ทีละขั้นตอน (06:49 นาที)** — โครงสร้าง 5 หมวด บัญชีคุม-บัญชีย่อย เพิ่ม/แก้ไข/ปิดใช้งานบัญชี และพิมพ์ผังบัญชี: [ดูคลิป YouTube](https://www.youtube.com/watch?v=7-3eHM21aOU) · คู่มือ [[howto-gl-chart-of-accounts]]
+- **แนวทางใช้งานสำหรับสำนักงานบัญชี ดูแลลูกค้าหลายสิบถึงหลายร้อยบริษัท (19:30 นาที)** — แยกฐานข้อมูลรายนิติบุคคล ตั้งต้นบริษัทใหม่ กำหนดสิทธิ์พนักงาน และรอบงานภาษีรายเดือน: [ดูคลิป YouTube](https://www.youtube.com/watch?v=EOTH8QO4rPE) · คู่มือ [[sales-accounting-partner]]
+- **ระบบแชทและผู้ช่วย AI ประจำร้าน BC Ai Chat (สาธิตใช้งานสดหลายเครื่องพร้อมกัน)**: [ดูคลิป YouTube](https://www.youtube.com/watch?v=8fHjQbyqWyI) และ [คลิปสอน BC Super App แบบละเอียด](https://www.youtube.com/watch?v=9d9FI3HUNc0) · คู่มือ [[sys-bc-ai-chat-oa]]
+
+---
+
+## 3. แกลเลอรีภาพหน้าจอจริงประกอบคู่มือบน www.bcaccount.com
+
+สามารถเปิดอ่านคู่มือภาพประกอบทีละหน้าบนเว็บไซต์หลักได้ที่ [คู่มือออนไลน์ www.bcaccount.com/manual](https://bcaccount.com/manual/):
+
+1. **หน้าเข้าสู่ระบบและเลือกกลุ่มกิจการ/บริษัท** ([อ่านคู่มือเข้าสู่ระบบ](https://bcaccount.com/manual/getting-started) · [การเลือกบริษัท](https://bcaccount.com/manual/select-company))
+
+![หน้าเข้าสู่ระบบ BC Ai Account รองรับรหัสผ่านและบัญชี Google](https://bcaccount.com/manual/images/01-login.png)
+
+![หน้าเลือกบริษัทและฐานข้อมูลกิจการใน BC Ai Account](https://bcaccount.com/manual/images/03-company-selection.png)
+
+2. **หน้าจอใบสั่งซื้อ ขายสินค้า จ่ายชำระเจ้าหนี้ และรับชำระลูกหนี้** ([ใบสั่งซื้อ](https://bcaccount.com/manual/purchase-order) · [ขายสินค้า](https://bcaccount.com/manual/sales) · [จ่ายชำระเจ้าหนี้](https://bcaccount.com/manual/payables) · [รับชำระลูกหนี้](https://bcaccount.com/manual/receivables))
+
+![ฟอร์มสร้างใบสั่งซื้อสินค้าใหม่ใน BC Ai Account](https://bcaccount.com/manual/images/06-purchase-order-new-form.png)
+
+![หน้ารายการบันทึกขายสินค้าและบริการใน BC Ai Account](https://bcaccount.com/manual/images/07-sales-list.png)
+
+---
+
+## ดูเพิ่มเติม
+- [[menu-catalog-overview]] — สารบัญรหัสเมนู 4 หลักทั้งหมด (**1001**–**9070**)
+- [[website-manual-and-blog-directory]] — แผนที่รวมทุกหน้าผลิตภัณฑ์ โซลูชัน และบทความบัญชี-ภาษีบน www.bcaccount.com
+- [[start-first-day]] — เช็กลิสต์ตั้งค่า 7 ขั้นตอนวันแรก

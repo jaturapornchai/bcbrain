@@ -21,7 +21,7 @@ registerHooks({
 });
 
 const { GROUPS, RELATION_TYPES, groupOf, inferRelation, matchesAudience } = await import("../lib/groups.ts");
-const { connectedNeighbors, excerpt, expandSynonyms, getNote, graph, renderNote, search, terms, traverseGraph, vault } = await import("../lib/vault.ts");
+const { collectRelatedMedia, connectedNeighbors, excerpt, expandSynonyms, extractNoteMedia, findMedia, getNote, graph, parseYouTubeUrl, renderNote, resolveBcImageUrl, search, terms, traverseGraph, vault } = await import("../lib/vault.ts");
 type NoteType = import("../lib/vault.ts").Note;
 
 // 1. Groups & Audience contract
@@ -82,6 +82,24 @@ const pragma = renderNote({
   body: "menu `1.11.1.6` <!-- pragma: allowlist secret -->\n\n| a | b |\n|---|---|\n| 1 | 7.10.1.1 | <!-- pragma: allowlist secret -->\n\n<!-- x --><script>alert(1)</script>", // pragma: allowlist secret
 });
 assert.ok(!pragma.includes("pragma") && !pragma.includes("<script"), "HTML comments dropped, other raw HTML still escaped");
+
+// Media connectors: www.bcaccount.com image normalization + whitelist & YouTube embed card
+assert.equal(
+  resolveBcImageUrl("https://www.bcaccount.com/manual/images/04-main-menu-dashboard.png"),
+  "https://bcaccount.com/manual/images/04-main-menu-dashboard.png",
+  "www.bcaccount.com normalizes to apex bcaccount.com for 200 OK image delivery",
+);
+assert.equal(resolveBcImageUrl("https://evil.example.com/track.png"), null, "untrusted external image host blocked");
+const ytParsed = parseYouTubeUrl("https://www.youtube.com/watch?v=_DattZyKqDA&list=PLO9P7tPZLXB0");
+assert.equal(ytParsed?.videoId, "_DattZyKqDA");
+assert.equal(ytParsed?.listId, "PLO9P7tPZLXB0");
+const mediaHtml = renderNote({
+  ...synthetic,
+  body: "![หน้าจอหลัก](https://www.bcaccount.com/manual/images/04-main-menu-dashboard.png)\n\n![บล็อก](https://evil.example.com/x.png)\n\n[🎬 แนะนำสมองของกิจการ](https://www.youtube.com/watch?v=_DattZyKqDA&list=PLO9P7tPZLXB0)\n",
+});
+assert.ok(mediaHtml.includes('class="md-fig"') && mediaHtml.includes('src="https://bcaccount.com/manual/images/04-main-menu-dashboard.png"'), "bcaccount image renders figure");
+assert.ok(!mediaHtml.includes("evil.example.com"), "untrusted image never rendered");
+assert.ok(mediaHtml.includes('class="yt-card"') && mediaHtml.includes("https://www.youtube-nocookie.com/embed/_DattZyKqDA?list=PLO9P7tPZLXB0&amp;rel=0"), "YouTube link renders privacy-enhanced embed card");
 
 // 4. Secret scanner (including bcrypt & argon2)
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "scan-"));
@@ -179,9 +197,12 @@ for (const slug of [
   "playbook-call-center",
   "playbook-sales",
   "menu-catalog-overview",
+  "video-visual-tutorials",
+  "website-manual-and-blog-directory",
   "start-first-day",
   "howto-screen-shortcuts-workbench",
   "howto-admin-system-management",
+  "howto-tax-calendar-and-sme-incentives",
   "howto-sale-overview",
   "howto-tax-overview",
   "howto-doc-edit-cancel-delete",
@@ -190,6 +211,10 @@ for (const slug of [
   "ts-common-no-permission",
   "ts-common-period-closed",
   "sales-overview",
+  "sales-pricing-packages",
+  "sales-accounting-partner",
+  "sales-support-implementation-contact",
+  "sys-bc-ai-chat-oa",
   "playbook-dev",
   "dev-rules-accounting-sql",
   "dev-integration-quickstart",
@@ -312,5 +337,27 @@ assert.equal(travIso.neighbors.length, 0, "traverseGraph(user) returns zero neig
 
 const nbCtx = connectedNeighbors(["sql-ic-stock-balance"], "dev", 6);
 assert.ok(nbCtx.length > 0 && nbCtx.every((s) => s.audience !== "user" && s.slug !== "index"), "connectedNeighbors respects dev isolation");
+
+// 9. MCP Media extraction, 1-hop related media fallback, and findMedia()
+const parsedMedia = extractNoteMedia(
+  "![ภาพหน้าขาย](https://www.bcaccount.com/manual/images/23-sales-invoice.png)\n[🎬 สอนขายสินค้า](https://www.youtube.com/watch?v=4b7hW0pxf9Y&list=PLO9P7tPZLXB0)\n[คู่มือขาย](https://www.bcaccount.com/manual/sales)",
+  "ทดสอบสื่อ",
+);
+assert.equal(parsedMedia.images[0]?.url, "https://bcaccount.com/manual/images/23-sales-invoice.png");
+assert.equal(parsedMedia.videos[0]?.videoId, "4b7hW0pxf9Y");
+assert.equal(parsedMedia.videos[0]?.thumbnailUrl, "https://i.ytimg.com/vi/4b7hW0pxf9Y/hqdefault.jpg");
+assert.equal(parsedMedia.webPages[0]?.url, "https://bcaccount.com/manual/sales");
+
+// Sub-note without direct media (howto-sale-quotation) pulls Sales screenshot & EP.4 YouTube tutorial via 1-hop neighbor (howto-sale-overview)
+const hopMedia = collectRelatedMedia(["howto-sale-quotation"], "user");
+assert.ok(hopMedia.images.some((i) => i.url.startsWith("https://bcaccount.com/")), "1-hop media fallback surfaces bcaccount.com screenshot");
+assert.ok(hopMedia.videos.some((v) => v.url.includes("youtube.com/watch")), "1-hop media fallback surfaces YouTube tutorial");
+
+const poMedia = findMedia({ query: "ใบสั่งซื้อ", kind: "all", audience: "user", limit: 15 });
+assert.ok(poMedia.items.some((x) => x.kind === "youtube" && x.videoId === "74csOGLdjJk"), "findMedia('ใบสั่งซื้อ') returns EP.3 Purchase YouTube");
+assert.ok(poMedia.items.some((x) => x.kind === "image" && x.url.startsWith("https://bcaccount.com/")), "findMedia('ใบสั่งซื้อ') returns screenshot");
+
+const vidHits = search("วิดีโอสอนใช้งาน YouTube", 5, "user");
+assert.ok((vidHits[0]?.videos?.length ?? 0) > 0 && (vidHits[0]?.images?.length ?? 0) > 0, "search() attaches images & videos arrays to SearchHit");
 
 console.log("selftest ok");

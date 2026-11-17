@@ -997,7 +997,13 @@ export default function Brain3D({ nodes, links, rels, children }: Props) {
                   <div className="mcp-out">
                     <span className="mcp-arrow">↳</span>
                     <span className="mcp-found">
-                      {ev.totalHits > 0 ? `พบ ${ev.totalHits} โน้ต` : "ไม่พบโน้ตที่ตรง"}
+                      {ev.tool === "find_media"
+                        ? ev.totalHits > 0
+                          ? `พบ ${ev.totalHits} สื่อ`
+                          : "ไม่พบสื่อที่ตรง"
+                        : ev.totalHits > 0
+                          ? `พบ ${ev.totalHits} โน้ต`
+                          : "ไม่พบโน้ตที่ตรง"}
                     </span>
                     {ev.hits.map((h) => {
                       const idx = slugIndex.get(h.slug);

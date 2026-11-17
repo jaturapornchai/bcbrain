@@ -4,10 +4,11 @@ import { graph, updatedAt } from "@/lib/vault";
 const MCP_URL = "https://brain.bcsmethai.com/mcp";
 const SKILL_URL = "https://brain.bcsmethai.com/skills/bcbrain/SKILL.md";
 const TOOLS = [
-  ["ask_brain", "ถามเป็นภาษาคนหรือคำถาม Dev (กรอง audience: user/dev/all) ได้โน้ตที่เกี่ยวข้องเต็มๆ พร้อมบริบทกราฟ 1 ทอด"],
-  ["search_brain", "ค้นคำ (ตัดคำไทย + คำพ้องไทย-SQL + ชื่อตาราง SQL พร้อม BM25 + 1-hop graph boost)"],
+  ["ask_brain", "ถามเป็นภาษาคนหรือคำถาม Dev (กรอง audience: user/dev/all) ได้โน้ตเต็มๆ พร้อมลิงก์รูปภาพ & YouTube อัตโนมัติ และบริบทกราฟ 1 ทอด"],
+  ["search_brain", "ค้นคำ (ตัดคำไทย + คำพ้องไทย-SQL + รหัสเมนู 4 หลัก + BM25) พร้อมแนบอาร์เรย์ images และ videos ในผลลัพธ์"],
+  ["find_media", "ดึงลิงก์รูปภาพหน้าจอจริง (bcaccount.com), คลิปสอน YouTube (PLO9P7tPZLXB0 พร้อม thumbnail/embed) และหน้าเว็บอ้างอิงพร้อมแชร์"],
   ["traverse_brain", "ไล่สายสัมพันธ์หลายทอด 1–3 hops (uses_table, writes_table, posts_rule) หรือหาเส้นทางสั้นสุดระหว่าง 2 โน้ต"],
-  ["read_note", "อ่านโน้ตเต็มตาม slug พร้อมกลุ่ม โซน audience และลิงก์ระบุชนิดความสัมพันธ์ไป-กลับ"],
+  ["read_note", "อ่านโน้ตเต็มตาม slug พร้อมกลุ่ม โซน audience ลิงก์สื่อ (youtube_videos / images / web_pages) และลิงก์ไป-กลับ"],
   ["list_notes", "สารบัญโน้ตทั้งหมด กรองตาม folder, tag หรือ audience ('all' | 'user' | 'dev') ได้"],
 ];
 
@@ -53,6 +54,7 @@ export default function Home() {
             <pre>{`read_note({ slug: "playbook-call-center" })
 // หรือ read_note({ slug: "playbook-sales" })
 ask_brain({ question: "เช็คเด้งทำยังไง", audience: "user" })
+find_media({ query: "ใบสั่งซื้อ", kind: "all", audience: "user" })
 search_brain({ query: "ภพ30 ภาษีซื้อขาย", audience: "user" })
 traverse_brain({ slug: "howto-cheque-received", depth: 2, audience: "user" })`}</pre>
           </div>
@@ -96,6 +98,15 @@ url = "${MCP_URL}"`}</pre>
         <div className="actions">
           <a className="btn" href="/skills/bcbrain/SKILL.md">
             ดาวน์โหลด SKILL.md (/bcbrain)
+          </a>
+          <a className="btn" href="/n/video-visual-tutorials?mode=user">
+            คลังวิดีโอ YouTube &amp; ภาพหน้าจอ
+          </a>
+          <a className="btn" href="https://bcaccount.com" target="_blank" rel="noopener noreferrer">
+            เว็บไซต์หลัก bcaccount.com ↗
+          </a>
+          <a className="btn" href="https://www.youtube.com/watch?v=_DattZyKqDA&list=PLO9P7tPZLXB0" target="_blank" rel="noopener noreferrer">
+            เพลย์ลิสต์ YouTube สอนใช้งาน ↗
           </a>
         </div>
         <div className="mcp-modes">
