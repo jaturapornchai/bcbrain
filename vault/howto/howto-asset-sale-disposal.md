@@ -10,10 +10,10 @@ aliases:
   - ตัดจำหน่ายสินทรัพย์
   - กำไรขาดทุนจากการขายสินทรัพย์
 sources:
-  - frontend/account/transaction/AssetSaleScreen.tsx:86
-  - frontend/account/transaction/AssetSaleScreen.tsx:337
-  - frontend/account/transaction/AssetSaleScreen.tsx:514
-  - frontend/account/transaction/AssetSaleScreen.tsx:796
+  - frontend/account/transaction/AssetSaleScreen.tsx:115-138
+  - frontend/account/transaction/AssetSaleScreen.tsx:308-389
+  - frontend/account/transaction/AssetSaleScreen.tsx:518-658
+  - frontend/account/transaction/AssetSaleScreen.tsx:890-993
   - backend/internal/application/process/fa_sale.go:160
   - backend/internal/application/process/fa_sale.go:292
   - backend/internal/application/process/fa_sale.go:385
@@ -35,7 +35,7 @@ sources:
 
 ## ขั้นตอนบันทึกขายสินทรัพย์
 
-1. เมื่อเปิดหน้าจอ **บันทึกการขายสินทรัพย์** (หากมีสิทธิ์เพิ่มข้อมูล) ระบบจะเข้าสู่โหมดเพิ่มเอกสารใหม่และสร้างเลขที่เอกสารให้อัตโนมัติพร้อมกรอกทันที (หรือกด **เพิ่มใหม่** / ระบุเลขที่เอกสารเองได้)
+1. เมื่อเปิดหน้าจอ **บันทึกการขายสินทรัพย์** (หากมีสิทธิ์เพิ่มข้อมูล) ระบบจะเข้าสู่โหมดเพิ่มเอกสารใหม่และสร้างเลขที่เอกสารให้อัตโนมัติพร้อมกรอกทันที (หรือกด **เพิ่มใหม่** / ระบุเลขที่เอกสารเองได้ และเมื่อเปลี่ยน **วันที่เอกสาร**, **รูปแบบเอกสาร** หรือ **สาขา** กรณีรูปแบบเอกสารแยกรันเลขตามสาขา ระบบจะอัปเดตเลขที่เอกสารให้อัตโนมัติ)
 2. กรอกข้อมูลหัวเอกสาร:
    - **วันที่เอกสาร**, **สมุดรายวัน**, **ประเภทการขาย** (ขายเงินเชื่อ / ขายเงินสด) และรหัส **ลูกหนี้** — เมื่อเลือกลูกหนี้ ระบบจะดึงค่าเริ่มต้นของลูกหนี้มาเติมให้ทันที ทั้งประเภทการขาย ประเภทภาษี อัตราภาษี จำนวนวันเครดิต และวันครบกำหนด
    - **ประเภทภาษี** (ภาษีแยกนอก / ภาษีรวมใน / ภาษีอัตราศูนย์ / ไม่กระทบภาษี) และเลขที่ใบกำกับภาษี (ถ้าว่าง ระบบใช้เลขที่เอกสาร)
