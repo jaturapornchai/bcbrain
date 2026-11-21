@@ -12,7 +12,7 @@ aliases:
 sources:
   - frontend/src/config/schemas/masterDetailSchemas.ts:532
   - frontend/account/process/SystemProcessWorkbenchScreen.tsx:598
-  - frontend/account/transaction/AssetSaleScreen.tsx:75
+  - frontend/account/transaction/AssetSaleScreen.tsx:86
   - frontend/account/master/HirePurchaseLeasingScreen.tsx:128
   - backend/internal/application/process/fa_depreciation.go:534
   - backend/internal/application/process/fa_sale.go:160
