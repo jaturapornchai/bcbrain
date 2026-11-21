@@ -9,8 +9,9 @@ sources:
   - backend/internal/application/process/transcalc.go:56-68
   - backend/internal/application/process/trans_validate.go:21-40
   - backend/internal/application/process/trans_save_rules.go:21-48
-  - backend/internal/application/process/gl_template.go:352-360
-  - backend/internal/application/process/gl_template_defaults.go:148-163
+  - backend/internal/application/process/gl_template.go:265-295
+  - backend/internal/application/process/gl_template_defaults.go:148-210
+  - backend/internal/application/process/runtime_options.go:1-130
   - backend/internal/application/process/stock_rebuild.go:110-115
 ---
 
@@ -46,12 +47,12 @@ sources:
 |---|---|---|
 | `vat_type`, `vat_type_1` | `integer` / `varchar` | ประเภท VAT เริ่มต้นฝั่งขาย / ซื้อ (`0 = แยกนอก`, `1 = รวมใน`, `2/3 = ยกเว้น/ไม่กระทบภาษี`) |
 | `vat_rate`, `wht_rate` | `numeric` | อัตรา VAT (เช่น `7`) และ WHT มาตรฐาน |
-| `discout_type` *(สะกดตาม DDL จริง)* | `smallint` / `varchar` | ลำดับคำนวณ VAT กับส่วนลดท้ายบิล: `0 = VAT ก่อนหักส่วนลด`, `1 = VAT หลังหักส่วนลด` |
+| `discout_type` *(สะกดตาม DDL จริง, DEFAULT `1`)* | `smallint` / `varchar` | ลำดับคำนวณ VAT กับส่วนลดท้ายบิล: `0 = VAT ก่อนหักส่วนลด`, `1 = VAT หลังหักส่วนลด` (Default `1`) |
 | `discount_vat_type` | `smallint` / `varchar` | การหักส่วนลดท้ายบิลระหว่างสินค้ามีภาษีกับยกเว้น: `0 = หักสินค้ามีภาษีก่อน`, `1 = เฉลี่ยตามสัดส่วน` (`2` อ่านเป็น `0`) |
 | `discount_step_round_off`, `calc_item_price_discount`, `manual_total` | `smallint` | ปิดการปัดเศษส่วนลดหลายขั้น, ปัดเศษส่วนลดรายบรรทัดตอนคำนวณ Line VAT, อนุญาตกรอกยอดรวมเอง |
 | `check_input_vat` | `smallint` | บังคับกรอก `tax_doc_no` และ `tax_doc_date` สำหรับเอกสารซื้อ/ขายที่มี VAT (`VatType IN (0,1)`) |
 | `gl_trans_type` | `integer` / `varchar` | การบันทึกบัญชี GL: `0 = แยกรายบรรทัด`, `1 = รวมบัญชีที่ซ้ำกันในสาขาเดียวกัน (Compound)` |
-| `inventory_gl_post` | `smallint` / `varchar` | ระบบบันทึกบัญชีสต็อก: `0 = Perpetual (ต่อเนื่อง)`, `1 = Periodic (สิ้นงวด)` |
+| `inventory_gl_post` | `smallint` / `varchar` | ระบบบันทึกบัญชีสต็อก: `0 = Periodic (สิ้นงวด — ตัดเงื่อนไขต้นทุน/สต็อก 101, 103)`, `1 = Perpetual (ต่อเนื่อง)` |
 | `gl_process_realtime`, `lock_direct_journal`, `lock_date_back` | `smallint` | ประมวลผล GL แบบ Real-time, ห้ามลงรายวันตรง, ล็อกลงวันที่ย้อนหลัง |
 | `multi_currency`, `home_currency` | `smallint` / `varchar` | เปิดระบบหลายสกุลเงิน (`1 = เปิดใช้`) และรหัสสกุลเงินหลัก (เช่น `THB`) |
 
@@ -72,7 +73,7 @@ sources:
 
 | คอลัมน์ | ชนิดข้อมูล | ความหมาย / ค่า Flag ที่ยืนยันจากโค้ด Go |
 |---|---|---|
-| `warning_credit_money`, `lock_credit_money`, `request_ar_credit`, `sr_ss_credit_check`, `check_credit_sale_reserve_sale_order` | `smallint` | เตือนเกินวงเงินเครดิต, ล็อกห้ามขายเกินวงเงิน, บังคับขออนุมัติวงเงิน, ตรวจเครดิตที่สั่งจอง/สั่งขาย |
+| `warning_credit_money`, `lock_credit_money`, `request_ar_credit`, `request_credit_type`, `sr_ss_credit_check`, `check_credit_sale_reserve_sale_order`, `check_ar_status_credit` | `smallint` | เตือน/ล็อกเกินวงเงินเครดิต, บังคับขออนุมัติวงเงิน (+ ประเภท `request_credit_type`), ตรวจเครดิตสั่งจอง/สั่งขาย, และเช็กวันปิดเครดิตลูกค้า `ar_customer_detail.close_credit_date` |
 | `credit_sale_include_deposit`, `ar_credit_chq_outstanding` | `smallint` | นับหักยอดมัดจำ/ล่วงหน้าคงเหลือ และรวมเช็คค้างรับในยอดใช้วงเงินเครดิต |
 | `purchase_request_approve_until_end`, `ref_pr_approve`, `ref_po_approve`, `doc_ref_salesorder_approve`, `doc_ref_reservation_approve` | `smallint` | บังคับอ้างอิงเฉพาะใบเสนอซื้อ/สั่งซื้อ/สั่งขาย/สั่งจองที่อนุมัติแล้ว และปิด PR เมื่อตรวจครบจบจริง (`successPR`) |
 | `check_qty_over_doc_ref`, `receive_more_po`, `pu_from_po_only`, `ss_ref_po_only`, `doc_sale_order_edit` | `smallint` | ห้ามป้อนจำนวนเกินเอกสารอ้างอิง, ยอมรับของเกิน PO, บังคับรับ/ซื้อจาก PO เท่านั้น, ยอมแก้ไขใบเสนอราคา |

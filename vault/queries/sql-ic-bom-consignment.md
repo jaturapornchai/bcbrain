@@ -3,7 +3,7 @@ title: "SQL สูตรการผลิต (BOM), ใบสั่งประ
 audience: dev
 tags: [sql, queries, ic, bom, assembly, consignment]
 aliases: ["SQL BOM สูตรผลิต", "SQL ใบสั่งประกอบสินค้า", "SQL สินค้าฝากขาย Consignment", "ic_bom_header", "ar_consignment_account"]
-sources: ["backend/internal/application/process/bom_assembly.go:165-450", "backend/internal/application/process/consignment.go:130-210", "backend/internal/application/process/report_menu_ic.go:244-275"]
+sources: ["backend/internal/application/process/bom_assembly.go:165-600", "backend/internal/application/process/consignment.go:130-210", "backend/internal/application/process/report_menu_ic.go:244-275"]
 ---
 
 ชุดคำสั่ง SQL สำหรับระบบผลิต/ประกอบสินค้า (`ic_bom_header`, `ic_bom_detail`, `ic_assembly_order`) และระบบบัญชีฝากขาย (`ar_consignment_account`, `ar_consignment_log`)
@@ -45,7 +45,7 @@ ORDER BY h.bom_code, d.line_number;
 
 ## 2. ประวัติใบสั่งประกอบสินค้า & ความเชื่อมโยงใบเบิกวัตถุดิบ-รับสำเร็จรูป (`ic_assembly_order`)
 
-ใบสั่งประกอบจะจับคู่เอกสารสต็อกจริง 2 ใบ คือ `issue_doc_no` (เบิกวัตถุดิบ `trans_flag = 56`) และ `receipt_doc_no` (รับสินค้าสำเร็จรูป `trans_flag = 60`):
+ใบสั่งประกอบจะจับคู่เอกสารสต็อกจริง 2 ใบ คือ `issue_doc_no` (เบิกวัตถุดิบ `trans_flag = 56`) และ `receipt_doc_no` (รับสินค้าสำเร็จรูป `trans_flag = 54`):
 
 **พารามิเตอร์**: `$1::date` (วันเริ่มต้น), `$2::date` (วันสิ้นสุด)
 

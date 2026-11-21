@@ -6,12 +6,13 @@ sources:
   - "backend/internal/application/process/bcMenu.json:2051"
   - "frontend/account/tabs/screenRegistry.tsx:934"
   - "frontend/src/config/schemas/masterDetailSchemas.ts:337"
-  - "frontend/account/master/BomAssemblyScreen.tsx:114"
-  - "frontend/account/master/BomAssemblyScreen.tsx:765"
-  - "backend/internal/application/process/bom_assembly.go:545"
-  - "backend/internal/application/process/bom_assembly.go:865"
-  - "backend/internal/application/process/bom_assembly.go:1106"
+  - "frontend/account/master/BomAssemblyScreen.tsx:120-360"
+  - "frontend/account/master/BomAssemblyScreen.tsx:860-1160"
+  - "backend/internal/application/process/bom_assembly.go:234-435"
+  - "backend/internal/application/process/bom_assembly.go:749-960"
+  - "backend/internal/application/process/bom_assembly.go:1068-1655"
   - "backend/internal/application/process/trans_set_item.go:22"
+  - "scripts/sql/33_seed_bcdemo_bom_assembly.sql:1-81"
 ---
 
 # สินค้าชุด และสูตรการผลิต / ใบสั่งประกอบสินค้า (BOM Assembly)
@@ -36,11 +37,11 @@ sources:
 1. กด **เพิ่มใหม่** ฝั่งทะเบียนสูตรการผลิต
 2. กรอกข้อมูลหัวสูตร:
    - **รหัสสูตร BOM** (ความยาวไม่เกิน 30 ตัวอักษร ห้ามซ้ำ) และ **ชื่อสูตรการผลิต**
-   - **สินค้าสำเร็จรูป (FG)** และ **หน่วยนับสำเร็จรูป** (ต้องเป็นสินค้าที่มีอยู่จริงในทะเบียนสินค้า)
+   - **สินค้าสำเร็จรูป (FG)** และ **หน่วยนับสำเร็จรูป** (ต้องเป็นสินค้าที่มีอยู่จริงในทะเบียนสินค้า โดยต้องเลือกรหัสสินค้าสำเร็จรูปก่อนกดแว่นขยายเลือกหน่วยนับ ระบบจึงจะกรองเฉพาะหน่วยนับที่ผูกกับสินค้านั้น)
    - **ผลผลิตที่ได้ต่อสูตร (Yield)** — ต้องมากกว่า 0 (เช่น 1 สูตร ได้ 1 ชุด หรือ 10 กล่อง)
    - **ค่าแรงประกอบ (Labor Cost)** และ **ค่าโสหุ้ย (Overhead Cost)** ต่อสูตร
-   - **คลังจัดเก็บสำเร็จรูป** และ **ที่เก็บสำเร็จรูป** ตั้งต้น
-3. เพิ่มรายการ **วัตถุดิบ (RM)** อย่างน้อย 1 รายการ (ห้ามใช้วัตถุดิบรหัสเดียวกับสินค้าสำเร็จรูป) ระบุหน่วยนับ จำนวนที่ใช้ (> 0) และ **เปอร์เซ็นต์สูญเสีย** (รองรับสูงสุด 500%) แล้วกด **บันทึกข้อมูล**
+   - **คลังจัดเก็บสำเร็จรูป** และ **ที่เก็บสำเร็จรูป** ตั้งต้น (เมื่อเลือกคลังแล้ว ช่องค้นหาที่เก็บจะกรองเฉพาะที่เก็บของคลังนั้นให้อัตโนมัติ)
+3. เพิ่มรายการ **วัตถุดิบ (RM)** อย่างน้อย 1 รายการ (ห้ามใช้วัตถุดิบรหัสเดียวกับสินค้าสำเร็จรูป) เลือกสินค้าวัตถุดิบก่อนแล้วระบุหน่วยนับ จำนวนที่ใช้ (> 0) และ **เปอร์เซ็นต์สูญเสีย** (รองรับสูงสุด 500%) แล้วกด **บันทึกข้อมูล** *(ในฐานข้อมูลสาธิตระบบจะเตรียมสูตรตัวอย่าง **BOM-DEMO-01** และ **BOM-DEMO-02** พร้อมรายการวัตถุดิบให้ทดสอบทันที)*
 
 > [!WARNING]
 > สูตรการผลิตที่มีประวัติใบสั่งผลิตแล้วจะไม่สามารถลบสูตรได้โดยตรง ต้องลบใบสั่งผลิตที่อ้างอิงสูตรนั้นก่อน

@@ -3,7 +3,7 @@ title: "สเปก Process Engine & Workflow Dispatcher (/process/*)"
 audience: dev
 tags: [api, process-engine, workflow, transactions, stock, gl]
 aliases: ["Process Engine API", "/process/trans/save", "/process/workflow", "/process/stock/rebuild", "/process/doc/save", "StockTools API"]
-sources: ["backend/internal/adapter/inbound/http/router.go:133-215", "backend/internal/adapter/inbound/http/process/handler.go:1-345", "backend/internal/adapter/inbound/http/process/workflow_handler.go:1-503", "backend/internal/adapter/inbound/http/process/stocktools_handler.go:46-189", "backend/internal/adapter/inbound/http/process/master_handler.go:18-60", "backend/internal/adapter/inbound/http/process/transgrid_handler.go:20-88", "backend/internal/adapter/inbound/http/process/barcode_handler.go:22-72", "backend/internal/adapter/inbound/http/process/docpicture_handler.go:36-140", "backend/internal/adapter/inbound/http/process/itemdetail_handler.go:16-59", "backend/internal/adapter/inbound/http/process/master_detail_handler.go:1-43"]
+sources: ["backend/internal/adapter/inbound/http/router.go:65-122", "backend/internal/adapter/inbound/http/process/handler.go:1-345", "backend/internal/adapter/inbound/http/process/jobs_handler.go:1-130", "backend/internal/adapter/inbound/http/process/options_handler.go:1-39", "backend/internal/adapter/inbound/http/process/workflow_handler.go:1-503", "backend/internal/adapter/inbound/http/process/stocktools_handler.go:46-189", "backend/internal/adapter/inbound/http/process/master_handler.go:18-60", "backend/internal/adapter/inbound/http/process/transgrid_handler.go:20-88", "backend/internal/adapter/inbound/http/process/barcode_handler.go:22-72", "backend/internal/adapter/inbound/http/process/docpicture_handler.go:36-140", "backend/internal/adapter/inbound/http/process/itemdetail_handler.go:16-59", "backend/internal/adapter/inbound/http/process/master_detail_handler.go:1-43"]
 ---
 
 **Process Engine** คือหัวใจหลักในการประมวลผลทางบัญชี สต็อก การเงิน ภาษี และ Workflow อัจฉริยะทั้งหมดของ **BC Ai Account** โดย mount คู่ขนานทั้งที่ `/process/*` และ `/api/v1/process/*` (`router.go:133-215`) กำหนด Request Body สูงสุดที่ `16 MiB` (`maxJSONBody`)
@@ -27,8 +27,14 @@ sources: ["backend/internal/adapter/inbound/http/router.go:133-215", "backend/in
 | `/process/doc/approve` | อนุมัติเอกสาร (`approve_status`) | - |
 | `/process/doc/bills` | ดึงรายการบิลค้างชำระเพื่อรับ/จ่ายเงิน (`OutstandingBills`) | รองรับทั้งฝั่ง AR และ AP รวมตั้งหนี้ยกมาและขายสินทรัพย์ (`1802`) |
 | `/process/doc/flow` | คำนวณสถานะอ้างอิงเอกสาร (`used_status`, `doc_success`) | ใช้เวลาตรวจหรือซ่อมแซมความเชื่อมโยงเอกสาร |
-| `/process/stock/rebuild` | ประมวลผลยอดสต็อกและต้นทุนสินค้าใหม่ (`RebuildStock`) | รองรับคำสั่งแบบ `update_trans_detail`, `recheck_trans_flow`, `check_so_doc_success`, `recheck_doc_flow` และระบุรหัสสินค้า/ช่วง/เลขที่บิล |
-| `/process/gl/rebuild` | ลงบัญชีอัตโนมัติ (Rebuild GL) ตามช่วงวันที่/ผังบันทึก | ตรวจสอบงวดบัญชีและคำนวณ Dr/Cr ให้สมดุล |
+| `/process/stock/rebuild` | ประมวลผลยอดสต็อกและต้นทุนสินค้าใหม่ (`RebuildStock`) | รองรับ `async: true` (+ `ChainNext`) และคำสั่งแบบ `update_trans_detail`, `recheck_trans_flow`, `check_so_doc_success`, `recheck_doc_flow` |
+| `/process/gl/rebuild` | ลงบัญชีอัตโนมัติ (Rebuild GL) ตามช่วงวันที่/ผังบันทึก | รองรับ `async: true` (+ `ChainNext`), ตรวจสอบงวดบัญชีและคำนวณ Dr/Cr ให้สมดุล |
+| `/process/ar/rebuild` | คำนวณยอดลูกหนี้คงค้างและตัดชำระใหม่ (`RebuildAR`) | ปรับปรุงยอดค้างชำระลูกหนี้ให้ตรงกับรายการรายวัน |
+| `/process/ap/rebuild` | คำนวณยอดเจ้าหนี้คงค้างและตัดชำระใหม่ (`RebuildAP`) | ปรับปรุงยอดค้างชำระเจ้าหนี้ให้ตรงกับรายการรายวัน |
+| `/process/options/runtime` | `GET` / `POST` อ่านสวิตช์ `CompanyRuntimeOptions` จาก `erp_option` + สิทธิ์ `erp_user` | ให้ Web / Desktop / Mobile ใช้กติกาชุดเดียวกันกับฝั่ง Go (`runtime_options.go`) |
+| `/process/jobs/enqueue` | สั่งรันคิวงานประมวลผลเบื้องหลัง (`stock_rebuild`, `ar_rebuild`, `ap_rebuild`, `gl_rebuild`) | รองรับ `priority`, `idempotencyKey` และ `chainNext` (`202 Accepted`) |
+| `/process/jobs`, `/process/jobs/health`, `/process/jobs/{jobId}` | `GET` ดูรายการคิว, สถานะ Cluster/AutoScaler และรายละเอียดงาน (`POST .../cancel` เพื่อยกเลิก) | ใช้ Broker แบบ Resilient Redis/Memory และรองรับสตรีมสด SSE |
+| `/process/jobs/events`, `/process/jobs/{jobId}/events` | `GET` SSE Stream ติดตามความคืบหน้าคิวงานทั้งบริษัทหรือราย `jobId` | ส่ง Event อัปเดตความคืบหน้าแบบเรียลไทม์ |
 | `/process/gl/template-defaults` | โหลดรูปแบบลงบัญชีอัตโนมัติ (`gl_journal_template`) | - |
 | `/process/gl/recurring` | จัดการรายการลงบัญชีประจำงวดอัตโนมัติ (Recurring JV) | - |
 | `/process/cheque/rebuild` | ประมวลผลสถานะเช็ครับ/เช็คจ่ายใหม่ทั้งหมด | - |
