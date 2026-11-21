@@ -7,8 +7,11 @@ sources:
   - frontend/account/form/FieldControl.tsx:1-335
   - frontend/src/config/schemas/erpOption/index.ts:1-61
   - frontend/src/config/help/bcFieldHelpCatalog.ts:1-579
-  - frontend/src/config/i18n/bcI18n.tsx:1-1004
-  - frontend/shared/components/GlobalLanguageTranslator.tsx:1-368
+  - frontend/src/config/i18n/bcI18n.tsx:1-150
+  - frontend/src/config/i18n/bcLangEngine.ts:1-120
+  - frontend/src/config/i18n/bcLanguageStore.ts:1-120
+  - frontend/src/config/i18n/bcBilingualDataCache.ts:1-120
+  - frontend/shared/components/GlobalLanguageTranslator.tsx:1-120
   - backend/internal/application/process/report_hierarchy.go:1-663
   - frontend/workmonitor/WorkstationTelemetryAgent.tsx:1-1676
 ---
@@ -27,10 +30,11 @@ sources:
 
 ---
 
-## 2. Contextual Field Help & WeakMap Bilingual Translator (`bcFieldHelpCatalog.ts`, `bcI18n.tsx`, `GlobalLanguageTranslator.tsx`)
+## 2. Contextual Field Help & Multi-Language Store/DOM Engine (`bcFieldHelpCatalog.ts`, `bcI18n.tsx`, `bcLangEngine.ts`, `bcLanguageStore.ts`, `GlobalLanguageTranslator.tsx`)
 
 - **Field Help**: `bcFieldHelpCatalog.ts` จับคู่ช่องกรอก ปุ่ม แท็บ และคอลัมน์เข้ากับคลังคำอธิบายภาษาไทยใน `frontend/src/config/help/data/*.json` (`bc_fields.json`, `bc_phrases.json`, `ar_ap.json`, `ic.json`, `gl_tax.json`, `trans.json`) และ endpoint `/api/v1/help`
-- **Bilingual DOM Engine**: `GlobalLanguageTranslator.tsx` เดิน DOM ด้วย `WeakMap` เก็บข้อความต้นฉบับ แปลเฉพาะป้ายกำกับ UI ผ่านพจนานุกรม `TH_TO_EN_EXACT` + `Intl.Segmenter` (`bcI18n.tsx`, `bcThaiWordDict.ts`) โดยข้ามเซลล์ข้อมูลธุรกิจจริง (`isDataCellTextNode`) เพื่อไม่ให้ชื่อลูกค้าหรือชื่อสินค้าถูกแปลเพี้ยน
+- **Compact Language Packs (`bcLanguageStore.ts` + `bcLangEngine.ts`)**: โหลดชุดภาษาจาก Backend (`/api/language?pack=<lang>` จาก `language.json`) แบบ Lazy เฉพาะภาษาที่ใช้งาน (`th`, `en`, `lo`) แล้ว compile เทมเพลตข้อความและดัชนี hash (`cat`, `lex`) ไว้ในหน่วยความจำโดยไม่ bundle คำศัพท์ไว้ฝั่ง Client
+- **Multi-Language DOM Engine**: `GlobalLanguageTranslator.tsx` (`WeakMap` เก็บข้อความต้นฉบับ + `bcBilingualDataCache.ts` แปลข้อมูลหลักแบบขอดู) แปลป้ายกำกับ UI และข้อความเตือนด้วย `bcI18n.tsx` / `bcLangEngine.ts` โดยข้ามเซลล์ข้อมูลธุรกิจจริง (`isDataCellTextNode`) เพื่อไม่ให้ชื่อลูกค้าหรือชื่อสินค้าถูกแปลเพี้ยน (รองรับทั้ง **ไทย / อังกฤษ / ลาว**)
 
 ---
 

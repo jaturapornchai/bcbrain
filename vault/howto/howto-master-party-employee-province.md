@@ -6,8 +6,9 @@ sources:
   - frontend/account/master/EmployeeScreen.tsx:1-1042
   - frontend/account/master/DealerScreen.tsx:1-897
   - frontend/account/master/ProvinceTreeScreen.tsx:1-2168
-  - frontend/account/master/CustomerDetailScreen.tsx:1-3764
-  - frontend/account/master/SupplierDetailScreen.tsx:1-2961
+  - frontend/account/master/CustomerDetailScreen.tsx:1-200
+  - frontend/account/master/SupplierDetailScreen.tsx:1-200
+  - frontend/account/master/partyPersonName.ts:1-32
   - frontend/account/master/ThaiBankDirectoryModal.tsx:1-481
   - frontend/account/master/masterAutoCode.ts:1-160
 ---
@@ -33,6 +34,7 @@ sources:
 ## 2. รายละเอียดเชิงลึกลูกหนี้–เจ้าหนี้ และตัวแทนจำหน่าย
 
 - **รายละเอียดเพิ่มเติมลูกหนี้และเจ้าหนี้**: นอกเหนือจากชื่อ ที่อยู่ และเลขผู้เสียภาษี 13 หลัก ยังผูก **วงเงินเครดิต จำนวนวันเครดิต ระดับราคาขาย 0–9 กลุ่มลูกค้าหลัก–ย่อย เงื่อนไขวางบิล/รับเช็ค พนักงานขายประจำ เขตขนส่ง ที่อยู่จัดส่งหลายแห่ง และบัญชีแยกประเภทคุมยอดเฉพาะราย** ได้ครบถ้วน
+  - **แยกประเภทบุคคลธรรมดา vs นิติบุคคลชัดเจน**: เมื่อเลือกประเภทเป็น **นิติบุคคล** ช่องชื่อบุคคล (**คำนำหน้า / ชื่อ / นามสกุล**) จะถูกล็อกไม่ให้กรอกซ้ำซ้อน และเมื่อเลือก **บุคคลธรรมดา** ระบบช่วยรวมคำนำหน้า–ชื่อ–นามสกุลลงในชื่อหลักโดยไม่ต่อคำนำหน้าซ้ำ (เช่น ไม่ทำให้คำว่า "บริษัท" ขึ้นซ้ำสองครั้ง)
 - **ทะเบียนตัวแทนจำหน่าย**: บริหารข้อมูลตัวแทน เขตพื้นที่ดูแล และเงื่อนไขผลตอบแทนการขาย
 - **ระบบรันรหัสข้อมูลหลักอัตโนมัติ**: เมื่อสร้างสินค้า ลูกหนี้ หรือเจ้าหนี้ใหม่ กดปุ่มรันรหัสถัดไปเพื่อให้โปรแกรมสร้างรหัสเรียงลำดับตามหมวดโดยไม่ชนกับรหัสเดิม
 
