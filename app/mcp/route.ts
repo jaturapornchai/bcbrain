@@ -11,15 +11,22 @@ import {
   getNote,
   listVaultRows,
   search,
+  searchWithMeta,
+  syncCommit,
   terms,
   traverseGraph,
   updatedAt,
   vaultFolders,
+  warmVaultIndexes,
   type Note,
   type NoteMedia,
 } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
+
+if (process.env.NODE_ENV === "production") {
+  warmVaultIndexes();
+}
 
 const INSTRUCTIONS = `BC Brain = dual-audience knowledge base of the BC Ai Account product suite (Thai accounting/ERP for SMEs: sales, purchasing, inventory, AR/AP, cash/bank/cheques, fixed assets, GL, VAT/WHT, reports + add-on systems: POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Market, Dashboard, MonitorMap, WorkMonitor, Company Brain), verified against the real source code.
 
@@ -32,12 +39,12 @@ Choose the mode that matches the caller's role before answering:
 (b) General users / call-center / pre-sale assistants:
     - First call read_note("playbook-call-center") for usage/support or read_note("playbook-sales") for pre-sale questions, and follow it.
     - ALWAYS pass audience: "user" to ask_brain, search_brain, traverse_brain, and list_notes.
-    - For menu lookups or 4-digit menu codes (1001–9070 across 734 screens) or legacy dotted codes (e.g. 1.3.1, 4.13), check menu-catalog-overview and menu-cat-1-setup .. menu-cat-9-gl (or search the 4-digit/dotted code directly).
+    - For menu lookups or 4-digit menu codes (1001–9070 across 735 screens) or legacy dotted codes (e.g. 1.3.1, 4.13), check menu-catalog-overview and menu-cat-1-setup .. menu-cat-9-gl (or search the 4-digit/dotted code directly).
     - Answer in plain, easy-to-understand Thai step by step without code, SQL, table names, or developer jargon. Always state BOTH the exact Thai menu breadcrumb path AND its 4-digit menu code (e.g. "เริ่มต้น > ตั้งค่าองค์กร พนักงาน และเอกสาร > กำหนดรายละเอียดบริษัท" (รหัสเมนู 1003)), exact button names, keyboard shortcuts (howto-screen-shortcuts-workbench), on-screen messages, and ALWAYS share the ready-to-open screenshot URLs (https://bcaccount.com/...) and YouTube tutorial URLs (playlist PLO9P7tPZLXB0) provided in the response's Media & Reference Links section (or call find_media to look up screenshots and YouTube videos directly).
     - When a user cannot find a menu, check the 4 product editions (Starter, Standard, Professional, Enterprise), the Feature Switchboard (รหัสเมนู 1002), and user-group permissions (ts-menu-missing-switchboard, howto-admin-system-management).
     - For pricing, packages, accounting-firm partner program, support hours, or implementation services, cite only the verified official figures in sales-pricing-packages, sales-accounting-partner, and sales-support-implementation-contact (always noting prices exclude 7% VAT and external AI API costs, and never invent custom discounts or contract terms—direct formal quote requests to https://bcaccount.com/quotation or LINE @bcaccount / 089-922-3131). For tax/legal interpretation, explain only what the system does and advise consulting the customer's auditor or the Revenue Department.
 
-General rules: answer only from note content; if the notes do not cover it, say so honestly without guessing. Never ask for or expose passwords, tokens, or secrets. Slugs are internal references; do not show them to general users unless asked.`;
+General rules: answer ONLY from note content verified against the real source code; when ask_brain abstains or flags low-confidence retrieval, or notes do not cover a detail, state clearly that BC Brain has no verified record without guessing or inventing menu codes, table names, columns, or prices. Never ask for or expose passwords, tokens, or secrets. Slugs are internal references; do not show them to general users unless asked.`;
 
 const audienceSchema = z
   .enum(["all", "user", "dev"])
@@ -95,16 +102,21 @@ function formatAggregatedMediaBlock(m: NoteMedia): string {
   return `\n\n---\n\n${sections.join("\n\n")}`;
 }
 
-function noteText(n: Note, body = n.body): string {
+function noteText(n: Note, body = n.body, includeSources = false): string {
   const out = n.outEdges.map((e) => `[[${e.slug}]] (${e.rel})`).join(" ") || "-";
   const inn = n.inEdges.map((e) => `[[${e.slug}]] (${e.rel})`).join(" ") || "-";
   const mediaLines = formatNoteMediaLines(n.media);
+  const srcLine =
+    includeSources && n.audience === "dev" && n.sources.length
+      ? [`verified_sources: ${n.sources.slice(0, 8).join(", ")}`]
+      : [];
   return [
     `# ${n.title}`,
     `slug: ${n.slug} | folder: ${n.folder} | audience: ${n.audience} | tags: ${n.tags.join(", ")}`,
     "",
     body.trim(),
     "",
+    ...srcLine,
     ...mediaLines,
     `links: ${out}`,
     `backlinks: ${inn}`,
@@ -161,10 +173,10 @@ const FIND_MEDIA_INPUT = {
 
 function buildServer() {
   const server = new McpServer(
-    { name: "bcbrain", version: "2.0.0" },
+    { name: "bcbrain", version: "2.1.0" },
     {
       instructions: `${INSTRUCTIONS}
-Knowledge last updated: ${updatedAt} (Thai time).`,
+Knowledge last updated: ${updatedAt} (Thai time)${syncCommit ? ` · source bcaiaccount@${syncCommit}` : ""}.`,
     },
   );
   const emit = (
@@ -195,21 +207,42 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
     async ({ question, audience }) => {
       const t0 = performance.now();
       const filter = audience ?? "all";
-      const hits = search(question, 4, filter);
+      const { hits, confidence, totalTerms, bestMatchedTerms, topScore } = searchWithMeta(question, 4, filter);
       if (!hits.length) {
         emit("ask_brain", filter, question, [], 0, t0);
-        return text(`No matching notes (audience=${filter}). Try other keywords (Thai or SQL/API identifiers) or list_notes.`);
+        return text(`🛑 Abstain — No matching notes (audience=${filter}). Do not guess—try other keywords (Thai or SQL/API identifiers) or list_notes.`);
       }
+      const coverage = bestMatchedTerms / Math.max(1, totalTerms);
+      if (confidence === "low" && (coverage < 0.5 || topScore < 18)) {
+        emit(
+          "ask_brain",
+          filter,
+          question,
+          hits.slice(0, 2).map((h) => ({ slug: h.slug, title: h.title, folder: h.folder })),
+          hits.length,
+          t0,
+        );
+        const candidates = hits
+          .slice(0, 3)
+          .map((h) => `- ${h.slug} (${h.folder}) — ${h.title}`)
+          .join("\n");
+        return text(
+          `🛑 Abstain — Insufficient Grounded Evidence in BC Brain (audience=${filter}, confidence=low, coverage=${bestMatchedTerms}/${totalTerms}, topScore=${topScore}) for: ${question}\n\nDo NOT extrapolate or guess. State clearly that BC Brain has no verified record for this question.\nClosest topic candidates (inspect with read_note only if relevant):\n${candidates}`,
+        );
+      }
+      const selectedHits = confidence === "low" ? hits.slice(0, 2) : hits;
       const ts = terms(question);
-      // ponytail: fixed budget ~24k chars total; first hit gets more room since it is usually the answer
-      const parts = hits.map((h, i) => {
+      const showDevSources = filter === "dev";
+      // ponytail: fixed budget ~24k chars total; first hit gets more room since it is usually the answer; low-confidence trims tighter to prevent distraction
+      const parts = selectedHits.map((h, i) => {
         const n = getNote(h.slug)!;
-        return noteText(n, excerpt(n.body, ts, i === 0 ? 9000 : 5000));
+        const cap = confidence === "low" ? (i === 0 ? 4500 : 2500) : i === 0 ? 9000 : 5000;
+        return noteText(n, excerpt(n.body, ts, cap), showDevSources);
       });
       const graphCtx = connectedNeighbors(
-        hits.map((h) => h.slug),
+        selectedHits.map((h) => h.slug),
         filter,
-        8,
+        confidence === "low" ? 4 : 8,
       );
       const ctxBlock = graphCtx.length
         ? `\n\n---\n\n## Connected Graph Context (1-hop — use read_note or traverse_brain to inspect)\n${graphCtx
@@ -217,16 +250,22 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
             .join("\n")}`
         : "";
       const mediaCtx =
-        filter !== "dev" ? formatAggregatedMediaBlock(collectRelatedMedia(hits.map((h) => h.slug), filter, 5, 5, 5)) : "";
+        filter !== "dev" ? formatAggregatedMediaBlock(collectRelatedMedia(selectedHits.map((h) => h.slug), filter, 5, 5, 5)) : "";
+      const guardrailBanner =
+        confidence === "low"
+          ? `\n> ⚠️ Low-confidence match (matched ${bestMatchedTerms}/${totalTerms} query terms, top score ${topScore}). Verify carefully before answering; if the notes below do not directly answer the question, state honestly that BC Brain has no verified record instead of guessing.\n`
+          : "";
       emit(
         "ask_brain",
         filter,
         question,
-        hits.map((h) => ({ slug: h.slug, title: h.title, folder: h.folder })),
-        hits.length,
+        selectedHits.map((h) => ({ slug: h.slug, title: h.title, folder: h.folder })),
+        selectedHits.length,
         t0,
       );
-      return text(`Top ${hits.length} notes (audience=${filter}) for: ${question}\n\n${parts.join("\n\n---\n\n")}${mediaCtx}${ctxBlock}`);
+      return text(
+        `Top ${selectedHits.length} notes (audience=${filter}, confidence=${confidence}, coverage=${bestMatchedTerms}/${totalTerms}) for: ${question}${guardrailBanner}\n\n${parts.join("\n\n---\n\n")}${mediaCtx}${ctxBlock}`,
+      );
     },
   );
 
@@ -342,7 +381,7 @@ Knowledge last updated: ${updatedAt} (Thai time).`,
           1,
           t0,
         );
-        return text(noteText(n));
+        return text(noteText(n, n.body, n.audience === "dev"));
       }
       emit("read_note", "all", slug, [], 0, t0);
       const near = search(slug.replace(/[-_]/g, " "), 5).map((h) => h.slug);

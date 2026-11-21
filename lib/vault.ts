@@ -425,6 +425,49 @@ function load(): Map<string, Note> {
     }
   }
 
+  // 2c) Automatic 4-digit menu-code synapses (`shares_menu`):
+  //     Connects focused user notes referencing the same menu code (e.g. 1004, 2050, 4013) without exploding broad catalogs.
+  const menuIndex = new Map<string, string[]>();
+  const MENU_CODE_CTX = /(?:เมนู|รหัสเมนู|รหัส|menu)\s*([1-9]\d{3})\b/gi;
+  const isExcludedYear = (c: string) => {
+    const n = Number(c);
+    return (n >= 2015 && n <= 2035) || (n >= 2555 && n <= 2580);
+  };
+  for (const n of notes.values()) {
+    if (n.audience !== "user" || n.slug === "index" || n.slug.startsWith("menu-cat")) continue;
+    const foundMenus = new Set<string>();
+    for (const m of `${n.title} ${n.aliases.join(" ")} ${n.body}`.matchAll(MENU_CODE_CTX)) {
+      const code = m[1];
+      if (code && !isExcludedYear(code)) foundMenus.add(code);
+    }
+    for (const a of n.aliases) {
+      const t = a.trim();
+      if (/^[1-9]\d{3}$/.test(t) && !isExcludedYear(t)) foundMenus.add(t);
+    }
+    for (const code of foundMenus) {
+      const bucket = menuIndex.get(code);
+      if (bucket) bucket.push(n.slug);
+      else menuIndex.set(code, [n.slug]);
+    }
+  }
+  for (const n of notes.values()) {
+    if (n.audience !== "user" || n.slug === "index" || n.slug.startsWith("menu-cat")) continue;
+    const existingTargets = new Set(n.links);
+    let addedMenu = 0;
+    for (const [code, peers] of menuIndex) {
+      if (peers.length < 2 || peers.length > 6 || !peers.includes(n.slug)) continue;
+      for (const peerSlug of peers) {
+        if (peerSlug === n.slug || existingTargets.has(peerSlug)) continue;
+        existingTargets.add(peerSlug);
+        n.outEdges.push({ slug: peerSlug, rel: "shares_menu", inferred: true });
+        n.links.push(peerSlug);
+        addedMenu++;
+        if (addedMenu >= 5) break;
+      }
+      if (addedMenu >= 5) break;
+    }
+  }
+
   // 3) Populate reverse edges / backlinks
   for (const n of notes.values()) {
     for (const e of n.outEdges) {
@@ -904,6 +947,15 @@ const SYNONYM_GROUPS: string[][] = [
   ["พักบิล", "ปิดกะ", "ลิ้นชัก", "จอลูกค้า", "เครื่องพิมพ์ใบเสร็จ", "objectbox"],
   ["ทุจริต", "เฝ้าระวัง", "จอพนักงาน", "fraud", "workmonitor"],
   ["ป้ายขนส่ง", "ป้ายชื่อขนส่ง", "สติกเกอร์บาร์โค้ด"],
+  ["นิติบุคคล", "บุคคลธรรมดา", "คำนำหน้า", "ชื่อบุคคล", "ar_customer", "ap_supplier"],
+  ["ขายติดลบ", "สต็อกติดลบ", "ห้ามติดลบ", "สินค้าติดลบ", "negative"],
+  ["รูปแบบเอกสาร", "เลขที่เอกสาร", "เล่มเอกสาร", "erp_doc_format", "1014", "1015"],
+  ["ออกแบบฟอร์ม", "พิมพ์เอกสาร", "ตัวอย่างก่อนพิมพ์", "print", "1096", "1097"],
+  ["ข้อมูลเริ่มต้น", "preset", "starter", "ค่าเริ่มต้น"],
+  ["ปรับปรุงภาษา", "language_manage", "พจนานุกรมภาษา", "1005"],
+  ["คิวงาน", "ประมวลผลเบื้องหลัง", "procqueue", "ar_rebuild", "ap_rebuild", "jobs_enqueue"],
+  ["พารามิเตอร์กลาง", "runtime_options", "options_runtime"],
+  ["ปิดเครดิต", "วันปิดเครดิต", "close_credit_date"],
 ];
 
 const SYNONYM_MAP = (() => {
@@ -1115,7 +1167,52 @@ function getPosting(idx: SearchIndex, t: string): Posting {
   return built;
 }
 
+export type SearchConfidence = "high" | "medium" | "low";
+
+export type SearchMetaResult = {
+  hits: SearchHit[];
+  confidence: SearchConfidence;
+  totalTerms: number;
+  bestMatchedTerms: number;
+  topScore: number;
+};
+
+let indexesWarmed = false;
+export function warmVaultIndexes(): void {
+  if (indexesWarmed) return;
+  const b = getBundle();
+  getSearchIndex(b, "all");
+  getSearchIndex(b, "user");
+  getSearchIndex(b, "dev");
+  indexesWarmed = true;
+}
+
 // ponytail: inverted-index BM25 + Thai-SQL synonym expansion + hub authority + 1-hop graph boost
+export function searchWithMeta(q: string, limit = 8, filter: AudienceFilter = "all"): SearchMetaResult {
+  const ts = terms(q);
+  const hits = search(q, limit, filter);
+  if (!hits.length || !ts.length) {
+    return { hits, confidence: "low", totalTerms: ts.length, bestMatchedTerms: 0, topScore: 0 };
+  }
+  const topNote = getNote(hits[0].slug);
+  let bestMatchedTerms = 0;
+  if (topNote) {
+    const combined = `${topNote.haystack.title} ${topNote.haystack.meta} ${topNote.haystack.body}`;
+    for (const t of ts) {
+      if (combined.includes(t)) bestMatchedTerms++;
+    }
+  }
+  const coverage = bestMatchedTerms / Math.max(1, ts.length);
+  const topScore = hits[0].score;
+  let confidence: SearchConfidence = "low";
+  if ((coverage >= 0.6 && topScore >= 35) || (ts.length === 1 && topScore >= 25) || (coverage === 1 && topScore >= 20)) {
+    confidence = "high";
+  } else if (coverage >= 0.5 && topScore >= 18) {
+    confidence = "medium";
+  }
+  return { hits, confidence, totalTerms: ts.length, bestMatchedTerms, topScore };
+}
+
 export function search(q: string, limit = 8, filter: AudienceFilter = "all"): SearchHit[] {
   const b = getBundle();
   const cacheKey = `${filter}\0${limit}\0${q.trim()}`;
@@ -1482,7 +1579,13 @@ export function excerpt(body: string, ts: string[], budget: number): string {
   }
   const omitted = parts.filter((_, i) => !keep.has(i)).map((p) => p.split("\n")[0].replace(/^#+\s*/, ""));
   const out = parts.filter((_, i) => keep.has(i)).join("\n");
-  const cut = out.length > budget ? out.slice(0, budget) + " …" : out;
+  let cut = out.length > budget ? out.slice(0, budget) : out;
+  if (out.length > budget) {
+    // Never leave an unclosed markdown/SQL code fence when trimming long notes
+    const fenceCount = (cut.match(/^```/gm) ?? []).length;
+    if (fenceCount % 2 === 1) cut += "\n```";
+    cut += " …";
+  }
   return `${cut}\n\n[excerpt — ${omitted.length ? `omitted sections: ${omitted.join(" | ")}. ` : ""}read_note for the full note]`;
 }
 
@@ -1731,5 +1834,6 @@ export function renderNote(n: Note): string {
 }
 
 // last knowledge update shown on every page and in MCP instructions, Thai date + time in Bangkok time
+export const syncCommit = (process.env.SYNC_COMMIT ?? "").trim();
 export const updatedAt = new Intl.DateTimeFormat("th-TH", { dateStyle: "long", timeStyle: "short", timeZone: "Asia/Bangkok" })
   .format(new Date(process.env.BUILD_TIME ?? Date.now())) + " น.";

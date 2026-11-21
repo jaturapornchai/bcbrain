@@ -62,9 +62,18 @@ for (const q of ["เช็คเด้ง ออกใบกำกับภา�
 }
 const askUser = (await call("ask_brain", { question: "ตาราง ic_trans", audience: "user" })).text;
 check(!askUser.includes("| audience: dev |"), "ask_brain audience=user excludes dev notes");
+check(!askUser.includes("verified_sources:"), "ask_brain audience=user never exposes internal source file paths");
 const askDev = (await call("ask_brain", { question: "ออกใบกำกับภาษีขาย", audience: "dev" })).text;
 check(!askDev.includes("| audience: user |"), "ask_brain audience=dev excludes user notes");
 check(askDev.includes("Connected Graph Context"), "ask_brain includes Connected Graph Context");
+check(askDev.includes("verified_sources:"), "ask_brain audience=dev includes verified_sources grounding");
+for (const trap of ["สูตรทำแกงเขียวหวานไก่ใส่กะทิสด", "วิธีปลูกทุเรียนภูเขาไฟ"]) {
+  const askTrap = (await call("ask_brain", { question: trap, audience: "user" })).text;
+  check(
+    askTrap.includes("🛑 Abstain") || askTrap.includes("No matching notes"),
+    `ask_brain strictly abstains on ungrounded query "${trap}" to prevent hallucination`,
+  );
+}
 
 // ---- traverse_brain (multi-hop, shortest path & isolation) ----
 const travMulti = await call("traverse_brain", { slug: "sql-ic-stock-balance", depth: 2, audience: "dev" });
@@ -174,6 +183,7 @@ const CASES = [
   ["user", "คืนภาษีนักท่องเที่ยว ภ.พ.10 e-VRT ขั้นต่ำ 2000 บาท", "howto-tourist-vat-refund-evrt"],
   ["user", "พิมพ์บาร์โค้ด A4 เมนู 2020 ป้ายขนส่ง 6006 ประวัติการพิมพ์ต้นฉบับ", "howto-print-labels-barcode-audit"],
   ["user", "จอลูกค้าใบที่ 2 POS เครื่องพิมพ์ความร้อน พักบิล เตะลิ้นชัก", "howto-pos-hardware-display-promo"],
+  ["user", "1005 ปรับปรุงภาษา Language Dictionary", "menu-catalog-overview", "menu-cat-1-setup", "howto-global-ui-bilingual-datalist-tools"],
   ["dev", "findSalePrice bcRound TransRefImport ReconcileSubledger", "doc-price-engine-ref-import-calc"],
   ["dev", "ObjectBox SyncEngine ThermalPrinterService TIS-620 Flutter POS", "arch-pos-flutter-objectbox-sync"],
   ["dev", "TwoStageBrainExecutor evidenceFusionEngine 5-Channel Company Brain", "arch-company-brain-fusion-pipeline"],

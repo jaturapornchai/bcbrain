@@ -7,3 +7,6 @@ node_modules/
 *.key
 next-env.d.ts
 *.tsbuildinfo
+.sync-state.json
+.sync.lock
+.sync-logs/

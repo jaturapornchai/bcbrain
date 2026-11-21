@@ -12,7 +12,15 @@
     "test": "node scripts/selftest.ts",
     "test:deep": "node scripts/deep-test.ts",
     "check": "node scripts/check-notes.mjs",
-    "check:drift": "node scripts/check-notes.mjs D:/bcaiaccount --strict --drift"
+    "check:drift": "node scripts/check-notes.mjs D:/bcaiaccount --strict --drift",
+    "verify:grounding": "node scripts/verify-grounding.mjs",
+    "sync:check": "node scripts/detect-changes.mjs",
+    "sync:plan": "node scripts/hourly-sync.mjs --plan-only",
+    "sync:finalize": "node scripts/hourly-sync.mjs --finalize",
+    "sync:dry": "node scripts/hourly-sync.mjs --dry-run",
+    "sync:now": "node scripts/hourly-sync.mjs",
+    "deploy:win": "node scripts/deploy.mjs",
+    "task:install": "node scripts/install-hourly-task.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

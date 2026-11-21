@@ -21,7 +21,7 @@ registerHooks({
 });
 
 const { GROUPS, RELATION_TYPES, groupOf, inferRelation, matchesAudience } = await import("../lib/groups.ts");
-const { collectRelatedMedia, connectedNeighbors, excerpt, expandSynonyms, extractNoteMedia, findMedia, getNote, graph, parseYouTubeUrl, renderNote, resolveBcImageUrl, search, terms, traverseGraph, vault } = await import("../lib/vault.ts");
+const { collectRelatedMedia, connectedNeighbors, excerpt, expandSynonyms, extractNoteMedia, findMedia, getNote, graph, parseYouTubeUrl, renderNote, resolveBcImageUrl, search, searchWithMeta, terms, traverseGraph, vault } = await import("../lib/vault.ts");
 type NoteType = import("../lib/vault.ts").Note;
 
 // 1. Groups & Audience contract
@@ -51,6 +51,8 @@ assert.ok(terms("ic_trans_detail").includes("ic_trans_detail"), "full identifier
 
 const ex = excerpt("intro\n## A\n" + "x".repeat(50) + "\n## B gold\ngold", ["gold"], 30);
 assert.ok(ex.includes("## B gold") && !ex.includes("xxx") && ex.includes("omitted sections: A"), ex);
+const exFence = excerpt("intro\n```sql\nSELECT " + "a, ".repeat(40) + "b FROM ic_trans;\n```", ["sql"], 60);
+assert.equal((exFence.match(/^```/gm) ?? []).length % 2, 0, "excerpt closes unclosed code fence cleanly");
 
 // 3. XSS / wikilink render safety
 const synthetic: NoteType = {
@@ -309,8 +311,16 @@ assert.ok(
   "implicit SQL synapse links sql-ic-stock-balance -> tbl-ic-trans-detail",
 );
 assert.ok(
-  [...vault().values()].filter((n) => n.audience !== "dev").every((n) => n.outEdges.every((e) => !e.inferred)),
-  "implicit SQL table synapses only apply to dev notes",
+  [...vault().values()]
+    .filter((n) => n.audience !== "dev")
+    .every((n) =>
+      n.outEdges.every(
+        (e) =>
+          !e.inferred ||
+          (e.rel === "shares_menu" && vault().get(e.slug)?.audience === "user"),
+      ),
+    ),
+  "implicit SQL/code synapses only apply to dev notes; inferred shares_menu stays strictly inside user zone",
 );
 assert.ok(
   traverseGraph({ slug: "start-mcp-ai", depth: 2, audience: "user" }).neighbors.every((s) => s.audience !== "dev"),
@@ -376,4 +386,25 @@ assert.ok(menuPeers.neighbors.some((s) => s.slug === "ts-stock-cost-mismatch-reb
 const codePeers = traverseGraph({ slug: "doc-marketplace-payroll-dbd-evrt", depth: 1, relation: "implements_code", audience: "dev" });
 assert.ok(codePeers.neighbors.length > 0 && codePeers.neighbors.every((s) => s.audience === "dev"), "implements_code links dev notes sharing Go handlers");
 
-console.log("selftest ok");
+// 11. Anti-hallucination confidence scoring (high on grounded queries, low on ungrounded/out-of-domain queries)
+const highMeta = searchWithMeta("โครงสร้างตาราง ic_trans_detail", 4, "dev");
+assert.equal(highMeta.confidence, "high", `grounded dev query should be high confidence, got ${JSON.stringify(highMeta)}`);
+for (const trap of ["ยานอวกาศ ดาวอังคาร บั้งไฟพญานาค คอนโดหรู", "สูตรทำแกงเขียวหวานไก่ใส่กะทิสด", "วิธีปลูกทุเรียนภูเขาไฟ"]) {
+  const lowMeta = searchWithMeta(trap, 4, "user");
+  const cov = lowMeta.bestMatchedTerms / Math.max(1, lowMeta.totalTerms);
+  assert.equal(lowMeta.confidence, "low", `out-of-domain query "${trap}" must flag low confidence, got ${JSON.stringify(lowMeta)}`);
+  assert.ok(cov < 0.5 || lowMeta.topScore < 18, `out-of-domain query "${trap}" must trigger abstain threshold`);
+}
+
+const lang1005 = searchWithMeta("1005 ปรับปรุงภาษา Language Dictionary", 5, "user");
+assert.ok(
+  lang1005.hits.some((h) => h.slug === "menu-catalog-overview" || h.slug === "menu-cat-1-setup" || h.slug === "howto-global-ui-bilingual-datalist-tools"),
+  `1005 search should retrieve menu/language docs, got ${JSON.stringify(lang1005.hits.map((h) => h.slug))}`,
+);
+const fmt1015 = searchWithMeta("1015 กำหนดรูปแบบเลขที่เอกสาร", 3, "user");
+assert.ok(
+  fmt1015.hits.some((h) => h.slug === "start-doc-formats" || h.slug === "menu-cat-1-setup"),
+  `1015 search should retrieve start-doc-formats or menu-cat-1-setup, got ${JSON.stringify(fmt1015.hits.map((h) => h.slug))}`,
+);
+
+console.log(`selftest ok (1005=${JSON.stringify(lang1005.hits.slice(0, 3).map((h) => h.slug))}, 1015=${fmt1015.hits[0]?.slug})`);

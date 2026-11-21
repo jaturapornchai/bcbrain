@@ -18,7 +18,7 @@
   - `traverse_brain(slug, to_slug?, depth?, direction?, relation?, folder?, limit?, audience?)` — follow 18 typed synapse relations (`uses_table`, `writes_table`, `posts_rule`, `has_query`, `exposes_api`, `solves_issue`, `shares_menu`, `implements_code`, `bridges_zone`, etc.) 1–3 hops or find shortest paths (including cross-zone screen <-> code <-> SQL table paths when `audience: "all"`)
   - `read_note(slug)` — full markdown note with `audience`, `youtube_videos`/`images`/`web_pages` summary lines, typed outgoing links, and typed backlinks
   - `list_notes(folder?, tag?, audience?)` — index of notes filterable by `folder`, `tag`, and `audience`
-- **Call Center / Sales mode**: Read `read_note("playbook-call-center")` or `read_note("playbook-sales")` first, then ALWAYS pass `audience: "user"`, cite both exact Thai menu breadcrumb paths AND 4-digit menu codes (`1001`–`9070` across 734 screens via `menu-catalog-overview`), include verified screenshot links (`https://bcaccount.com/...`) and YouTube tutorials (`PLO9P7tPZLXB0` via `Media & Reference Links` or `find_media`), and answer in plain Thai without code/SQL jargon. Cite official pricing/support facts strictly from `sales-pricing-packages`, `sales-accounting-partner`, and `sales-support-implementation-contact` (prices exclude 7% VAT and external AI API costs; never invent custom discounts).
+- **Call Center / Sales mode**: Read `read_note("playbook-call-center")` or `read_note("playbook-sales")` first, then ALWAYS pass `audience: "user"`, cite both exact Thai menu breadcrumb paths AND 4-digit menu codes (`1001`–`9070` across 735 screens via `menu-catalog-overview`), include verified screenshot links (`https://bcaccount.com/...`) and YouTube tutorials (`PLO9P7tPZLXB0` via `Media & Reference Links` or `find_media`), and answer in plain Thai without code/SQL jargon. Cite official pricing/support facts strictly from `sales-pricing-packages`, `sales-accounting-partner`, and `sales-support-implementation-contact` (prices exclude 7% VAT and external AI API costs; never invent custom discounts).
 - **Developer mode**: Read `read_note("playbook-dev")` first, then pass `audience: "dev"` (or `"all"` when business workflow context is also needed). Follow `dev-rules-accounting-sql` (`NUMERIC`, `COALESCE(last_status, 0) = 0`).
 - **Slash Skill (`/bcbrain`)**: Installable skill instructions at https://brain.bcsmethai.com/skills/bcbrain/SKILL.md (handles `/bcbrain`, `/bcbrain dev`, `/bcbrain all`, `/bcbrain setup`, and stateless HTTP JSON-RPC fallback).
 
@@ -30,7 +30,7 @@
 
 ## Canonical Entry Hubs
 - User / Call Center Playbook: https://brain.bcsmethai.com/n/playbook-call-center?mode=user
-- Full 4-Digit Menu Catalog (1001–9070, 734 screens): https://brain.bcsmethai.com/n/menu-catalog-overview?mode=user
+- Full 4-Digit Menu Catalog (1001–9070, 735 screens): https://brain.bcsmethai.com/n/menu-catalog-overview?mode=user
 - YouTube Video Tutorials (Playlist PLO9P7tPZLXB0) & Live Screenshots: https://brain.bcsmethai.com/n/video-visual-tutorials?mode=user
 - Website & 90+ Accounting/Tax Articles Directory (www.bcaccount.com): https://brain.bcsmethai.com/n/website-manual-and-blog-directory?mode=user
 - Official 4-Edition Pricing & Accounting Partner Program: https://brain.bcsmethai.com/n/sales-pricing-packages?mode=user | https://brain.bcsmethai.com/n/sales-accounting-partner?mode=user

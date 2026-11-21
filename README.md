@@ -21,18 +21,26 @@
 | ![หน้ารายละเอียดโน้ตพร้อมสื่อและไซแนปส์](docs/images/note-media-synapses.png) | ![BC Brain Neural Network](app/opengraph-image.png) |
 
 ## Workflow
-1. สกัดความรู้จาก `d:\bcaiaccount` → เขียนโน้ตลง `vault/<โฟลเดอร์>/<slug>.md` ตามกติกาใน `docs/extract-brief.md` (frontmatter `title`, `tags`, `aliases`, `sources` — `sources` เก็บ `path:start-end` เพื่อตรวจภายใน ไม่แสดงบนหน้าเว็บและ MCP)
-   - รัน `node scripts/check-notes.mjs D:/bcaiaccount --strict` เพื่อตรวจ frontmatter, slug ซ้ำข้ามโฟลเดอร์, `sources` ที่มีอยู่จริงพร้อมตรวจช่วงบรรทัดต้น-จบเทียบ EOF, ลิงก์เสีย (`[[wikilink]]` และ `[[relation::slug]]`), ศัพท์โค้ดหลุดในโซนผู้ใช้ทั่วไป และตัวกรองความปลอดภัย `FORBIDDEN_SECURITY` ทุกโฟลเดอร์
-   - รัน `npm run check:drift` เพื่อตรวจสอบว่าไฟล์ต้นทางใน `D:/bcaiaccount` มีการแก้ไขใหม่กว่าวันที่อัปเดตโน้ตหรือไม่
+1. **อัปเดตสมองอัตโนมัติทุก 1 ชั่วโมง (`\bcbrain\hourly-sync` — Read-Only 100% บน `d:\bcaiaccount`)**:
+   - Windows Scheduled Task รัน `scripts/hidden.vbs` → `scripts/hourly-sync.cmd` → `node scripts/hourly-sync.mjs` ทุก 1 ชั่วโมงแบบไม่เปิดหน้าต่าง console
+   - `scripts/detect-changes.mjs` ตรวจ SHA-256 content hash ของโค้ดจริงใน `d:\bcaiaccount` (ใช้ `git --no-optional-locks` และอ่านอย่างเดียว ห้ามสร้าง/แก้/ลบไฟล์ใน `d:\bcaiaccount` เด็ดขาด) + ตรวจ `sources:` EOF drift + ตรวจเมนูใหม่ใน `bcMenu.json` (หากไม่มีการเปลี่ยนแปลงจะจบแบบ `NOOP` ใน ~1 วินาที)
+   - เมื่อพบความเปลี่ยนแปลง ตัวสกัด AI (`claude.exe` จำกัดสิทธิ์ `--tools "Read,Glob,Grep"` เท่านั้น) อ่านโค้ดจริงแล้วอัปเดตเฉพาะโน้ตที่กระทบใน `vault/` ผ่าน **7 ด่านตรวจกันหลอน**:
+     1. `node scripts/check-notes.mjs D:/bcaiaccount --strict`
+     2. `node scripts/scan-secrets.mjs`
+     3. `node scripts/verify-grounding.mjs` (ตรวจรหัสเมนู 4 หลักเทียบ `bcMenu.json`, ตาราง SQL ในบล็อกโค้ดเทียบ schema/backend จริง และ shrink guard กันโน้ตหดหาย)
+     4. `npx tsc --noEmit`
+     5. `npm test` (`selftest.ts`)
+     6. `npm run test:deep` (`deep-test.ts`)
+     7. `node scripts/deploy.mjs` → `npm run build` + แพ็ก standalone/public/vault + สลับ `/opt/bcbrain` แบบ atomic (สำรอง `/opt/bcbrain.prev`) + ยิง `scripts/mcp-eval.mjs https://brain.bcsmethai.com/mcp` บน Production จริง (หากไม่ผ่านให้ rollback อัตโนมัติทันที)
 2. `npm run build` → `prebuild` รัน `scripts/scan-secrets.mjs` สแกนคีย์/โทเค็น/รหัสผ่าน/hash (`bcrypt`, `argon2`)/อีเมล/IP สาธารณะใน `vault/` และโฟลเดอร์ skill หากพบ build จะหยุดทันที (พิมพ์เฉพาะ `ไฟล์:บรรทัด`)
-3. `bash deploy/deploy.sh` → build + แพ็ก standalone + `public` + `vault` → อัปโหลดไป `/opt/bcbrain` (สำรองรุ่นก่อนที่ `/opt/bcbrain.prev`) → restart `bcbrain.service`
-4. Caddy (`brain.bcsmethai.com` → `127.0.0.1:3951`) ให้บริการ HTTPS สาธารณะ
+3. Caddy (`brain.bcsmethai.com` → `127.0.0.1:3951`) ให้บริการ HTTPS สาธารณะ
 
 โครงสร้างโค้ดหลัก:
 - `lib/groups.ts` — นิยาม 16 โฟลเดอร์ (`root` = `both`, 9 โฟลเดอร์โซน `user`, 6 โฟลเดอร์โซน `dev`), สี, ชื่อภาษาไทย, `groupOf()`, `matchesAudience()`, `RelationType`, `RELATION_LABEL`, `inferRelation()`
-- `lib/vault.ts` — Lean In-Memory GraphRAG: โหลด `vault/` แบบ atomic `VaultBundle`, สร้างเส้นประสาทเชื่อมโยงอัตโนมัติ 4 ชั้น (Explicit typed wikilinks + Cross-folder 4-digit menu synapses `shares_menu` + Implicit SQL table synapses `uses_table`/`writes_table` + Shared source-code synapses `implements_code` & Cross-zone bridges `bridges_zone`), อินเด็กซ์กลับด้าน (`Int32Array`/`Float32Array` postings), ปรับรูปคำไทย/ภาษี + ตัดคำไทย `Intl.Segmenter` + คำพ้องไทย-SQL + BM25 + Relation-Weighted 1-hop graph boost, พิกัดสมอง 3D ล่วงหน้า (`computeBrainLayout()`), แคช HTML กัน XSS และ `traverseGraph()` (multi-hop 1–3 ทอด & shortest path)
+- `lib/vault.ts` — Lean In-Memory GraphRAG: โหลด `vault/` แบบ atomic `VaultBundle`, สร้างเส้นประสาทเชื่อมโยงอัตโนมัติ 4 ชั้น (Explicit typed wikilinks + Dynamic 4-digit menu synapses `shares_menu` + Implicit SQL table synapses `uses_table`/`writes_table` + Shared source-code synapses `implements_code` & Cross-zone bridges `bridges_zone`), อินเด็กซ์กลับด้าน pre-warmed (`warmVaultIndexes()`), ปรับรูปคำไทย/ภาษี + ตัดคำไทย `Intl.Segmenter` + คำพ้องไทย-SQL + BM25 + Relation-Weighted 1-hop graph boost, ระบบวัดความมั่นใจกันหลอน (`searchWithMeta()`), `excerpt()` แบบไม่ตัดกลาง code fence, พิกัดสมอง 3D ล่วงหน้า (`computeBrainLayout()`), แคช HTML กัน XSS และ `traverseGraph()` (multi-hop 1–3 ทอด & shortest path)
 - `lib/mcp-events.ts`, `app/mcp/events/route.ts` — Bus เหตุการณ์และสตรีม SSE (`/mcp/events`) สำหรับแสดง Terminal สดและปล่อยสัญญาณแสงบนสมอง 3D ทันทีเมื่อ `/mcp` ถูกเรียก (กรองความลับ/อีเมล/IP/เบอร์โทรอัตโนมัติ)
-- `app/mcp/route.ts` — Stateless Streamable HTTP MCP 6 tools (`ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `read_note`, `list_notes`) พร้อมตัวกรอง `audience: "all" | "user" | "dev"`, แนบลิงก์รูปภาพหน้าจอ (`https://bcaccount.com/...`) และคลิป YouTube (`PLO9P7tPZLXB0` พร้อม `thumbnailUrl`/`embedUrl`) อัตโนมัติ, Connected Graph Context 1 ทอด, CORS (`OPTIONS`), จำกัดขนาดคำขอ 32 KB (`413`) และจำกัดอัตราเรียก 180 ครั้ง/นาทีต่อ IP (`429`)
+- `app/mcp/route.ts` — Stateless Streamable HTTP MCP 6 tools (`ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `read_note`, `list_notes`) พร้อมตัวกรอง `audience: "all" | "user" | "dev"`, สัญญาณ `confidence` + แถบเตือนกันหลอนเมื่อคะแนนต่ำ, แนบ `verified_sources` เฉพาะโหมด `dev`, แนบลิงก์รูปภาพหน้าจอ (`https://bcaccount.com/...`) และคลิป YouTube (`PLO9P7tPZLXB0` พร้อม `thumbnailUrl`/`embedUrl`) อัตโนมัติ, Connected Graph Context 1 ทอด, CORS (`OPTIONS`), จำกัดขนาดคำขอ 32 KB (`413`) และจำกัดอัตราเรียก 180 ครั้ง/นาทีต่อ IP (`429`)
+- `scripts/detect-changes.mjs`, `scripts/verify-grounding.mjs`, `scripts/hourly-sync.mjs`, `scripts/deploy.mjs`, `scripts/install-hourly-task.mjs` — ชุดระบบอัปเดตสมองอัตโนมัติทุก 1 ชม. แบบอ่านอย่างเดียว + 7 ด่านตรวจกันหลอน + deploy และ rollback อัตโนมัติ
 - `components/Brain3D.tsx`, `components/Shell.tsx`, `app/page.tsx`, `app/n/page.tsx`, `app/n/[slug]/page.tsx` — หน้าเว็บสมอง 3 มิติ (ใช้พิกัดที่คำนวณจากเซิร์ฟเวอร์ทันที) และหน้าคลังโน้ตพร้อมตัวสลับโหมด 3 ปุ่ม
 - `app/layout.tsx`, `app/robots.ts`, `app/sitemap.ts`, `public/llms.txt`, `app/icon.png`, `app/opengraph-image.png`, `next.config.ts` — โครงสร้าง Metadata, OpenGraph/Twitter Image, Sitemap/Robots/LLMs index และ HTTP Security & `Cache-Control` headers
 - `.agents/skills/bcbrain/SKILL.md`, `public/skills/bcbrain/SKILL.md` — Skill `/bcbrain` สำหรับเชื่อมและเรียกใช้สมอง BC ผ่าน MCP (หรือ HTTP JSON-RPC fallback) ดาวน์โหลดได้ที่ `/skills/bcbrain/SKILL.md`
@@ -63,6 +71,11 @@ npm test               # selftest: groups, isolation, ตัดคำไทย, 
 npm run test:deep      # deep-test: 6 มิติ (ตัดคำ/คำพ้อง 27 ข้อ, ค้นหา 116 เคส, แยกโซน 365 โน้ต, กราฟ 3D/XSS/PNG, fuzz, throughput)
 npm run check          # ตรวจโน้ตใน vault (ส่ง path ของ bcaiaccount และ --strict เพื่อตรวจเข้มงวด)
 npm run check:drift    # ตรวจโน้ตแบบ --strict พร้อมรายงานโน้ตที่ไฟล์โค้ดใน D:/bcaiaccount แก้ใหม่กว่าโน้ต (--fail-on-drift เพื่อบังคับ exit 1)
+npm run verify:grounding # ตรวจความถูกต้องกันหลอน (เมนู 4 หลักเทียบ bcMenu.json + ตาราง SQL เทียบ schema/backend + EOF)
+npm run sync:check     # ตรวจว่า D:/bcaiaccount มีไฟล์เปลี่ยนหรือโน้ตได้รับผลกระทบอะไรบ้าง (อ่านอย่างเดียว)
+npm run sync:dry       # ทดลองวางแผนสกัดความรู้โดยไม่แก้ไฟล์และไม่ deploy
+npm run sync:now       # สกัดความรู้ส่วนที่เปลี่ยน + ตรวจ 7 ด่าน + deploy ขึ้น Production อัตโนมัติ
+npm run task:install   # ติดตั้ง Windows Scheduled Task \bcbrain\hourly-sync ให้ทำงานอัตโนมัติทุก 1 ชั่วโมง
 npm run scan           # สแกนความลับใน vault และไฟล์ skill
 node scripts/mcp-eval.mjs http://localhost:3000/mcp         # ประเมิน MCP 51 เคส (ทั้งโหมด user/Call Center/Sales, dev และ cross-zone synapses) บนเครื่อง
 node scripts/mcp-eval.mjs https://brain.bcsmethai.com/mcp   # ประเมิน MCP 51 เคส บน Production จริง
