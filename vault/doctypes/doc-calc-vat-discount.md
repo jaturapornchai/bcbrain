@@ -11,9 +11,11 @@ aliases:
   - "ขายสด ขายเชื่อ ซื้อสด ซื้อเชื่อ inquiry_type"
 sources:
   - "backend/internal/application/process/transcalc.go:15-217"
+  - "backend/internal/application/process/trans_grid.go:227-280"
   - "backend/internal/application/process/trans.go:250-560"
   - "backend/internal/application/process/docs.go:600-635"
   - "frontend/account/transaction/transLayouts.ts:45-210"
+  - "frontend/account/transaction/TransItemGrid.tsx:1212-1244"
 ---
 
 # สูตรคำนวณส่วนลด ภาษีมูลค่าเพิ่ม 4 รูปแบบ (`vat_type`) และความหมาย `inquiry_type`
@@ -70,6 +72,11 @@ $$\text{total\_amount} = \text{total\_after\_vat} + \text{total\_except\_vat} \q
 ### ตัวเลือกใน `erp_option` ที่มีผลต่อส่วนลดและมัดจำ (`transcalc.go`)
 - `item_price_decimal` / `item_amount_decimal`: จำนวนทศนิยมราคาต่อหน่วยและจำนวนเงิน (ค่าเริ่มต้น `2` ตำแหน่ง ปัดเศษแบบ Half-Up)
 - `discout_type` / `discount_vat_type`: กำหนดลำดับการหักส่วนลดท้ายบิลและเงินมัดจำ (`advance_amount`) ว่าหักก่อนคิด VAT หรือหักหลังคิด VAT เพื่อให้ตรงกับใบกำกับภาษีของคู่ค้า
+
+### การแก้ไขช่อง `sum_amount` โดยตรง (`SumAmountManual`)
+- ในตารางสินค้า (`TransItemGrid.tsx`) ผู้ใช้สามารถกรอกช่อง `sum_amount` (คอลัมน์ "จำนวนเงิน") โดยตรงเมื่อ `qty * price` มีเศษปัดทศนิยมไม่ตรงหน้าบิล (`Changed: "sumAmount"`, `SumAmountManual: true`)
+- `trans_grid.go` (`onSumAmount`) จะปัด `sum_amount` ตามทศนิยม `amount` และคำนวณ `price` ย้อนกลับด้วย `*big.Rat` (ถ้าไม่มีส่วนลดหรือราคาเป็น 0; หาก `qty = 0` และ `sum_amount != 0` จะตั้ง `qty = 1` และ `price = sum_amount`) พร้อมคง `sum_amount` ตามที่กรอกไว้ไม่ให้ `qty * price` ทับ และยังคงตรวจสิทธิ์ขายต่ำกว่าทุน/ราคามาตรฐานตามปกติ
+- หากผู้ใช้แก้ `itemCode`, `qty`, `unitCode`, `price`, `discount` หรือ `vatType` ภายหลัง ระบบจะรีเซ็ต `SumAmountManual = false` เพื่อคำนวณยอดตามสูตรปกติอีกครั้ง
 
 ---
 

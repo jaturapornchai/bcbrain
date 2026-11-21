@@ -14,7 +14,7 @@ sources:
   - frontend/shared/ui/BcCalculatorDialog.tsx:1-322
   - frontend/shared/ui/BcMapPickerModal.tsx:1-1629
   - frontend/shared/components/BusinessExtFieldsCard.tsx:1-986
-  - frontend/account/master/LanguageManageScreen.tsx:36-757
+  - frontend/account/master/LanguageManageScreen.tsx:36-755
 ---
 
 # เครื่องมือมาตรฐานทุกหน้าจอ สองภาษาไทย-อังกฤษ ปรับแต่งตาราง ประวัติแก้ไข เครื่องคิดเลข และแผนที่
