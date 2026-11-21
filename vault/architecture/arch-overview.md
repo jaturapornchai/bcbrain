@@ -52,3 +52,4 @@ sources: ["backend/internal/di/container.go:40-197", "backend/internal/adapter/i
 - [[part_of_arch::arch-pos-flutter-objectbox-sync]] — สถาปัตยกรรม Flutter POS Offline-First (`ObjectBox` 13 structs, `SyncEngine`, `ThermalPrinterService` TIS-620)
 - [[part_of_arch::arch-company-brain-fusion-pipeline]] — สถาปัตยกรรมเชิงลึก Company Brain (`TwoStageBrainExecutor`, `.rl` graph, 5-Channel RRF Fusion)
 - [[part_of_arch::arch-i18n-field-help-schema-forms]] — สถาปัตยกรรม Schema-Driven Forms (`erpOption` 9 tabs), Field Help, ระบบสองภาษา DOM และ Report Hierarchy
+- [[part_of_arch::arch-process-jobs-queue]] — สถาปัตยกรรมคิวประมวลผลแบบกระจาย (`JobEngine`, `bc_process_job` / `bc_process_outbox`, Redis Streams, `AutoScaler` AIMD)

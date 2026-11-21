@@ -32,7 +32,7 @@ sources: ["backend/internal/adapter/inbound/http/router.go:65-122", "backend/int
 | `/process/ar/rebuild` | คำนวณยอดลูกหนี้คงค้างและตัดชำระใหม่ (`RebuildAR`) | ปรับปรุงยอดค้างชำระลูกหนี้ให้ตรงกับรายการรายวัน |
 | `/process/ap/rebuild` | คำนวณยอดเจ้าหนี้คงค้างและตัดชำระใหม่ (`RebuildAP`) | ปรับปรุงยอดค้างชำระเจ้าหนี้ให้ตรงกับรายการรายวัน |
 | `/process/options/runtime` | `GET` / `POST` อ่านสวิตช์ `CompanyRuntimeOptions` จาก `erp_option` + สิทธิ์ `erp_user` | ให้ Web / Desktop / Mobile ใช้กติกาชุดเดียวกันกับฝั่ง Go (`runtime_options.go`) |
-| `/process/jobs/enqueue` | สั่งรันคิวงานประมวลผลเบื้องหลัง (`stock_rebuild`, `ar_rebuild`, `ap_rebuild`, `gl_rebuild`) | รองรับ `priority`, `idempotencyKey` และ `chainNext` (`202 Accepted`) |
+| `/process/jobs/enqueue` | สั่งรันคิวงานประมวลผลเบื้องหลัง (`stock_rebuild`, `ar_rebuild`, `ap_rebuild`, `gl_rebuild`) | รองรับ `priority`, `idempotencyKey` และ `chainNext` (`202 Accepted`) — ดูสถาปัตยกรรม [[part_of_arch::arch-process-jobs-queue]] |
 | `/process/jobs`, `/process/jobs/health`, `/process/jobs/{jobId}` | `GET` ดูรายการคิว, สถานะ Cluster/AutoScaler และรายละเอียดงาน (`POST .../cancel` เพื่อยกเลิก) | ใช้ Broker แบบ Resilient Redis/Memory และรองรับสตรีมสด SSE |
 | `/process/jobs/events`, `/process/jobs/{jobId}/events` | `GET` SSE Stream ติดตามความคืบหน้าคิวงานทั้งบริษัทหรือราย `jobId` | ส่ง Event อัปเดตความคืบหน้าแบบเรียลไทม์ |
 | `/process/gl/template-defaults` | โหลดรูปแบบลงบัญชีอัตโนมัติ (`gl_journal_template`) | - |
