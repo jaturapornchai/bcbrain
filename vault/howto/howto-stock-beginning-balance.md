@@ -3,7 +3,7 @@ title: "บันทึกสินค้าและวัตถุดิบค
 tags: [howto, stock, beginning-balance]
 aliases: ["ยอดยกมาสินค้า", "สินค้าคงเหลือยกมา", "บันทึกยอดยกมาสต๊อก"]
 sources:
-  - "backend/internal/application/process/bcMenu.json:2402"
+  - "backend/internal/application/process/bcMenu.json:2419"
   - "frontend/account/tabs/transMenuMap.ts:924"
   - "frontend/account/transaction/StockBeginningBalanceScreen.tsx:1108"
   - "frontend/account/transaction/StockBeginningBalanceScreen.tsx:1458"
