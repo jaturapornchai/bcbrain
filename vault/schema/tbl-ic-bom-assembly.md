@@ -5,13 +5,13 @@ aliases: [ic_bom_header, ic_bom_detail, ic_assembly_order, ic_formular, ic_produ
 sources:
   - scripts/sql/02_data_schema.sql:5087-5116
   - scripts/sql/02_data_schema.sql:6043-6084
-  - backend/internal/application/process/bom_assembly.go:167-565
+  - backend/internal/application/process/bom_assembly.go:166-628
   - scripts/sql/33_seed_bcdemo_bom_assembly.sql:1-81
 ---
 
 # `ic_bom_header`, `ic_bom_detail` & `ic_assembly_order` — สูตรผลิต BOM และใบสั่งประกอบ
 
-ระบบสูตรการผลิตและใบสั่งประกอบ/ผลิตสินค้าใช้ชุดตาราง **`ic_bom_*` + `ic_assembly_order`** ที่สร้างโดย Go Backend (`bom_assembly.go:167-235` พร้อม `PRIMARY KEY` จริง; สำหรับฐานข้อมูลตัวอย่าง `bcdemo` มี `ensureDemoBomSeedTx` และ `33_seed_bcdemo_bom_assembly.sql` เติมสูตรตัวอย่าง `BOM-DEMO-01`, `BOM-DEMO-02` อัตโนมัติเมื่อยังไม่มีข้อมูล และ `listBomAssembly` ดึงรายการ `Components` จาก `ic_bom_detail` กลับมาครบทุกสูตร) และรองรับการทำงานแบบ Atomic Transaction โดยสร้างเอกสาร **เบิกวัตถุดิบ (`trans_flag = 56`)** คู่กับ **รับสินค้าสำเร็จรูป (`trans_flag = 54`)** ใน [[tbl-ic-trans]] / [[tbl-ic-trans-detail]] นอกจากนี้ใน `02_data_schema.sql` ยังมีตารางสูตร C# ดั้งเดิม (`ic_formular*` และ `ic_production_formula*`) อยู่ด้วย
+ระบบสูตรการผลิตและใบสั่งประกอบ/ผลิตสินค้าใช้ชุดตาราง **`ic_bom_*` + `ic_assembly_order`** ที่สร้างโดย Go Backend (`bom_assembly.go:166-235` พร้อม `PRIMARY KEY` จริง; สำหรับฐานข้อมูลตัวอย่าง `bcdemo` มี `ensureDemoBomSeedTx` และ `33_seed_bcdemo_bom_assembly.sql` เติมสูตรตัวอย่าง `BOM-DEMO-01`, `BOM-DEMO-02` อัตโนมัติเมื่อยังไม่มีข้อมูล และ `listBomAssembly` ดึงรายการ `Components` จาก `ic_bom_detail` กลับมาครบทุกสูตร) และรองรับการทำงานแบบ Atomic Transaction โดยสร้างเอกสาร **เบิกวัตถุดิบ (`trans_flag = 56`)** คู่กับ **รับสินค้าสำเร็จรูป (`trans_flag = 54`)** ใน [[tbl-ic-trans]] / [[tbl-ic-trans-detail]] นอกจากนี้ใน `02_data_schema.sql` ยังมีตารางสูตร C# ดั้งเดิม (`ic_formular*` และ `ic_production_formula*`) อยู่ด้วย
 
 ## 1. ตารางสูตรผลิตและใบสั่งประกอบ (`bom_assembly.go:167-230`)
 
