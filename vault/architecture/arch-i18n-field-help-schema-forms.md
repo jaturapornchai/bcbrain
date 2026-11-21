@@ -12,6 +12,7 @@ sources:
   - frontend/src/config/i18n/bcLanguageStore.ts:1-120
   - frontend/src/config/i18n/bcBilingualDataCache.ts:1-120
   - frontend/shared/components/GlobalLanguageTranslator.tsx:1-120
+  - backend/internal/platform/i18n/language.json:1-30
   - backend/internal/application/process/report_hierarchy.go:1-663
   - frontend/workmonitor/WorkstationTelemetryAgent.tsx:1-1676
 ---
