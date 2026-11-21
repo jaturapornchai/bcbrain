@@ -14,7 +14,7 @@ sources:
   - frontend/account/master/ItemScreen.tsx:2566-2650
   - frontend/src/config/help/data/ic.json:169-269
   - backend/internal/application/process/hidden_cost.go:15-26
-  - frontend/account/master/HiddenCostScreen.tsx:1060-1085
+  - frontend/account/master/HiddenCostScreen.tsx:1097-1155
   - backend/internal/application/process/stock_lot.go:488-741
   - frontend/src/config/schemas/erpOption/tab3Item.ts:88-148
 ---

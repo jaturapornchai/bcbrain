@@ -13,7 +13,7 @@ sources:
   - frontend/src/config/help/data/trans.json:3-56
   - frontend/account/master/DocFormatScreen.tsx:198-283
   - backend/internal/application/process/doc_format_defaults.go:27-107
-  - backend/internal/application/process/doc_no_next.go:11-79
+  - backend/internal/application/process/doc_no_next.go:11-78
   - frontend/src/lib/doc-no.ts:1-41
   - frontend/src/lib/doc-no-helpers.ts:1-29
 ---

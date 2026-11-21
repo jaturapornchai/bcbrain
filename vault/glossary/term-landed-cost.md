@@ -13,7 +13,7 @@ aliases:
 sources:
   - backend/internal/application/process/hidden_cost.go:15-26
   - frontend/account/master/HiddenCostScreen.tsx:4-7
-  - frontend/account/master/HiddenCostScreen.tsx:1060-1085
+  - frontend/account/master/HiddenCostScreen.tsx:1097-1155
   - frontend/src/config/schemas/erpOption/tab3Item.ts:109
 ---
 

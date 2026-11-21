@@ -9,6 +9,7 @@ sources:
   - backend/internal/application/process/hidden_cost.go:15-100
   - backend/internal/application/process/hidden_cost.go:649-710
   - backend/internal/application/process/hidden_cost.go:809-875
+  - backend/internal/application/process/doc_no_next.go:12-44
 ---
 
 # `ic_hidden_cost_process` — ประมวลผลต้นทุนแฝง / นำเข้า และต้นทุนตามน้ำหนัก
@@ -21,7 +22,7 @@ sources:
 ## 1. ตารางชุดต้นทุนแฝง `ic_hidden_cost_process*` (`hidden_cost.go:674-706,809-870`)
 
 ### 1.1 `ic_hidden_cost_process` (หัวเอกสารต้นทุนแฝง AFC)
-- **Logical Key**: `doc_no`
+- **Logical Key**: `doc_no` (ไม่มีคอลัมน์ `trans_flag` — endpoint `docnonext` ใน `doc_no_next.go:12,33-40` จึงรันเลขโดยไม่กรอง `trans_flag` เช่นเดียวกับ `gl_journal`)
 - **คอลัมน์หลักและคอลัมน์นำเข้าต่างประเทศ**:
   - `doc_no`, `doc_date`, `doc_time`, `doc_format_code`, `branch_code`, `remark`
   - `doc_no_adjust`, `doc_format_code_adjust`: เลขที่เอกสารปรับปรุงมูลค่า (`ic_trans` `trans_flag = 66`) ที่สร้างคู่กัน
