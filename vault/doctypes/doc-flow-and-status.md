@@ -13,7 +13,7 @@ aliases:
 sources:
   - "backend/internal/application/process/doc_flow.go:19-520"
   - "backend/internal/application/process/doc_flow_graph.go:25-490"
-  - "backend/internal/application/process/service.go:721-975"
+  - "backend/internal/application/process/service.go:821-855"
 ---
 
 # สายโซ่การอ้างอิงเอกสาร (Document Flow) และสถานะ `used_status` / `doc_success`
@@ -104,5 +104,5 @@ flowchart LR
 | **`used_status_2`** | `0` = ปกติ<br>`1` = ถูกอ้างอิงขั้นที่สอง | ใช้แยกสถานะการอ้างอิงสายรอง เช่น เงินมัดจำที่ถูกผูกกับ PO/SO เทียบกับการตัดชำระจริง |
 | **`doc_success`** | `0` = ยังค้างส่ง/ค้างรับ (Open)<br>`1` = ดำเนินการครบทุกรายการแล้ว (Completed) | คำนวณระดับหน่วยฐาน (`qty * stand_value / divide_value`): เมื่อผลรวมจำนวนที่ส่ง/รับจริง **บวก** จำนวนที่ยกเลิกรายบรรทัด (`cancel_type = 2`) `>=` จำนวนสั่งตั้งต้นทุกรายการ ระบบจะตั้ง `doc_success = 1` |
 
-### สูตรตรวจสอบ `doc_success` ของใบสั่งขาย (`trans_flag = 36`) จาก `service.go:721-736`
+### สูตรตรวจสอบ `doc_success` ของใบสั่งขาย (`trans_flag = 36`) จาก `service.go:821-837`
 ใบสั่งขาย `h` (`trans_flag = 36`) จะได้ `doc_success = 1` ก็ต่อเมื่อผลรวมปริมาณหน่วยฐานของทุกรายการสินค้าใน `ic_trans_detail` ของใบสั่งขาย น้อยกว่าหรือเท่ากับผลรวมปริมาณหน่วยฐานในเอกสารปลายน้ำ `trans_flag IN (37, 44)` (ใบยกเลิกสั่งขายรายบรรทัด + ใบขายจริง) ที่ `ref_doc_no = h.doc_no` และ `COALESCE(last_status, 0) = 0` (ดูตัวอย่าง SQL ดึงงานค้างส่งที่ [[sql-sale-quotation-so-backlog]] และ [[sql-buy-pr-po-grn-backlog]])

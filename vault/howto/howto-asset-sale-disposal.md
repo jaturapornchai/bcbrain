@@ -11,9 +11,9 @@ aliases:
   - กำไรขาดทุนจากการขายสินทรัพย์
 sources:
   - frontend/account/transaction/AssetSaleScreen.tsx:116-140
-  - frontend/account/transaction/AssetSaleScreen.tsx:287-390
+  - frontend/account/transaction/AssetSaleScreen.tsx:287-420
   - frontend/account/transaction/AssetSaleScreen.tsx:538-780
-  - frontend/account/transaction/AssetSaleScreen.tsx:863-1016
+  - frontend/account/transaction/AssetSaleScreen.tsx:863-1027
   - backend/internal/application/process/fa_sale.go:160
   - backend/internal/application/process/fa_sale.go:292
   - backend/internal/application/process/fa_sale.go:385

@@ -5,18 +5,18 @@ aliases: [ic_bom_header, ic_bom_detail, ic_assembly_order, ic_formular, ic_produ
 sources:
   - scripts/sql/02_data_schema.sql:5087-5116
   - scripts/sql/02_data_schema.sql:6043-6084
-  - backend/internal/application/process/bom_assembly.go:166-628
-  - backend/internal/application/process/bom_assembly.go:922-931
-  - backend/internal/application/process/bom_assembly.go:1570-1620
-  - backend/internal/application/process/bom_assembly.go:1737-1795
-  - backend/internal/application/process/service.go:2269-2278
-  - backend/internal/application/process/service.go:3119-3157
+  - backend/internal/application/process/bom_assembly.go:130-435
+  - backend/internal/application/process/bom_assembly.go:840-960
+  - backend/internal/application/process/bom_assembly.go:1586-1650
+  - backend/internal/application/process/bom_assembly.go:1756-1815
+  - backend/internal/application/process/service.go:2385-2394
+  - backend/internal/application/process/service.go:3235-3274
   - scripts/sql/33_seed_bcdemo_bom_assembly.sql:1-81
 ---
 
 # `ic_bom_header`, `ic_bom_detail` & `ic_assembly_order` — สูตรผลิต BOM และใบสั่งประกอบ
 
-ระบบสูตรการผลิตและใบสั่งประกอบ/ผลิตสินค้าใช้ชุดตาราง **`ic_bom_*` + `ic_assembly_order`** ที่สร้างโดย Go Backend (`bom_assembly.go:166-235` พร้อม `PRIMARY KEY` จริง; สำหรับฐานข้อมูลตัวอย่าง `bcdemo` มี `ensureDemoBomSeedTx` และ `33_seed_bcdemo_bom_assembly.sql` เติมสูตรตัวอย่าง `BOM-DEMO-01`, `BOM-DEMO-02` อัตโนมัติเมื่อยังไม่มีข้อมูล และ `listBomAssembly` ดึงรายการ `Components` จาก `ic_bom_detail` กลับมาครบทุกสูตร) และรองรับการทำงานแบบ Atomic Transaction โดยสร้างเอกสาร **เบิกวัตถุดิบ (`trans_flag = 56`)** คู่กับ **รับสินค้าสำเร็จรูป (`trans_flag = 54`)** ใน [[tbl-ic-trans]] / [[tbl-ic-trans-detail]] พร้อมซิงก์ `fg_total_cost` และสั่ง `rebuildGLTx` โพสต์บัญชี `trans_flag = 54` เฉพาะใบรับที่ผูกใน `ic_assembly_order.receipt_doc_no` (`bom_assembly.go:1570-1620`, `service.go:2269-2278, 3119-3157`) นอกจากนี้ `saveBomFormula` ยังตรวจจับสูตรวนลูปหลายทอด (`checkBomCycle` ป้องกัน A → B → A) และรองรับโครงสร้าง `ic_formular*` กับ `ic_production_formula*` เดิมใน `02_data_schema.sql` อยู่ด้วย
+ระบบสูตรการผลิตและใบสั่งประกอบ/ผลิตสินค้าใช้ชุดตาราง **`ic_bom_*` + `ic_assembly_order`** ที่สร้างโดย Go Backend (`bom_assembly.go:166-260` พร้อม `PRIMARY KEY` จริง; สำหรับฐานข้อมูลตัวอย่าง `bcdemo` มี `ensureDemoBomSeedTx` และ `33_seed_bcdemo_bom_assembly.sql` เติมสูตรตัวอย่าง `BOM-DEMO-01`, `BOM-DEMO-02` อัตโนมัติเมื่อยังไม่มีข้อมูล และ `listBomAssembly` ดึงรายการ `Components` จาก `ic_bom_detail` กลับมาครบทุกสูตร) และรองรับการทำงานแบบ Atomic Transaction โดยสร้างเอกสาร **เบิกวัตถุดิบ (`trans_flag = 56`)** คู่กับ **รับสินค้าสำเร็จรูป (`trans_flag = 54`)** ใน [[tbl-ic-trans]] / [[tbl-ic-trans-detail]] พร้อมซิงก์ `fg_total_cost` และสั่ง `rebuildGLTx` โพสต์บัญชี `trans_flag = 54` เฉพาะใบรับที่ผูกใน `ic_assembly_order.receipt_doc_no` (`bom_assembly.go:1586-1650`, `service.go:2385-2394, 3235-3274`) นอกจากนี้ `normalizeBomAssemblyInput` (`bom_assembly.go:407-433`) รองรับทั้ง Payload แบบแบนและแบบซ้อน `bom` (พร้อม `rmQtyPerYield`), `saveBomFormula` ตรวจจับสูตรวนลูปหลายทอด (`checkBomCycle` ป้องกัน A → B → A ที่ `bom_assembly.go:946, 1756-1815`) และรองรับโครงสร้าง `ic_formular*` กับ `ic_production_formula*` เดิมใน `02_data_schema.sql` อยู่ด้วย
 
 ## 1. ตารางสูตรผลิตและใบสั่งประกอบ (`bom_assembly.go:167-230`)
 

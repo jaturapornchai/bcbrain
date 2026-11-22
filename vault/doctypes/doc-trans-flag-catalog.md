@@ -14,11 +14,11 @@ sources:
   - "backend/internal/application/process/docs.go:25-115"
   - "backend/internal/application/process/doc_cancel.go:30-112"
   - "backend/internal/application/process/gl_template_rules_apar.go:18-95"
-  - "backend/internal/application/process/service.go:2269-2278"
-  - "backend/internal/application/process/service.go:2445-2460"
-  - "backend/internal/application/process/service.go:3119-3157"
+  - "backend/internal/application/process/service.go:2272-2395"
+  - "backend/internal/application/process/service.go:2562-2585"
+  - "backend/internal/application/process/service.go:3235-3274"
   - "backend/internal/application/process/fa_depreciation.go:35-45"
-  - "backend/internal/application/process/cheque.go:19-41"
+  - "backend/internal/application/process/cheque.go:19-56"
   - "backend/internal/application/process/report_menu_cb.go:152-584"
 ---
 
@@ -110,7 +110,7 @@ sources:
 
 | `trans_flag` | รหัสฟอร์แมต | ชื่อเอกสาร | `calc_flag` | คู่ยกเลิก / ความสัมพันธ์พิเศษ |
 |---:|---|---|---:|---|
-| `54` | `IB` | สินค้า/วัตถุดิบ คงเหลือยกมา และรับสินค้าสำเร็จรูปจากการผลิต BOM | `+1` | ล็อกต้นทุนยกมาเสมอ (`is_lock_cost = 1`); กรณียอดยกมาไม่โพสต์ GL แต่ถ้าระบุใน `ic_assembly_order.receipt_doc_no` จะโพสต์ GL รับเข้าสินค้าสำเร็จรูปอัตโนมัติ (`service.go:2269-2278, 3119-3157`) |
+| `54` | `IB` | สินค้า/วัตถุดิบ คงเหลือยกมา และรับสินค้าสำเร็จรูปจากการผลิต BOM | `+1` | ล็อกต้นทุนยกมาเสมอ (`is_lock_cost = 1`); กรณียอดยกมาไม่โพสต์ GL แต่ถ้าระบุใน `ic_assembly_order.receipt_doc_no` จะโพสต์ GL รับเข้าสินค้าสำเร็จรูปอัตโนมัติ (`service.go:2385-2394, 3235-3274`) |
 | `56` | `IO` | เบิกสินค้า/วัตถุดิบ | `-1` | ยกเลิก=`57` (`IOC`), อ้างใบขอเบิก `122` ได้ |
 | `57` | `IOC` | ยกเลิกใบเบิกสินค้า/วัตถุดิบ | `+1` | `orig_flag = 56` |
 | `58` | `IR` | รับคืนสินค้า/วัตถุดิบ จากการเบิก | `+1` | ยกเลิก=`59` (`IRC`), อ้างใบเบิก `56` |
@@ -200,7 +200,7 @@ sources:
 | `411` | `ic_trans` | `CHP` | บันทึกเช็ครับผ่าน | ยกเลิก=`431` (`CCP`), เปลี่ยนสถานะเป็นเช็คผ่าน (`2`) |
 | `412` | `ic_trans` | `CRT` | บันทึกเช็ครับคืน (เช็คเด้ง) | ยกเลิก=`432` (`CTC`), เปลี่ยนสถานะเป็นเช็ครับคืน (`3`) |
 | `413` | `ic_trans` | `CRC` | บันทึกเช็ครับขาดสิทธิ์/ยกเลิก | ยกเลิก=`433` (`DCC`), เปลี่ยนสถานะเป็นเช็คยกเลิก/ขาดสิทธิ์ (`4`) |
-| `414` | `ic_trans` | — | บันทึกเช็คคืนนำเข้าใหม่ / ขายลดเช็ครับ | ยกเลิก=`434` (`doc_cancel.go:57`); `cheque.go:19,39` แมป `status = 6` (`เช็คคืนนำเข้าใหม่`) และ `service.go:2548,2604` ใช้ใน `glRebuildTransFlags` |
+| `414` | `ic_trans` | — | บันทึกเช็คคืนนำเข้าใหม่ / ขายลดเช็ครับ | ยกเลิก=`434` (`doc_cancel.go:57`); `cheque.go:19,47` แมป `status = 6` (`เช็คคืนนำเข้าใหม่`) และ `service.go:2572,3486` ใช้ใน `glRebuildTransFlags` |
 | `416` | `ic_trans` | `CDE` | บันทึกการเปลี่ยนเช็ค (เช็ครับ) | ยกเลิก=`436` (`CED`), เปลี่ยนสถานะเป็นเช็คเปลี่ยน (`7`) |
 | `418` | `ic_trans` | `CND` | บันทึกคืนเช็ค/ตั้งหนี้ใหม่ (เช็ครับ) | เปลี่ยนสถานะเป็นเช็คตั้งหนี้ใหม่ (`8`) และตั้งลูกหนี้กลับ (จับคู่ด้วย `item_code`) |
 | `420` | `ic_trans` | `TM` | โอนเงินรับเข้าธนาคารปลายทาง (Auto Twin ของ `422`) | สร้างอัตโนมัติผ่าน `SyncTransferPair` (`doc_no` เดียวกับ `422`) |

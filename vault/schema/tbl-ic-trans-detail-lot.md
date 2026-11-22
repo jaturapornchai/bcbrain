@@ -6,7 +6,12 @@ sources:
   - scripts/sql/02_data_schema.sql:6969-6996
   - backend/internal/application/process/stock_lot.go:157-185
   - backend/internal/application/process/stock_lot.go:313-332
-  - backend/internal/application/process/stock_beginning.go:41-125
+  - backend/internal/application/process/db_migrate.go:1015-1025
+  - backend/internal/application/process/service.go:1159-1167
+  - backend/internal/application/process/service.go:1621-1683
+  - backend/internal/application/process/service.go:1926-2023
+  - backend/internal/application/process/stock_beginning.go:39-125
+  - backend/internal/application/process/stock_beginning.go:531-572
   - backend/internal/application/process/trans_lot_auto.go:85-135
   - backend/internal/application/process/trans_save_rules.go:178-188
   - backend/internal/application/process/trans.go:421-425
@@ -39,15 +44,16 @@ sources:
 | `calc_flag` | `smallint` | `1` = รับ Lot เข้า, `-1` = จ่าย Lot ออก |
 | `wh_code`, `shelf_code` | `varchar(25)` | คลังและที่เก็บของ Lot นั้น |
 | `doc_line_number`, `line_number` | `smallint` | `doc_line_number` อ้างลำดับบรรทัดแม่ใน `ic_trans_detail`; `line_number` คือลำดับย่อยของ Lot ภายในบรรทัด |
-| `mfd_date`, `expire_date`, `mfn_name` | `date`, `date`, `varchar(255)` | วันที่ผลิต, วันหมดอายุ (ใช้คำนวณ FEFO), และชื่อผู้ผลิต/แหล่งผลิต |
+| `mfd_date`, `expire_date`, `date_expire`, `mfn_name` | `date`, `date`, `date`, `varchar(255)` | วันที่ผลิต, วันหมดอายุ (`expire_date` และ `date_expire` ถูกซิงก์คู่กันโดย `db_migrate.go:1015-1019`, `stock_beginning.go:567-571` และ `service.go:2010`), และชื่อผู้ผลิต/แหล่งผลิต |
 | `product_year`, `product_week` | `varchar(25)` | ปีและสัปดาห์ที่ผลิต |
 
 ## พฤติกรรมการใช้งานจริงใน Go Backend (Dual Storage Note)
 
 1. **การตรวจสอบและเลือก Lot อัตโนมัติตอนบันทึกเอกสาร (`trans_save_rules.go`, `trans_lot_auto.go`)**:
    - สินค้าที่มี `ic_inventory.cost_type = 2` (LOT กำหนดเอง) ในรายการกลุ่ม `lotFlags` ถ้าไม่ส่ง Lot ระบบจะไม่อนุญาตให้บันทึก (เว้นแต่ตั้งค่า `erp_option.find_lot_auto = 1` ในบิลขาย `44` ซึ่ง `autoLots` ใน `trans_lot_auto.go:50-131` จะอ่านยอดคงเหลือจาก **`ic_trans_detail.lot_number_1`** ด้วย `stockBalancePredicate` แล้วแบ่งบรรทัดให้อัตโนมัติ)
-2. **การบันทึกยอดยกมาและปรับปรุง Lot (`stock_beginning.go`, `stock_lot.go`)**:
-   - หน้าจอยอดยกมาสินค้า (`trans_flag = 54`) และหน้าจอปรับปรุง Lot อัตโนมัติ (`trans_flag = 66` ปรับเพิ่ม IA / `68` ปรับลด IS) บันทึกแถวลงทั้ง `ic_trans_detail` และ `ic_trans_detail_lot` พร้อมกัน และตอนลบเอกสาร `deleteTransTx` (`trans.go:423`) จะลบทั้ง `ic_trans_detail_lot` และ `ic_trans_detail` ด้วย
+2. **การบันทึกยอดยกมา ปรับปรุง Lot และคงเมทาดาต้า Lot ข้ามการ Rebuild (`stock_beginning.go`, `stock_lot.go`, `service.go`)**:
+   - หน้าจอยอดยกมาสินค้า (`trans_flag = 54`) และหน้าจอปรับปรุง Lot อัตโนมัติ (`trans_flag = 66` ปรับเพิ่ม IA / `68` ปรับลด IS) บันทึกแถวลงทั้ง `ic_trans_detail` (รวม `lot_number`, `lot_number_1`, `mfd_date`, `date_expire` ใน `sbInsertDetail`) และ `ic_trans_detail_lot` พร้อมกัน และตอนลบเอกสาร `deleteTransTx` (`trans.go:423`) จะลบทั้ง `ic_trans_detail_lot` และ `ic_trans_detail` ด้วย
+   - ระหว่างรัน `rebuildStockTxWithOptions` (`service.go:1621-1683, 1855-1869, 1926-2023`) ระบบจะอ่าน `preservedLots` (`lot_number`, `mfd_date`, `COALESCE(date_expire, expire_date)`, `mfn_name`) จาก `ic_trans_detail_lot` มาเติมกลับให้การเคลื่อนไหว และคงแถว Lot ที่คีย์มือในเอกสารยอดยกมา (`trans_flag = 54`) ไว้แม้ตัวคำนวณต้นทุนไม่ได้สร้างแถวใหม่ให้ก็ตาม
    - กระบวนการปรับยอดจากใบตรวจนับ (`76`) ใช้ marker ใน [[tbl-ar-ap-trans-detail]] (`m.trans_flag IN (66, 68) AND m.billing_no = t.doc_no`) เพื่อกันการกดสร้างเอกสารปรับซ้ำ (`stock_lot.go:158-160`)
 
 ## ตัวอย่าง SQL จริงจากระบบ

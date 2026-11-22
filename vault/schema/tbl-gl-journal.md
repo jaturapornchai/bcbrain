@@ -44,7 +44,7 @@ sources:
   - backend/internal/application/process/report_menu_gl_fa.go:907
   - backend/internal/application/process/report_menu_gl_fa_tb.go:10
   - backend/internal/application/process/stock_beginning.go:112
-  - backend/internal/application/process/service.go:1756
+  - backend/internal/application/process/service.go:2536-2555
 ---
 
 # ตารางสมุดรายวันทั่วไป มิติปันส่วน และปิดงวดบัญชี
@@ -53,7 +53,7 @@ sources:
 
 > [!WARNING] ข้อควรรู้สำคัญที่สุดเมื่อ Query ตาราง GL
 > 1. **`gl_journal` ไม่มีคอลัมน์ `last_status` ใน DDL มาตรฐาน** (`02_data_schema.sql:4260-4285`) — เมื่อเอกสารต้นทางถูกยกเลิก ระบบจะลบแถว GL ออก หรือให้ตรวจสอบกับหัวเอกสารต้นทาง (`ic_trans` / `ap_ar_trans`) ด้วย `trans_flag` และ `doc_no`
-> 2. **คีย์เชื่อมหัว-ท้ายมาตรฐาน**: `gl_journal` และ `gl_journal_detail` เชื่อมกันด้วย `(doc_date, doc_no, COALESCE(book_code, ''))` (อ้างอิง `report_menu_gl_fa.go:907`, `service.go:1756`) และเวลาจัดทำงบต้องตรวจ `debit = credit` เสมอ
+> 2. **คีย์เชื่อมหัว-ท้ายมาตรฐาน**: `gl_journal` และ `gl_journal_detail` เชื่อมกันด้วย `(doc_date, doc_no, COALESCE(book_code, ''))` (อ้างอิง `report_menu_gl_fa.go:907`, `service.go:2536`) และเวลาจัดทำงบต้องตรวจ `debit = credit` เสมอ
 > 3. **สะกดผิดที่ต้องคงตาม Schema จริง**: ตาราง `gl_summary_close_account_detaiil` มีตัว `i` ซ้อนสองตัว (`detaiil`) และคอลัมน์ปันส่วนในตาราง `gl_journal_*_list` สะกดว่า `allocate_persent` (`persent`)
 
 ---
@@ -108,7 +108,7 @@ sources:
 | `description` | `varchar(5000)` | `''` | คำอธิบายบรรทัด |
 | `debit`, `credit` | `numeric` | `0.0` | จำนวนเงินฝั่งเดบิต และฝั่งเครดิต |
 | `debit_or_credit` | `smallint` | `0` | ฝั่งรายการ: `0` = เดบิต (Debit), `1` = เครดิต (Credit) |
-| `journal_type`, `is_pass` | `smallint` | `0` | ค่าเดียวกับหัว `gl_journal` (ถูกซิงค์ผ่าน `workflow.go:520,627` และ `service.go:1756`) |
+| `journal_type`, `is_pass` | `smallint` | `0` | ค่าเดียวกับหัว `gl_journal` (ถูกซิงค์ผ่าน `workflow.go:520,627` และ `service.go:2538`) |
 | `trans_flag`, `period_number`, `account_year`, `branch_code` | `int`/`smallint`/`varchar` | `0`/`''` | เมทาดาทาที่ซิงค์ตรงกับ `gl_journal` |
 
 ---

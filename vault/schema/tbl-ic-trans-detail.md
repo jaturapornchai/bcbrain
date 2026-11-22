@@ -6,9 +6,10 @@ sources:
   - scripts/sql/02_data_schema.sql:6754-6886
   - scripts/sql/03_audit_r1_migrations.sql:122-152
   - backend/internal/platform/db/pool.go:32-35
-  - backend/internal/application/process/service.go:839-842
-  - backend/internal/application/process/service.go:961-970
-  - backend/internal/application/process/service.go:1048-1338
+  - backend/internal/application/process/db_migrate.go:1015-1025
+  - backend/internal/application/process/service.go:941-970
+  - backend/internal/application/process/service.go:1132-1167
+  - backend/internal/application/process/service.go:1390-1750
   - backend/internal/application/process/stock_rebuild.go:15-65
   - backend/internal/application/process/trans.go:693-724
   - backend/internal/application/process/trans_save_rules.go:241-271
@@ -57,7 +58,7 @@ sources:
 | `price`, `price_exclude_vat`, `discount`, `discount_amount`, `sum_amount`, `sum_amount_exclude_vat`, `total_vat_value` | `numeric`, `varchar(25)` | ราคาต่อหน่วย, ส่วนลด, มูลค่ารวมบรรทัด (ก่อน/รวม VAT) |
 | `average_cost`, `sum_of_cost`, `is_lock_cost`, `sum_of_cost_fix` | `numeric`, `smallint` | ต้นทุนเฉลี่ยต่อหน่วยฐานและต้นทุนรวมของบรรทัด (คำนวณโดย `rebuildStockTx`; ถ้า `is_lock_cost = 1` จะยึด `sum_of_cost_fix` เช่นเอกสารปรับปรุงจากต้นทุนแฝง `hidden_cost.go`) |
 | `hidden_cost_1`, `hidden_cost_1_exclude_vat`, `hidden_cost_2`, `hidden_cost_2_exclude_vat`, `sum_of_cost_1`, `average_cost_1` | `numeric` | ต้นทุนแฝง / ต้นทุนรวมค่าใช้จ่ายนำเข้า (`service.go:654` ป้องกัน `average_cost_1 IS NULL`) |
-| `lot_number_1`, `date_expire`, `mfd_date`, `mfn_name`, `bat_number`, `bat_date`, `product_year`, `product_week` | `varchar`, `date` | ข้อมูล Lot / วันหมดอายุ / วันผลิต บนบรรทัด (คู่กับตาราง [[tbl-ic-trans-detail-lot]]) |
+| `lot_number`, `lot_number_1`, `date_expire`, `mfd_date`, `mfn_name`, `bat_number`, `bat_date`, `product_year`, `product_week` | `varchar`, `date` | ข้อมูล Lot (`db_migrate.go:1020-1022` และ `service.go:1137,1164-1166` รองรับทั้ง `lot_number` และ `lot_number_1`) / วันหมดอายุ / วันผลิต บนบรรทัด (คู่กับตาราง [[tbl-ic-trans-detail-lot]]) |
 | `is_serial_number` | `smallint` | `1` = สินค้าคุม Serial Number (รายละเอียด SN อยู่ที่ [[tbl-ic-trans-serial-number]]) |
 | `ref_doc_no`, `ref_doc_date`, `ref_line_number`, `doc_ref_type`, `ref_row`, `ref_guid`, `set_ref_line`, `item_code_main`, `is_permium` | `varchar`, `integer`, `smallint` | การอ้างอิงบรรทัดข้ามเอกสาร (PO -> ซื้อ, SO -> ขาย) และสายสัมพันธ์แม่-ลูกของสินค้าชุด (`ref_guid` / `set_ref_line`) กับของแถม (`is_permium`) |
 | `temp_float_1`, `temp_float_2`, `temp_string_1` | `numeric`, `varchar(25)` | ช่องเก็บค่าอนุมัติชั่วคราวของใบอนุมัติซื้อ `trans_flag = 4` (`doc_approve_item.go`) |

@@ -4,7 +4,7 @@ audience: dev
 tags: [architecture, process-queue, redis-streams, outbox, autoscaler, worker, concurrency]
 aliases: ["JobEngine", "proc_jobs_engine", "bc_process_job", "bc_process_outbox", "procqueue AutoScaler", "Distributed Worker Daemon", "คิวประมวลผลเบื้องหลัง BC"]
 sources:
-  - backend/internal/application/process/proc_jobs_engine.go:1-1804
+  - backend/internal/application/process/proc_jobs_engine.go:1-1880
   - backend/internal/platform/procqueue/types.go:1-125
   - backend/internal/platform/procqueue/autoscaler.go:1-367
   - backend/internal/platform/procqueue/resilient_broker.go:1-26

@@ -13,7 +13,8 @@ sources:
   - "frontend/account/report/UniversalReportScreen.tsx:250-450"
   - "frontend/account/report/UniversalReportScreen.tsx:1150-1560"
   - "frontend/account/report/GlobalReportPrintModal.tsx:750-1200"
-  - "backend/internal/application/process/report_pdf.go:40-635"
+  - "backend/internal/application/process/report_pdf.go:30-1400"
+  - "backend/internal/application/process/report_lang_lo.go:1-470"
 ---
 
 # คู่มือตั้งค่าหน้ากระดาษ พิมพ์ PDF และส่งออก CSV ทุกรายงาน

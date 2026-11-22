@@ -4,10 +4,11 @@ tags: [howto, stock, hidden-cost, import]
 aliases: ["ต้นทุนแฝง", "ประมวลผลเฉลี่ยต้นทุนแฝง", "ต้นทุนนำเข้าต่างประเทศ", "ปันส่วนค่าขนส่ง"]
 sources:
   - "frontend/account/tabs/screenRegistry.tsx:814"
-  - "frontend/account/master/HiddenCostScreen.tsx:271-308"
-  - "frontend/account/master/HiddenCostScreen.tsx:467-543"
-  - "frontend/account/master/HiddenCostScreen.tsx:786-950"
-  - "frontend/account/master/HiddenCostScreen.tsx:1271-1310"
+  - "frontend/account/master/HiddenCostScreen.tsx:271-320"
+  - "frontend/account/master/HiddenCostScreen.tsx:467-595"
+  - "frontend/account/master/HiddenCostScreen.tsx:786-970"
+  - "frontend/account/master/HiddenCostScreen.tsx:1271-1400"
+  - "frontend/account/master/StockToolBits.tsx:67-97"
   - "backend/internal/application/process/hidden_cost.go:330"
   - "backend/internal/application/process/hidden_cost.go:522"
   - "backend/internal/application/process/hidden_cost.go:710"

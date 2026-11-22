@@ -10,8 +10,10 @@ aliases:
   - "RebuildStock"
   - "lot serial สต็อก"
 sources:
-  - "backend/internal/application/process/service.go:190-505"
-  - "backend/internal/application/process/service.go:1034-1340"
+  - "backend/internal/application/process/service.go:213-584"
+  - "backend/internal/application/process/service.go:748-840"
+  - "backend/internal/application/process/service.go:1390-2040"
+  - "backend/internal/application/process/stock_cost_engine.go:10-120"
   - "backend/internal/application/process/trans.go:780-1120"
 ---
 
@@ -39,7 +41,7 @@ sources:
 $$\text{Base Qty} = \text{qty} \times \frac{\text{COALESCE(NULLIF(stand\_value, 0), 1)}}{\text{COALESCE(NULLIF(divide\_value, 0), 1)}}$$
 
 - ปริมาณคงเหลือจริงต่อคลัง/ที่เก็บ จะคำนวณจาก `SUM(calc_flag * Base Qty)` เสมอ
-- ฟังก์ชัน `updateUnitRatioDetailTx` (`service.go:646`) คอยซิงก์ `stand_value` และ `divide_value` ให้ตรงกับทะเบียนหน่วยนับก่อนประมวลผลสต็อกใหม่
+- ฟังก์ชัน `updateUnitRatioDetailTx` (`service.go:748`) คอยซิงก์ `stand_value` และ `divide_value` ให้ตรงกับทะเบียนหน่วยนับก่อนประมวลผลสต็อกใหม่
 
 ---
 
@@ -50,7 +52,7 @@ $$\text{Base Qty} = \text{qty} \times \frac{\text{COALESCE(NULLIF(stand\_value, 
 2. ภายใน Transaction เดียวกัน ระบบสร้างหัวเอกสารและบรรทัดคู่แฝดขาโอนเข้า **`trans_flag = 70`** (`calc_flag = +1`) โดยใช้ **`doc_no` เดียวกันเป๊ะ** แต่สลับคลังปลายทางมาเป็นคลังรับเข้า (`wh_code`, `shelf_code`)
 3. เมื่อยกเลิกหรือลบใบโอน `72` ระบบจะยกเลิก/ลบแถว `70` ที่มี `doc_no` เดียวกันไปพร้อมกันเสมอ
 
-### กฎลำดับการ Replay ต้นทุน (`RebuildStock` ใน `service.go:1190-1225`)
+### กฎลำดับการ Replay ต้นทุน (`rebuildStockTxWithOptions` ใน `service.go:1686-1730`)
 เพื่อให้ต้นทุนของขาโอนเข้า (`70`) ทราบต้นทุนเฉลี่ยที่ตัดออกจากขาโอนออก (`72`) ในวินาทีเดียวกัน เครื่องยนต์คำนวณต้นทุนจะเรียงลำดับรายการเคลื่อนไหวของสินค้าแต่ละตัวด้วย `ORDER BY` พิเศษดังนี้:
 
 ```sql
@@ -73,13 +75,14 @@ ORDER BY
 
 ## 4. วิธีคำนวณต้นทุนสินค้า (`ic_inventory.cost_type`)
 
-ใน `service.go` รองรับทั้ง 2 วิธีหลักด้วย `*big.Rat`:
-1. **ต้นทุนถัวเฉลี่ยเคลื่อนที่ (`CalculateMovingAverage`, `service.go:190-354`)**:
+ใน `service.go` และ `stock_cost_engine.go` รองรับการคำนวณต้นทุนด้วย `*big.Rat` ครบทุกวิธี:
+1. **ต้นทุนถัวเฉลี่ยเคลื่อนที่ (`CalculateMovingAverage` `service.go:213-431` / `calcItemMovingAverageCost`)**:
    - เมื่อรับเข้า (`calc_flag = +1`): `new_total_qty = old_qty + in_qty`, `new_total_cost = old_cost + in_cost`, `avg_cost = RoundHalfUp(new_total_cost / new_total_qty, priceScale)`
    - เมื่อจ่ายออก (`calc_flag = -1`): `out_cost = RoundHalfUp(out_qty * avg_cost, amountScale)` (หากจ่ายหมดคลังพอดี `remaining_qty == 0` จะกวาด `remaining_cost` ทั้งหมดออกเพื่อไม่ให้เหลือเศษปัดทศนิยมค้างในมูลค่าคลัง!)
    - กรณีสต็อกติดลบชั่วคราวแล้วมีของรับเข้าภายหลัง ระบบรองรับการปรับมูลค่าตามมาตรฐาน BC 5.5
-2. **เข้าก่อน-ออกก่อน (`CalculateFIFOCost`, `service.go:356-505`)**:
-   - เก็บคิวกองต้นทุน (Cost Layers) ตามลำดับรับเข้า และตัดกองเก่าสุดออกก่อนตามลำดับเวลา เมื่อขายหมดกองจะขยับไปกองถัดไปอัตโนมัติ
+2. **เข้าก่อน-ออกก่อน / Lot / Expire / Identified / Standard (`CalculateFIFOCost` `service.go:432-584` และ `CalculateItemStockCost` `stock_cost_engine.go:67-92`)**:
+   - รองรับ `CostType` 0–5 (`0=MovingAvg`, `1=FIFO`, `2=LotFIFO`, `3=ExpireFEFO`, `4=Identified`, `5=StandardCost` จาก `ic_standard_cost`), ตัวเลือกคำนวณแยกคลัง (`CostByWh`) และคงเมทาดาต้า Lot (`preservedLots` ใน `service.go:1621-1683, 1926-2023`) ระหว่าง RebuildStock
+   - เก็บคิวกองต้นทุน (Cost Layers) ตามลำดับรับเข้า และตัดกองเก่าสุดออกก่อนตามลำดับเวลา/Lot/วันหมดอายุ เมื่อขายหมดกองจะขยับไปกองถัดไปอัตโนมัติ
 
 หากต้องการโพสต์ต้นทุนขายแบบ Perpetual (`Dr 5110-00 ต้นทุนขาย / Cr 1131-00 สินค้าคงเหลือ`) ลงใน `gl_journal_detail` ทันทีหลังคำนวณต้นทุนใหม่ ให้เรียก RebuildStock ก่อน แล้วตามด้วย RebuildGL ของบิลขาย (`action_code` `101` และ `103` ใน [[doc-gl-templates-trade-apar]])
 

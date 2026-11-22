@@ -11,8 +11,9 @@ sources:
   - "frontend/account/transaction/StockBeginningBalanceScreen.tsx:2275"
   - "frontend/account/transaction/StockBeginningBalanceScreen.tsx:2866"
   - "frontend/account/transaction/StockBeginningBalanceScreen.tsx:3601"
-  - "backend/internal/application/process/stock_beginning.go:112"
-  - "backend/internal/application/process/stock_beginning.go:292"
+  - "backend/internal/application/process/stock_beginning.go:39-125"
+  - "backend/internal/application/process/stock_beginning.go:215-245"
+  - "backend/internal/application/process/stock_beginning.go:530-667"
 ---
 
 # บันทึกสินค้าและวัตถุดิบคงเหลือยกมา (ยอดยกมาสต๊อก)
