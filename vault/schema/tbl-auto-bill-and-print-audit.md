@@ -3,10 +3,11 @@ title: โครงสร้างตารางวางบิลอัตโ�
 tags: [schema, auto-billing, print-audit, minio, employee, postgresql]
 aliases: [ar_auto_bill_rule, ar_auto_bill_log, ap_auto_bill_rule, ap_auto_bill_log, erp_print_audit_log, erp_doc_picture, erp_user, ar_shoptype2]
 sources:
-  - backend/internal/application/process/db_migrate.go:1330-1435
+  - backend/internal/application/process/db_migrate.go:1450-1461
+  - backend/internal/application/process/db_migrate.go:1890-1993
   - backend/internal/application/process/service.go:978-1012
   - scripts/sql/02_data_schema.sql:2925-2936
-  - scripts/sql/02_data_schema.sql:3826-3892
+  - scripts/sql/02_data_schema.sql:3828-3895
   - scripts/sql/02_data_schema.sql:1497-1574
 ---
 

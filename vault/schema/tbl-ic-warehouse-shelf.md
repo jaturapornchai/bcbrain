@@ -3,11 +3,11 @@ title: "ic_warehouse, ic_shelf & ic_wh_shelf — คลังสินค้า 
 tags: [schema, inventory, warehouse, shelf, reorder, bcaiaccount]
 aliases: [ic_warehouse, ic_shelf, ic_wh_shelf, ic_inventory_wh, ic_warehouse_location_group, คลังสินค้า]
 sources:
-  - scripts/sql/02_data_schema.sql:5824-5834
-  - scripts/sql/02_data_schema.sql:6428-6448
-  - scripts/sql/02_data_schema.sql:7270-7320
-  - scripts/sql/02_data_schema.sql:7356-7369
-  - scripts/sql/02b_sync_existing_db.sql:7060-7066
+  - scripts/sql/02_data_schema.sql:5881-5891
+  - scripts/sql/02_data_schema.sql:6485-6505
+  - scripts/sql/02_data_schema.sql:7328-7378
+  - scripts/sql/02_data_schema.sql:7414-7427
+  - scripts/sql/02b_sync_existing_db.sql:7054-7068
   - scripts/sql/03_audit_r1_migrations.sql:49-70
   - scripts/sql/04_seed_data.sql:228-241
   - scripts/sql/04_seed_data.sql:385-390
@@ -20,9 +20,9 @@ sources:
 กลุ่มตารางจัดการโครงสร้างการจัดเก็บสินค้าภายในกิจการ เชื่อมโยงระหว่างสาขา ([[tbl-erp-branch-department]]), คลังสินค้า (`ic_warehouse`), ที่เก็บ/ชั้นวาง (`ic_shelf`), และเกณฑ์จุดต่ำสุด-สูงสุดต่อสินค้าในแต่ละคลัง/ที่เก็บ (`ic_wh_shelf`)
 
 > [!IMPORTANT] ข้อสังเกตเรื่องชนิดข้อมูล `ic_wh_shelf.min_point` ในฐานข้อมูลเก่า
-> ใน `02_data_schema.sql:7356-7369` คอลัมน์ `min_point` และ `max_point` เป็น `numeric DEFAULT 0.0` แล้ว แต่สำหรับฐานข้อมูลเก่าจาก C# เดิมที่เคยเป็น `varchar(100)` จะมี Migration ใน `02b_sync_existing_db.sql:7066` และ `03_audit_r1_migrations.sql:49-70` แปลง `min_point` เป็น `NUMERIC(18,4)` เพื่อป้องกันความผิดพลาดในการเปรียบเทียบจุดสั่งซื้อ
+> ใน `02_data_schema.sql:7414-7427` คอลัมน์ `min_point` และ `max_point` เป็น `numeric DEFAULT 0.0` แล้ว แต่สำหรับฐานข้อมูลเก่าจาก C# เดิมที่เคยเป็น `varchar(100)` จะมี Migration ใน `02b_sync_existing_db.sql:7068` และ `03_audit_r1_migrations.sql:49-70` แปลง `min_point` เป็น `NUMERIC(18,4)` เพื่อป้องกันความผิดพลาดในการเปรียบเทียบจุดสั่งซื้อ
 
-## 1. `ic_warehouse` — ทะเบียนคลังสินค้า (`02_data_schema.sql:7270-7294`)
+## 1. `ic_warehouse` — ทะเบียนคลังสินค้า (`02_data_schema.sql:7328-7352`)
 
 - **ไม่มี SQL `PRIMARY KEY`** (ใช้ `roworder SERIAL NOT NULL` และ Index `idx_ic_warehouse_code` ON `ic_warehouse (code)`)
 - **คอลัมน์สำคัญ**:
@@ -31,7 +31,7 @@ sources:
   - `address`, `telephone`, `fax`, `latitude`, `longitude`: ที่อยู่และพิกัดคลังสินค้า
   - `user_group`, `wh_manager`, `status` (`smallint`): กลุ่มผู้ดูแล/หัวหน้าคลัง และสถานะ (`0` = ใช้งานปกติ)
 
-## 2. `ic_shelf` — ที่เก็บ / ชั้นวางสินค้า (`02_data_schema.sql:6428-6448`)
+## 2. `ic_shelf` — ที่เก็บ / ชั้นวางสินค้า (`02_data_schema.sql:6485-6505`)
 
 - **Index**: `idx_ic_shelf_code` ON `ic_shelf (code)` (ไม่มี SQL `PRIMARY KEY`)
 - **คอลัมน์สำคัญ**:
@@ -40,7 +40,7 @@ sources:
   - `width`, `weight`, `height`, `depth` (`varchar(10)`): ขนาดและน้ำหนักรับได้ของชั้นวาง
   - `stock_control` (`smallint`): สถานะควบคุมสต็อกระดับที่เก็บ
 
-## 3. `ic_wh_shelf` — ผูกสินค้าเข้าคลัง/ที่เก็บ และจุด Reorder (`02_data_schema.sql:7356-7369`)
+## 3. `ic_wh_shelf` — ผูกสินค้าเข้าคลัง/ที่เก็บ และจุด Reorder (`02_data_schema.sql:7414-7427`)
 
 - **ไม่มี SQL `PRIMARY KEY`** (ใช้ `roworder SERIAL NOT NULL`)
 - **Logical Key**: `(ic_code, wh_code, shelf_code)`
@@ -51,9 +51,9 @@ sources:
 
 ## 4. ตารางเสริมกลุ่มคลังและที่เก็บ
 
-- **`ic_inventory_wh`** (`5824-5834`): คู่อนุญาต/ค่าตั้งต้นคลัง-ที่เก็บ (`wh_code`, `shelf_code`, `remark`, `status`)
-- **`ic_warehouse_location_group`** (`7296-7307`): หัวกลุ่มตำแหน่งจัดเก็บ (`wh_code`, `location_group`, `name_1`, `name_2`, `status`)
-- **`ic_warehouse_location_group_detail`** (`7311-7320`): สมาชิกตำแหน่งในกลุ่ม (`wh_code`, `location_group`, `location`, `priolity smallint` *(สะกด `priolity` ตาม DDL จริง)*)
+- **`ic_inventory_wh`** (`5881-5891`): คู่อนุญาต/ค่าตั้งต้นคลัง-ที่เก็บ (`wh_code`, `shelf_code`, `remark`, `status`)
+- **`ic_warehouse_location_group`** (`7354-7367`): หัวกลุ่มตำแหน่งจัดเก็บ (`wh_code`, `location_group`, `name_1`, `name_2`, `status`)
+- **`ic_warehouse_location_group_detail`** (`7369-7378`): สมาชิกตำแหน่งในกลุ่ม (`wh_code`, `location_group`, `location`, `priolity smallint` *(สะกด `priolity` ตาม DDL จริง)*)
 
 ## ตัวอย่าง SQL จริง: ตรวจจับสินค้าต่ำกว่าจุดสั่งซื้อ (`min_point`) เทียบยอดคงเหลือจริงรายคลัง
 

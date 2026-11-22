@@ -18,11 +18,11 @@ sources:
   - backend/internal/adapter/inbound/http/tms/handler.go:1646
   - backend/internal/adapter/inbound/http/tms/handler.go:1672
   - backend/internal/adapter/inbound/http/tms/handler.go:1703
-  - scripts/sql/02b_sync_existing_db.sql:9605
-  - scripts/sql/02b_sync_existing_db.sql:9628
-  - scripts/sql/02b_sync_existing_db.sql:9655
-  - scripts/sql/02_data_schema.sql:9275
-  - scripts/sql/02_data_schema.sql:1996
+  - scripts/sql/02b_sync_existing_db.sql:9607
+  - scripts/sql/02b_sync_existing_db.sql:9630
+  - scripts/sql/02b_sync_existing_db.sql:9657
+  - scripts/sql/02_data_schema.sql:9333
+  - scripts/sql/02_data_schema.sql:1997
 ---
 
 # ตารางระบบขนส่งและบริหารยานพาหนะ TMS (`tms_*`, `transport_type`, `auto_ship_to`)
@@ -35,12 +35,12 @@ sources:
 
 | ตาราง | Primary Key / Index | วัตถุประสงค์หลัก | ที่มา DDL |
 | :--- | :--- | :--- | :--- |
-| `tms_fleet_vehicle` | `roworder` (`SERIAL PRIMARY KEY`) | ทะเบียนรถขนส่ง พนักงานขับ รถร่วม/รถบริษัท GPS และระยะ PM | `http/tms/handler.go:1607`, `02b_sync_existing_db.sql:9605` |
-| `tms_trip_manifest` | `roworder` (`SERIAL PRIMARY KEY`) | ใบคุมเที่ยวรถ (Trip) ต้นทุนค่าขนส่ง และยอดขายรวมต่อเที่ยว | `http/tms/handler.go:1646`, `02b_sync_existing_db.sql:9628` |
-| `tms_delivery_stop` | `roworder` (`SERIAL PRIMARY KEY`) | จุดส่งสินค้าปลายทาง เชื่อมใบแพ็ค WMS/บิล ERP เก็บ COD และ e-POD | `http/tms/handler.go:1672`, `02b_sync_existing_db.sql:9655` |
+| `tms_fleet_vehicle` | `roworder` (`SERIAL PRIMARY KEY`) | ทะเบียนรถขนส่ง พนักงานขับ รถร่วม/รถบริษัท GPS และระยะ PM | `http/tms/handler.go:1607`, `02b_sync_existing_db.sql:9607` |
+| `tms_trip_manifest` | `roworder` (`SERIAL PRIMARY KEY`) | ใบคุมเที่ยวรถ (Trip) ต้นทุนค่าขนส่ง และยอดขายรวมต่อเที่ยว | `http/tms/handler.go:1646`, `02b_sync_existing_db.sql:9630` |
+| `tms_delivery_stop` | `roworder` (`SERIAL PRIMARY KEY`) | จุดส่งสินค้าปลายทาง เชื่อมใบแพ็ค WMS/บิล ERP เก็บ COD และ e-POD | `http/tms/handler.go:1672`, `02b_sync_existing_db.sql:9657` |
 | `tms_maintenance_log` | `roworder` (`SERIAL PRIMARY KEY`) | ประวัติซ่อมบำรุงรถ (PM/ซ่อม) ค่าอะไหล่ ค่าแรง ภาษี และเชื่อมเอกสารจ่าย ERP | `http/tms/handler.go:1703` |
-| `transport_type` | `roworder` (`SERIAL NOT NULL`), Index `idx_transport_type_code` | ตารางรหัสประเภท/วิธีการขนส่งมาตรฐาน ERP | `02_data_schema.sql:9275` |
-| `auto_ship_to` | `roworder` (`SERIAL NOT NULL`) | ตารางกำหนดคลัง/ชั้นจัดส่งอัตโนมัติตามสาขา | `02_data_schema.sql:1996` |
+| `transport_type` | `roworder` (`SERIAL NOT NULL`), Index `idx_transport_type_code` | ตารางรหัสประเภท/วิธีการขนส่งมาตรฐาน ERP | `02_data_schema.sql:9333` |
+| `auto_ship_to` | `roworder` (`SERIAL NOT NULL`) | ตารางกำหนดคลัง/ชั้นจัดส่งอัตโนมัติตามสาขา | `02_data_schema.sql:1997` |
 
 ---
 
@@ -48,7 +48,7 @@ sources:
 
 ### `tms_fleet_vehicle` — ทะเบียนรถขนส่งและสถานะ GPS/ซ่อมบำรุง
 * **Primary Key**: `roworder SERIAL PRIMARY KEY`
-* **คอลัมน์หลัก** (`02b_sync_existing_db.sql:9605` และขยายเพิ่มด้วย `ALTER TABLE` ใน `http/tms/handler.go:1637-1645`):
+* **คอลัมน์หลัก** (`02b_sync_existing_db.sql:9607` และขยายเพิ่มด้วย `ALTER TABLE` ใน `http/tms/handler.go:1637-1645`):
   * `vehicle_code` (`VARCHAR(40) NOT NULL DEFAULT ''`), `plate_no` (`VARCHAR(50) NOT NULL DEFAULT ''`), `vehicle_type` (`VARCHAR(100) NOT NULL DEFAULT ''`) — รหัสรถ ทะเบียน และประเภทรถ
   * `ownership_type` (`VARCHAR(80) DEFAULT 'OWN_FLEET'`) — ประเภทกรรมสิทธิ์ (ขยายจาก `varchar(40)` เป็น `varchar(80)` ใน `handler.go:1645`)
   * `contractor_name` (`VARCHAR(200)`), `cost_model` (`VARCHAR(150)`), `base_rate_baht` (`NUMERIC(18,2)`), `wht_tax_rate` (`NUMERIC(6,2)`) — ข้อมูลผู้รับเหมาขนส่ง รูปแบบคิดราคา ค่าจ้างตั้งต้น และอัตราหัก ณ ที่จ่าย
@@ -90,8 +90,8 @@ sources:
 ---
 
 ### ตารางอ้างอิงงานขนส่งในสคีมาหลัก (`transport_type`, `auto_ship_to`)
-* `transport_type` (`02_data_schema.sql:9275`): `roworder` (`SERIAL NOT NULL`), `code` (`VARCHAR(25)`), `name_1` (`VARCHAR(100)`), `name_2` (`VARCHAR(100)` ขยายเป็น `VARCHAR(200)` ใน L9286), `status` (`SMALLINT DEFAULT 0` เพิ่มใน L9287), `guid_code` (`VARCHAR(35)`), Index `idx_transport_type_code` บน `(code)` (L9288)
-* `auto_ship_to` (`02_data_schema.sql:1996`): `roworder` (`SERIAL NOT NULL`), `branch_code` (`VARCHAR(25)`), `wh_code` (`VARCHAR(100)`), `shelf_code` (`VARCHAR(100)`), `create_date_time_now`
+* `transport_type` (`02_data_schema.sql:9333`): `roworder` (`SERIAL NOT NULL`), `code` (`VARCHAR(25)`), `name_1` (`VARCHAR(100)`), `name_2` (`VARCHAR(100)` ขยายเป็น `VARCHAR(200)` ใน L9344), `status` (`SMALLINT DEFAULT 0` เพิ่มใน L9345), `guid_code` (`VARCHAR(35)`), Index `idx_transport_type_code` บน `(code)` (L9346)
+* `auto_ship_to` (`02_data_schema.sql:1997`): `roworder` (`SERIAL NOT NULL`), `branch_code` (`VARCHAR(25)`), `wh_code` (`VARCHAR(100)`), `shelf_code` (`VARCHAR(100)`), `create_date_time_now`
 
 ---
 

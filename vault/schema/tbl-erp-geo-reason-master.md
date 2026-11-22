@@ -3,14 +3,15 @@ title: มาสเตอร์ภูมิศาสตร์ คำนำหน
 tags: [dev, schema, erp, master, address, expenses, income]
 aliases: [erp_province, erp_amper, erp_tambon, erp_initial, erp_expenses_list, erp_income_list, erp_cn_reason, erp_package_reason, erp_insure_type, จังหวัด, ค่าใช้จ่าย]
 sources:
-  - scripts/sql/02_data_schema.sql:2500-2517
-  - scripts/sql/02_data_schema.sql:2611-2625
-  - scripts/sql/02_data_schema.sql:2905-2920
-  - scripts/sql/02_data_schema.sql:2932-2962
-  - scripts/sql/02_data_schema.sql:3517-3531
-  - scripts/sql/02_data_schema.sql:3615-3631
-  - scripts/sql/02_data_schema.sql:3727-3745
+  - scripts/sql/02_data_schema.sql:2540-2556
+  - scripts/sql/02_data_schema.sql:2651-2664
+  - scripts/sql/02_data_schema.sql:2958-3014
+  - scripts/sql/02_data_schema.sql:3570-3583
+  - scripts/sql/02_data_schema.sql:3668-3683
+  - scripts/sql/02_data_schema.sql:3780-3799
+  - scripts/sql/02b_sync_existing_db.sql:3597-3615
   - scripts/sql/22_erp_tambon_zip_code.sql:1-5
+  - backend/internal/application/process/db_migrate.go:1393-1409
   - backend/internal/application/process/service.go:897-912
   - backend/internal/application/process/service.go:949-951
 ---
@@ -29,7 +30,7 @@ sources:
 |---|---|---|
 | `erp_province` | `idx_erp_province_code` | `code` (`varchar(25)`), `name_1` / `name_2`, `lat` / `lng` (`numeric`: พิกัดกลางจังหวัด), `status` (`smallint`: `0 = ใช้งาน`) |
 | `erp_amper` | `idx_erp_amper_code` | `code` (`varchar(25)`), `name_1` / `name_2`, `province` (เชื่อม `erp_province.code`), `lat` / `lng` (`numeric`), `status` |
-| `erp_tambon` | `idx_erp_tambon_code` | `code` (`varchar(25)`), `name_1` / `name_2`, `amper` (เชื่อม `erp_amper.code`), `province` (เชื่อม `erp_province.code`), `lat` / `lng` (`numeric`), **`zip_code`** (`varchar(10)` — เพิ่มผ่าน `22_erp_tambon_zip_code.sql:4` และ `service.go:949`), `status` |
+| `erp_tambon` | `idx_erp_tambon_code` | `code` (`varchar(25)`), `name_1` / `name_2`, `amper` (เชื่อม `erp_amper.code`), `province` (เชื่อม `erp_province.code`), `lat` / `lng` (`numeric`), **`zip_code`** (`varchar(10)` — นิยามใน `02_data_schema.sql:3789,3798`, `02b_sync_existing_db.sql:3606,3615`, `db_migrate.go:1404,1409`, `22_erp_tambon_zip_code.sql:4` และ `service.go:949`), `status` |
 
 ---
 

@@ -7,7 +7,7 @@ sources:
   - "frontend/account/tabs/screenRegistry.tsx:1210"
   - "frontend/src/config/schemas/icMasterSchemas.ts:1198"
   - "frontend/account/transaction/SerialNumberModal.tsx:31"
-  - "frontend/account/master/StockCheckScreens.tsx:112"
+  - "frontend/account/master/StockCheckScreens.tsx:114-190"
   - "frontend/account/master/SerialWarrantyRmaScreen.tsx:141"
   - "frontend/account/master/SerialWarrantyRmaScreen.tsx:519"
   - "backend/internal/application/process/serial_warranty_rma.go:75"
@@ -28,7 +28,7 @@ sources:
 ## 2. ตรวจสอบ Serial มีปัญหา และตรวจนับ Serial
 
 - **ตรวจนับด้วยสแกนเนอร์**: ใช้เมนู **สินค้า › ตรวจนับสต็อกและปรับปรุงจากการตรวจนับ › ตรวจสอบสินค้า Serial Number** (รหัสเมนู **2045**) ตามขั้นตอนใน [[howto-stock-count]]
-- **ตรวจความผิดปกติของประวัติรับ-จ่าย**: เปิด **สินค้า › สอบถามและวิเคราะห์ข้อมูลสินค้า (บนหน้าจอ) › ตรวจสอบ Serial มีปัญหา** (รหัสเมนู **2069**) ระบุรหัสสินค้า (หรือเว้นว่างเพื่อตรวจทุกสินค้า) แล้วกด **วิเคราะห์** ระบบจะชี้จุดผิดปกติพร้อมเลขที่เอกสาร เช่น:
+- **ตรวจความผิดปกติของประวัติรับ-จ่าย**: เปิด **สินค้า › สอบถามและวิเคราะห์ข้อมูลสินค้า (บนหน้าจอ) › ตรวจสอบ Serial มีปัญหา** (รหัสเมนู **2069**) พิมพ์รหัสสินค้าหรือกดปุ่มแว่นขยายเพื่อค้นหาจากทะเบียนสินค้า (หากพิมพ์รหัสที่ไม่มีในระบบจะแจ้งเตือน **ไม่พบ : สินค้า** หรือเว้นว่างเพื่อตรวจทุกสินค้า) แล้วกด **วิเคราะห์** ระบบจะชี้จุดผิดปกติพร้อมเลขที่เอกสาร เช่น:
   - **ออกก่อนรับเข้า (ไม่มีรายการรับเข้ามาก่อน)**
   - **รายการออกจากคลัง/ที่เก็บ ... ไม่ตรงกับรายการรับเข้าล่าสุด ...**
 

@@ -3,10 +3,10 @@ title: "ic_trans_detail — บรรทัดสินค้ารายตั�
 tags: [schema, inventory, transaction, detail, costing, bcaiaccount]
 aliases: [ic_trans_detail, รายการสินค้าในเอกสาร, บรรทัดสต็อก]
 sources:
-  - scripts/sql/02_data_schema.sql:6754-6886
+  - scripts/sql/02_data_schema.sql:6812-6944
   - scripts/sql/03_audit_r1_migrations.sql:122-152
   - backend/internal/platform/db/pool.go:32-35
-  - backend/internal/application/process/db_migrate.go:1015-1025
+  - backend/internal/application/process/db_migrate.go:1018-1023
   - backend/internal/application/process/service.go:941-970
   - backend/internal/application/process/service.go:1132-1167
   - backend/internal/application/process/service.go:1390-1750
@@ -30,7 +30,7 @@ sources:
 
 - **ไม่มี SQL `PRIMARY KEY`** ใน `02_data_schema.sql` — ใช้ `roworder SERIAL NOT NULL` แทนตัวระบุแถว
 - **Logical Key ระดับบรรทัด**: `(doc_no, trans_flag, line_number)` (หมายเหตุ: กรณีโอนคลัง `72` แถวฝั่ง `72` และ `70` ใช้ `doc_no` เดียวกันโดยฝั่ง `72` อยู่ `line_number = n` และฝั่ง `70` อยู่ `line_number = n + 1` ตาม `stock_rebuild.go:57-64`)
-- **Indexes จาก `02_data_schema.sql:6882-6886`**:
+- **Indexes จาก `02_data_schema.sql:6940-6944`**:
   - `idx_ic_trans_detail_doc_no_trans_flag` ON `ic_trans_detail (doc_no, trans_flag)`
   - `idx_ic_trans_detail_doc_date_trans_flag` ON `ic_trans_detail (doc_date, trans_flag)`
   - `idx_ic_trans_detail_item_code` ON `ic_trans_detail (item_code)`

@@ -3,10 +3,10 @@ title: "ic_trans_detail_lot — ความเคลื่อนไหวสต
 tags: [schema, inventory, lot, fefo, expiry, bcaiaccount]
 aliases: [ic_trans_detail_lot, ตาราง Lot สินค้า, คุม Lot]
 sources:
-  - scripts/sql/02_data_schema.sql:6969-6996
+  - scripts/sql/02_data_schema.sql:7027-7054
   - backend/internal/application/process/stock_lot.go:157-185
   - backend/internal/application/process/stock_lot.go:313-332
-  - backend/internal/application/process/db_migrate.go:1015-1025
+  - backend/internal/application/process/db_migrate.go:994-1023
   - backend/internal/application/process/service.go:1159-1167
   - backend/internal/application/process/service.go:1621-1683
   - backend/internal/application/process/service.go:1926-2023
@@ -28,7 +28,7 @@ sources:
 
 - **ไม่มี SQL `PRIMARY KEY`** ใน `02_data_schema.sql` — ใช้ `roworder SERIAL NOT NULL`
 - **Logical Key**: `(doc_no, trans_flag, doc_line_number, line_number)` (1 บรรทัดใน `ic_trans_detail` สามารถแตกได้หลาย Lot)
-- **Indexes จาก `02_data_schema.sql:6994-6996`**:
+- **Indexes จาก `02_data_schema.sql:7052-7054`**:
   - `idx_ic_trans_detail_lot_doc_no_trans_flag` ON `ic_trans_detail_lot (doc_no, trans_flag)`
   - `idx_ic_trans_detail_lot_doc_date_trans_flag` ON `ic_trans_detail_lot (doc_date, trans_flag)`
   - `idx_ic_trans_detail_lot_item_code` ON `ic_trans_detail_lot (item_code)`
