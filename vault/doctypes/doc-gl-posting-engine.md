@@ -14,7 +14,8 @@ sources:
   - "backend/internal/application/process/gl_template_defaults.go:15-234"
   - "backend/internal/application/process/gl_template_rules_apar.go:18-95"
   - "backend/internal/application/process/service.go:509-556"
-  - "backend/internal/application/process/service.go:1343-2600"
+  - "backend/internal/application/process/service.go:2269-2460"
+  - "backend/internal/application/process/service.go:3119-3157"
 ---
 
 # กลไก GL Auto-Posting Engine ตัวแปร `&ACC...&` และกฎ `glRule01`–`glRule58`
@@ -101,6 +102,6 @@ flowchart TD
 3. **วิธีบันทึกบัญชีสินค้าคงเหลือ (`erp_option.gl_trans_type`)**:
    - **Periodic (สิ้นงวด — ค่าเริ่มต้น SME ทั่วไป)**: บิลซื้อเดบิต `5111-00 ซื้อสินค้า`, บิลขายไม่ลงต้นทุนขายรายใบ (`action_code` `101/103` จะได้ค่า `0`)
    - **Perpetual (ต่อเนื่อง)**: บิลซื้อเดบิต `1131-00 สินค้าคงเหลือ`, บิลขายสร้างคู่บัญชี `action_code = 101` (`Dr 5110-00 ต้นทุนขาย`) และ `action_code = 103` (`Cr 1131-00 สินค้าคงเหลือ`) จาก `sum_of_cost` ใน `ic_trans_detail`
-4. **รายการ `glRebuildTransFlags` (`service.go:1782-1798`)**: เมื่อสั่งประมวลผลโพสต์บัญชีใหม่ (`RebuildGL`) ระบบจะใช้ Advisory Lock ป้องกันการชนกับผู้ใช้หน้าจอ ลบเฉพาะใบสำคัญที่เกิดจากเอกสารอัตโนมัติ (`trans_direct = 0` ในช่วงวันที่ที่เลือก โดย **ไม่แตะใบสำคัญที่คีย์มือ `trans_flag = 0` หรือใบประมวลผลค่าเสื่อม `1801` / ปิดบัญชี `journal_type = 2`**) แล้วสร้างใหม่ทั้งหมดให้ตรงกับเอกสารปัจจุบัน 100%
+4. **รายการ `glRebuildTransFlags` (`service.go:2445-2460`)**: เมื่อสั่งประมวลผลโพสต์บัญชีใหม่ (`RebuildGL`) ระบบจะใช้ Advisory Lock ป้องกันการชนกับผู้ใช้หน้าจอ ลบเฉพาะใบสำคัญที่เกิดจากเอกสารอัตโนมัติ (`trans_direct = 0` ในช่วงวันที่ที่เลือก โดย **ไม่แตะใบสำคัญที่คีย์มือ `trans_flag = 0` หรือใบประมวลผลค่าเสื่อม `1801` / ปิดบัญชี `journal_type = 2`**) แล้วสร้างใหม่ทั้งหมดให้ตรงกับเอกสารปัจจุบัน 100% *(หมายเหตุ: `trans_flag = 54` อยู่ใน `glRebuildTransFlags` เพื่อโพสต์ GL เฉพาะใบรับสินค้าสำเร็จรูปจากการผลิต BOM ที่เชื่อมกับ `ic_assembly_order.receipt_doc_no` เท่านั้น ส่วนเอกสารยอดยกมาสต็อก `54` ทั่วไปจะข้ามไม่โพสต์ GL)*
 
 ดูตารางคู่บัญชี Dr/Cr รายหน้าจอครบทุกรหัสได้ที่ [[doc-gl-templates-trade-apar]] และ [[doc-gl-templates-cb-ic-fa]]

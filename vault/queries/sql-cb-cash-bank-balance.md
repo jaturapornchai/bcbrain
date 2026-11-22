@@ -367,7 +367,7 @@ future_flows AS (
         CASE WHEN c.chq_type = 2 THEN COALESCE(c.amount, 0) ELSE 0 END::numeric(18, 2) AS outflow_amt
     FROM cb_chq_list c
     WHERE c.chq_type IN (1, 2)
-      AND COALESCE(c.status, 0) NOT IN (2, 7, 8)
+      AND COALESCE(c.status, 0) NOT IN (2, 6, 7, 8)
 )
 SELECT
     ROUND(o.cash_and_bank_now, 2) AS current_cash_bank_balance,

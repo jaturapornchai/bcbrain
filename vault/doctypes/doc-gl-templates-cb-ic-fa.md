@@ -14,6 +14,8 @@ sources:
   - "backend/internal/application/process/gl_template_rules_ic.go:1-2179"
   - "backend/internal/application/process/fa_depreciation.go:716-752"
   - "backend/internal/application/process/fa_sale.go:160-218"
+  - "backend/internal/application/process/service.go:2269-2278"
+  - "backend/internal/application/process/service.go:3119-3157"
 ---
 
 # แม่แบบคู่บัญชี Dr/Cr อัตโนมัติ หมวดการเงิน เช็ค บัตร คลังสินค้า และสินทรัพย์ถาวร
@@ -79,6 +81,7 @@ sources:
 | หน้าจอ | `trans_flag` | กฎคำนวณ | เดบิต (Dr) | เครดิต (Cr) |
 |---|---:|---|---|---|
 | **`IO`** (เบิกสินค้า/วัตถุดิบ) | `56` | `glRule33` | `1133-00` สินค้าระหว่างผลิต WIP (หรือบัญชีค่าใช้จ่ายเบิกใช้ `act=1`) | `1132-00` วัตถุดิบคงเหลือ (`act=2`) |
+| **`IB` (เฉพาะรับเข้าจากการผลิต BOM)** | `54` | `buildStandardGLLines` (`service.go:3119-3157`) | `1131` / `1130` / `1141` สินค้าคงเหลือสำเร็จรูป (`fg_total_cost`) | `5110` / `5111` ต้นทุนผลิต (`rm_total_cost`), และแยก `5120`/`5210` (`labor_cost`), `5130`/`5220` (`overhead_cost`) เมื่อผลรวมตรงกัน *(ยอดยกมา `54` ที่ไม่อยู่ใน `ic_assembly_order` ไม่โพสต์ GL)* |
 | **`IR`** (รับคืนจากการเบิก) | `58` | `glRule35` | `1132-00` วัตถุดิบคงเหลือ (`act=2`) | `1133-00` สินค้าระหว่างผลิต WIP (`act=1`) |
 | **`IF`** (รับสินค้าสำเร็จรูป) | `60` | `glRule38` | `1131-00` สินค้าคงเหลือสำเร็จรูป (`act=1`) | `1133-00` สินค้าระหว่างผลิต WIP (`act=2`) |
 | **`IM`** (โอนสินค้าระหว่างคลัง) | `72` | `glRule34` | `1131-00` สินค้าคงเหลือคลังรับเข้า (`act=1`) | `1131-00` สินค้าคงเหลือคลังโอนออก (`act=2`) |

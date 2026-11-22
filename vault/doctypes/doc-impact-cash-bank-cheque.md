@@ -10,10 +10,11 @@ aliases:
   - "เงินสดย่อย cb_petty_cash 300 301"
   - "cbmParentOK cbmPassbookCTE"
 sources:
-  - "backend/internal/application/process/cheque.go:18-355"
+  - "backend/internal/application/process/cheque.go:18-301"
   - "backend/internal/application/process/report_menu_cb.go:110-185"
   - "backend/internal/application/process/report_menu_cb.go:520-605"
   - "backend/internal/application/process/report_menu_cb.go:640-845"
+  - "backend/internal/application/process/trans.go:799-816"
   - "backend/internal/application/process/trans.go:1130-1420"
 ---
 
@@ -104,13 +105,14 @@ stateDiagram-v2
 | **`3`** | เช็คคืน / เช็คเด้ง (`chq_type = 1, 2`) | `412 CRT` (กลับบัญชี `1122-00`) / `453 CPR` (`Dr ธนาคาร / Cr เจ้าหนี้`) |
 | **`4`** | เช็คยกเลิก / เช็คขาดสิทธิ์ (`chq_type = 1, 2`) | `413 CRC` (`Dr ลูกหนี้ / Cr 1122-00`) / `452 CHC` (`Dr ธนาคาร / Cr เจ้าหนี้`) |
 | **`5`** | เช็คขายลด (`cbmChqStatus` ใน `report_menu_cb.go:152`) | ป้ายสถานะรายงานสำหรับเช็คขายลด |
-| **`6`** | เช็คคืนนำเข้าใหม่ (`chq_type = 1`) | `414` (`cheque.go:19, 39` แมป `414 → 6`; ส่วน `service.go:2604` บันทึก GL กลุ่ม `413, 414, 418`) |
+| **`6`** | เช็คคืนนำเข้าใหม่ (`chq_type = 1`) / เอกสารต้นทางถูกยกเลิก | `414` (`cheque.go:19, 47` แมป `414 → 6`; `service.go:2456` ใช้ใน `glRebuildTransFlags`) **และ** `chequeStatusSQL` (`cheque.go:36-43`) ตั้ง `status = 6` อัตโนมัติเมื่อเอกสารต้นทาง (`ic_trans` หรือ `ap_ar_trans`) มี `last_status = 1` |
 | **`7`** | เช็คเปลี่ยน (`chq_type = 1, 2`) | `416 CDE` / `456 CPE` (จับคู่ใบเดิมผ่าน `COALESCE(NULLIF(d.chq_number, ''), d.item_code)`) |
 | **`8`** | เช็คตั้งหนี้ใหม่ (`chq_type = 1`) | `418 CND` (`Dr 1121-00 ลูกหนี้การค้า / Cr 1122-00 เช็ครับ`, จับคู่ด้วย `d.item_code`) |
 
 > **ข้อควรระวังสำหรับบัตรเครดิต (`chq_type = 3`) และ Wallet (`chq_type = 21`)**:
-> 1. ใน `chequeStatusSQL` (`cheque.go:41`): `461 → 1`, `462 → 2`, `463 → 1` ดังนั้นรายการที่ **รอขึ้นเงิน** คือ **`COALESCE(c.status, 0) = 0`** เท่านั้น (ตรงกับ `menu_statement_advance` ใน `report_menu_cb.go:583`: `((c.chq_type IN (1, 2) AND c.status IN (0, 1)) OR (c.chq_type = 3 AND c.status = 0))`)
-> 2. **เคล็ดลับการเชื่อมประวัติเช็ค**: เอกสารปฏิบัติการเช็คและบัตร (`410`–`463`) เก็บรายการเช็คแต่ละใบไว้ในตาราง **`ic_trans_detail`** โดยใส่เลขที่เช็คใน `ic_trans_detail.chq_number` และใส่รหัสสมุดเงินฝากธนาคารใน `ic_trans_detail.item_code` (ยกเว้น `418` และ `416`/`456` รุ่นเก่าที่เก็บรหัสเช็คเดิมไว้ใน `item_code` ด้วยตาม `cheque.go:47-52`)
+> 1. ใน `chequeStatusSQL` (`cheque.go:46-49`): `461 → 1`, `462 → 2`, `463 → 1` ดังนั้นรายการที่ **รอขึ้นเงิน** คือ **`COALESCE(c.status, 0) = 0`** เท่านั้น (ตรงกับ `menu_statement_advance` ใน `report_menu_cb.go:583`: `((c.chq_type IN (1, 2) AND c.status IN (0, 1)) OR (c.chq_type = 3 AND c.status = 0))`)
+> 2. **เคล็ดลับการเชื่อมประวัติเช็ค**: เอกสารปฏิบัติการเช็คและบัตร (`410`–`463`) เก็บรายการเช็คแต่ละใบไว้ในตาราง **`ic_trans_detail`** โดยใส่เลขที่เช็คใน `ic_trans_detail.chq_number` และใส่รหัสสมุดเงินฝากธนาคารใน `ic_trans_detail.item_code` (ยกเว้น `418` และ `416`/`456` รุ่นเก่าที่เก็บรหัสเช็คเดิมไว้ใน `item_code` ด้วยตาม `cheque.go:54-60`)
+> 3. **อัปเดตสถานะอัตโนมัติและการค้นหาเช็คข้ามคู่ค้า**: `rebuildTransDerived` (`trans.go:799-816`) คำนวณ `cb_chq_list.status` ใหม่ให้ทั้งเอกสารบริหารเช็คและเอกสารที่มีเช็คในแท็บรับ-จ่ายเงิน; ส่วน `ChequeCandidates` (`cheque.go:283-301`) เมื่อเปิด `SearchChequeOtherCust` จะค้นหาเช็คข้ามคู่ค้าได้สำหรับ `416, 418, 456` (`c.status IN (0,3)`)
 
 ---
 

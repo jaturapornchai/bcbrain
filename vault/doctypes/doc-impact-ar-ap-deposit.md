@@ -10,7 +10,7 @@ aliases:
   - "ตัดเงินมัดจำ เงินล่วงหน้า cb_trans_detail"
   - "ลูกหนี้ขายสินทรัพย์ 1802"
 sources:
-  - "backend/internal/application/process/docs.go:600-690"
+  - "backend/internal/application/process/docs.go:532-690"
   - "backend/internal/application/process/report_menu_ap_ar.go:526-562"
   - "backend/internal/application/process/trans_deposit.go:25-266"
   - "backend/internal/application/process/report_menu_sopo.go:34-41"
@@ -103,3 +103,6 @@ sources:
    - **ข้อควรระวังฝั่งขาย**: ต้องกรอง `u.trans_flag NOT IN (40, 110)` เสมอ เพื่อไม่ให้แถวรายละเอียดการรับเงินของตัวใบรับมัดจำเองมาหักตัวเอง!
 
 $$\text{Deposit Remaining} = \text{COALESCE}(t.\text{total\_amount}, 0) - (\text{ret} + \text{used})$$
+
+- **ข้อกำหนดเพิ่มเติมเมื่อคืนเงินมัดจำ/ล่วงหน้า (`trans_deposit.go:118-126`)**: เอกสารคืนเงิน (`20, 25, 42, 112`) ต้องระบุ `DocRef` อ้างอิงใบมัดจำ/ล่วงหน้าต้นทางของคู่ค้า (`cust_code`) เสมอ มิฉะนั้นระบบจะปฏิเสธด้วย `"กรุณาระบุเลขที่เอกสารอ้างอิงเงินมัดจำ/เงินล่วงหน้า"` และตรวจสอบยอดคงเหลือให้เพียงพอ (`must: true`)
+- **การตรวจแท็บชำระเงินของใบจ่าย/รับชำระหนี้ (`docs.go:532-541`)**: สำหรับ `trans_flag = 19` และ `239` ระบบบังคับเรียก `payCompleteCheck` และ `payAdvanceCheck` ทุกครั้งที่บันทึก แม้จะไม่ได้ส่งออบเจ็กต์ `Pay` มา (`payCheck = &TransPay{}`)

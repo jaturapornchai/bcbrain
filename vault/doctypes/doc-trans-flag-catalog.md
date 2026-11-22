@@ -14,7 +14,9 @@ sources:
   - "backend/internal/application/process/docs.go:25-115"
   - "backend/internal/application/process/doc_cancel.go:30-112"
   - "backend/internal/application/process/gl_template_rules_apar.go:18-95"
-  - "backend/internal/application/process/service.go:1782-1798"
+  - "backend/internal/application/process/service.go:2269-2278"
+  - "backend/internal/application/process/service.go:2445-2460"
+  - "backend/internal/application/process/service.go:3119-3157"
   - "backend/internal/application/process/fa_depreciation.go:35-45"
   - "backend/internal/application/process/cheque.go:19-41"
   - "backend/internal/application/process/report_menu_cb.go:152-584"
@@ -108,7 +110,7 @@ sources:
 
 | `trans_flag` | รหัสฟอร์แมต | ชื่อเอกสาร | `calc_flag` | คู่ยกเลิก / ความสัมพันธ์พิเศษ |
 |---:|---|---|---:|---|
-| `54` | `IB` | สินค้า/วัตถุดิบ คงเหลือยกมา | `+1` | ล็อกต้นทุนยกมาเสมอ (`is_lock_cost = 1`) |
+| `54` | `IB` | สินค้า/วัตถุดิบ คงเหลือยกมา และรับสินค้าสำเร็จรูปจากการผลิต BOM | `+1` | ล็อกต้นทุนยกมาเสมอ (`is_lock_cost = 1`); กรณียอดยกมาไม่โพสต์ GL แต่ถ้าระบุใน `ic_assembly_order.receipt_doc_no` จะโพสต์ GL รับเข้าสินค้าสำเร็จรูปอัตโนมัติ (`service.go:2269-2278, 3119-3157`) |
 | `56` | `IO` | เบิกสินค้า/วัตถุดิบ | `-1` | ยกเลิก=`57` (`IOC`), อ้างใบขอเบิก `122` ได้ |
 | `57` | `IOC` | ยกเลิกใบเบิกสินค้า/วัตถุดิบ | `+1` | `orig_flag = 56` |
 | `58` | `IR` | รับคืนสินค้า/วัตถุดิบ จากการเบิก | `+1` | ยกเลิก=`59` (`IRC`), อ้างใบเบิก `56` |

@@ -20,8 +20,9 @@ sources:
   - scripts/sql/02_data_schema.sql:2130
   - scripts/sql/02_data_schema.sql:9238
   - scripts/sql/02_data_schema.sql:9299
-  - backend/internal/application/process/cheque.go:19
-  - backend/internal/application/process/cheque.go:32
+  - backend/internal/application/process/cheque.go:19-68
+  - backend/internal/application/process/cheque.go:274-301
+  - backend/internal/application/process/trans.go:799-816
   - backend/internal/application/process/trans.go:1544
   - backend/internal/application/process/report_menu_cb.go:152
   - backend/internal/application/process/report_menu_cb.go:689
@@ -72,7 +73,7 @@ sources:
 | `side_code` | `varchar(25)` | `''` | รหัสฝ่าย |
 | `department_code` | `varchar(25)` | `''` | รหัสแผนก |
 | `external_chq` | `smallint` | `0` | เช็คภายนอก (`1` = ใช่) |
-| `status` | `smallint` | `0` | สถานะล่าสุดของเช็ค/บัตร (อัปเดตตาม `ic_trans_detail.trans_flag` ใน `cheque.go`):<br>• `0` = เช็คในมือ (ยังไม่เคลียร์)<br>• `1` = เช็คนำฝาก (`410`) / บัตรผ่าน (`461`) / Wallet ผ่าน (`463`)<br>• `2` = เช็คผ่าน (`411`, `451`) / ยกเลิกบัตร (`462`)<br>• `3` = เช็ครับคืน/เช็คจ่ายคืน (`412`, `453`)<br>• `4` = เช็คยกเลิก (`413`, `452`)<br>• `5` = เช็คขายลด<br>• `6` = เช็คคืนนำเข้าใหม่ (`414`)<br>• `7` = เช็คเปลี่ยน (`416`, `456`)<br>• `8` = เช็คตั้งหนี้ใหม่ (`418`) |
+| `status` | `smallint` | `0` | สถานะล่าสุดของเช็ค/บัตร (อัปเดตตาม `ic_trans_detail.trans_flag` และสถานะเอกสารแม่ใน `cheque.go`):<br>• `0` = เช็คในมือ (ยังไม่เคลียร์)<br>• `1` = เช็คนำฝาก (`410`) / บัตรผ่าน (`461`) / Wallet ผ่าน (`463`)<br>• `2` = เช็คผ่าน (`411`, `451`) / ยกเลิกบัตร (`462`)<br>• `3` = เช็ครับคืน/เช็คจ่ายคืน (`412`, `453`)<br>• `4` = เช็คยกเลิก (`413`, `452`)<br>• `5` = เช็คขายลด<br>• `6` = เช็คคืนนำเข้าใหม่ (`414`) **หรือ** เอกสารต้นทางใน `ic_trans` / `ap_ar_trans` ถูกยกเลิก (`last_status = 1`)<br>• `7` = เช็คเปลี่ยน (`416`, `456`)<br>• `8` = เช็คตั้งหนี้ใหม่ (`418`) |
 | `remark` | `varchar(255)` | `''` | หมายเหตุ |
 | `guid_code` | `varchar(35)` | `''` | รหัสอ้างอิงเฉพาะรายการ |
 
