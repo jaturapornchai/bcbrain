@@ -11,7 +11,7 @@ aliases:
   - ค่าเสื่อมราคาซ้ำ
   - ขายสินทรัพย์ไปแล้ว
 sources:
-  - backend/internal/application/process/docs.go:436
+  - backend/internal/application/process/docs.go:588
   - backend/internal/application/process/bank_statement_reconcile.go:174-679
   - backend/internal/application/process/bank_statement_xlsx.go:89-171
   - backend/internal/application/process/fa_depreciation.go:839-984

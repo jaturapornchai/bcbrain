@@ -14,7 +14,7 @@ sources:
   - "backend/internal/application/process/report_menu_cb.go:110-185"
   - "backend/internal/application/process/report_menu_cb.go:520-605"
   - "backend/internal/application/process/report_menu_cb.go:640-845"
-  - "backend/internal/application/process/trans.go:799-816"
+  - "backend/internal/application/process/trans.go:775-829"
   - "backend/internal/application/process/trans.go:1130-1420"
 ---
 
@@ -112,7 +112,7 @@ stateDiagram-v2
 > **ข้อควรระวังสำหรับบัตรเครดิต (`chq_type = 3`) และ Wallet (`chq_type = 21`)**:
 > 1. ใน `chequeStatusSQL` (`cheque.go:46-49`): `461 → 1`, `462 → 2`, `463 → 1` ดังนั้นรายการที่ **รอขึ้นเงิน** คือ **`COALESCE(c.status, 0) = 0`** เท่านั้น (ตรงกับ `menu_statement_advance` ใน `report_menu_cb.go:583`: `((c.chq_type IN (1, 2) AND c.status IN (0, 1)) OR (c.chq_type = 3 AND c.status = 0))`)
 > 2. **เคล็ดลับการเชื่อมประวัติเช็ค**: เอกสารปฏิบัติการเช็คและบัตร (`410`–`463`) เก็บรายการเช็คแต่ละใบไว้ในตาราง **`ic_trans_detail`** โดยใส่เลขที่เช็คใน `ic_trans_detail.chq_number` และใส่รหัสสมุดเงินฝากธนาคารใน `ic_trans_detail.item_code` (ยกเว้น `418` และ `416`/`456` รุ่นเก่าที่เก็บรหัสเช็คเดิมไว้ใน `item_code` ด้วยตาม `cheque.go:54-60`)
-> 3. **อัปเดตสถานะอัตโนมัติและการค้นหาเช็คข้ามคู่ค้า**: `rebuildTransDerived` (`trans.go:799-816`) คำนวณ `cb_chq_list.status` ใหม่ให้ทั้งเอกสารบริหารเช็คและเอกสารที่มีเช็คในแท็บรับ-จ่ายเงิน; ส่วน `ChequeCandidates` (`cheque.go:283-301`) เมื่อเปิด `SearchChequeOtherCust` จะค้นหาเช็คข้ามคู่ค้าได้สำหรับ `416, 418, 456` (`c.status IN (0,3)`)
+> 3. **อัปเดตสถานะอัตโนมัติและการค้นหาเช็คข้ามคู่ค้า**: `rebuildTransDerived` (`trans.go:775-829`, โดยเฉพาะ `810-827`) อ่านเลขที่เช็คในแท็บรับ-จ่ายเงินจาก `cb_chq_list` ด้วย เพื่อคำนวณ `cb_chq_list.status` ใหม่ให้ทั้งเอกสารบริหารเช็ค (`isChequeFlag`) และเอกสารทั่วไปที่มีเช็คในแท็บรับ-จ่ายเงิน; ส่วน `ChequeCandidates` (`cheque.go:283-301`) เมื่อเปิด `SearchChequeOtherCust` จะค้นหาเช็คข้ามคู่ค้าได้สำหรับ `416, 418, 456` (`c.status IN (0,3)`)
 
 ---
 
