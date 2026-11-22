@@ -3,7 +3,7 @@ title: "SQL สูตรการผลิต (BOM), ใบสั่งประ
 audience: dev
 tags: [sql, queries, ic, bom, assembly, consignment]
 aliases: ["SQL BOM สูตรผลิต", "SQL ใบสั่งประกอบสินค้า", "SQL สินค้าฝากขาย Consignment", "ic_bom_header", "ar_consignment_account"]
-sources: ["backend/internal/application/process/bom_assembly.go:166-628", "backend/internal/application/process/consignment.go:130-210", "backend/internal/application/process/report_menu_ic.go:244-275"]
+sources: ["backend/internal/application/process/bom_assembly.go:185-650", "backend/internal/application/process/consignment.go:130-210", "backend/internal/application/process/report_menu_ic.go:244-275"]
 ---
 
 ชุดคำสั่ง SQL สำหรับระบบผลิต/ประกอบสินค้า (`ic_bom_header`, `ic_bom_detail`, `ic_assembly_order`) และระบบบัญชีฝากขาย (`ar_consignment_account`, `ar_consignment_log`)
@@ -12,7 +12,7 @@ sources: ["backend/internal/application/process/bom_assembly.go:166-628", "backe
 
 ## 1. สูตรการผลิต (BOM) พร้อมต้นทุนประมาณการต่อ Batch (`ic_bom_header` + `ic_bom_detail`)
 
-อ้างอิงโครงสร้างตารางจาก `bom_assembly.go:166-205`:
+อ้างอิงโครงสร้างตารางจาก `bom_assembly.go:185-252`:
 
 **พารามิเตอร์**: `$1::text` (รหัสสูตร BOM หรือ `''` = สูตรที่ใช้งานอยู่ทั้งหมด)
 

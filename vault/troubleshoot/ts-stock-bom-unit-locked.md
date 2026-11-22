@@ -14,8 +14,8 @@ aliases:
   - สูตรการผลิตมีประวัติแล้ว
 sources:
   - frontend/account/master/ItemScreen.tsx:2566-2650
-  - backend/internal/application/process/bom_assembly.go:775-1795
-  - frontend/account/master/BomAssemblyScreen.tsx:865-1200
+  - backend/internal/application/process/bom_assembly.go:834-1842
+  - frontend/account/master/BomAssemblyScreen.tsx:945-1360
 ---
 
 # แก้ปัญหาล็อกหน่วยต้นทุน เปลี่ยนประเภทต้นทุนไม่ได้ และสูตรผลิตติดปัญหา
