@@ -12,7 +12,7 @@ sources: ["backend/internal/application/process/bom_assembly.go:185-650", "backe
 
 ## 1. สูตรการผลิต (BOM) พร้อมต้นทุนประมาณการต่อ Batch (`ic_bom_header` + `ic_bom_detail`)
 
-อ้างอิงโครงสร้างตารางจาก `bom_assembly.go:185-252`:
+อ้างอิงโครงสร้างตารางจาก `bom_assembly.go:186-252` (หมายเหตุ: หลังบ้าน `produceBomAssembly` อนุญาตสั่งประกอบเฉพาะสูตรที่ `active_status = 1` เท่านั้น โดยล็อกตรวจด้วย `FOR SHARE` ก่อนสร้างเอกสาร):
 
 **พารามิเตอร์**: `$1::text` (รหัสสูตร BOM หรือ `''` = สูตรที่ใช้งานอยู่ทั้งหมด)
 

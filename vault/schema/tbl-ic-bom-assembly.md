@@ -7,8 +7,8 @@ sources:
   - scripts/sql/02_data_schema.sql:6043-6084
   - backend/internal/application/process/bom_assembly.go:131-445
   - backend/internal/application/process/bom_assembly.go:806-1038
-  - backend/internal/application/process/bom_assembly.go:1615-1670
-  - backend/internal/application/process/bom_assembly.go:1784-1842
+  - backend/internal/application/process/bom_assembly.go:1365-1700
+  - backend/internal/application/process/bom_assembly.go:1805-1866
   - backend/internal/application/process/service.go:2385-2394
   - backend/internal/application/process/service.go:3235-3274
   - scripts/sql/33_seed_bcdemo_bom_assembly.sql:1-81
@@ -16,9 +16,9 @@ sources:
 
 # `ic_bom_header`, `ic_bom_detail` & `ic_assembly_order` — สูตรผลิต BOM และใบสั่งประกอบ
 
-ระบบสูตรการผลิตและใบสั่งประกอบ/ผลิตสินค้าใช้ชุดตาราง **`ic_bom_*` + `ic_assembly_order`** ที่สร้างโดย Go Backend (`bom_assembly.go:185-252` พร้อม `PRIMARY KEY` จริง; สำหรับฐานข้อมูลตัวอย่าง `bcdemo` มี `ensureDemoBomSeedTx` และ `33_seed_bcdemo_bom_assembly.sql` เติมสูตรตัวอย่าง `BOM-DEMO-01`, `BOM-DEMO-02` อัตโนมัติเมื่อยังไม่มีข้อมูล และ `listBomAssembly` ดึงรายการ `Components` จาก `ic_bom_detail` กลับมาครบทุกสูตร) และรองรับการทำงานแบบ Atomic Transaction โดยสร้างเอกสาร **เบิกวัตถุดิบ (`trans_flag = 56`)** คู่กับ **รับสินค้าสำเร็จรูป (`trans_flag = 54`)** ใน [[tbl-ic-trans]] / [[tbl-ic-trans-detail]] พร้อมซิงก์ `fg_total_cost` (หากขั้นตอนนี้ล้มเหลวจะทำชดเชยลบเอกสารทั้ง `54` และ `56` ทันที) และสั่ง `rebuildGLTx` โพสต์บัญชี `trans_flag = 54` เฉพาะใบรับที่ผูกใน `ic_assembly_order.receipt_doc_no` (`bom_assembly.go:1617-1667`, `service.go:2385-2394, 3235-3274`) นอกจากนี้ `normalizeBomAssemblyInput` (`bom_assembly.go:407-441`) รองรับทั้ง Payload แบบแบนและแบบซ้อน `bom` (พร้อม `rmQtyPerYield`), `prepareBomOptionalUpsertParams` (`bom_assembly.go:807-832`) จัดการฟิลด์เสริม (`fg_unit_code_2`, `fg_yield_qty_2`, `active_status`, `remark`) แบบ nullable เพื่อคงค่าเดิมใน DB เมื่อไม่ส่งมาอัปเดต, `saveBomFormula` ตรวจจับสูตรวนลูปหลายทอด (`checkBomCycle` ป้องกัน A → B → A ที่ `bom_assembly.go:974, 1784-1842`) และรองรับโครงสร้าง `ic_formular*` กับ `ic_production_formula*` เดิมใน `02_data_schema.sql` อยู่ด้วย
+ระบบสูตรการผลิตและใบสั่งประกอบ/ผลิตสินค้าใช้ชุดตาราง **`ic_bom_*` + `ic_assembly_order`** ที่สร้างโดย Go Backend (`bom_assembly.go:186-252` พร้อม `PRIMARY KEY` จริง; สำหรับฐานข้อมูลตัวอย่าง `bcdemo` มี `ensureDemoBomSeedTx` และ `33_seed_bcdemo_bom_assembly.sql` เติมสูตรตัวอย่าง `BOM-DEMO-01`, `BOM-DEMO-02` อัตโนมัติเมื่อยังไม่มีข้อมูล และ `listBomAssembly` ดึงรายการ `Components` จาก `ic_bom_detail` กลับมาครบทุกสูตร) และรองรับการทำงานแบบ Atomic Transaction โดยสร้างเอกสาร **เบิกวัตถุดิบ (`trans_flag = 56`)** คู่กับ **รับสินค้าสำเร็จรูป (`trans_flag = 54`)** ใน [[tbl-ic-trans]] / [[tbl-ic-trans-detail]] พร้อมซิงก์ `fg_total_cost` (หากขั้นตอนนี้ล้มเหลวจะทำชดเชยลบเอกสารทั้ง `54` และ `56` ทันที) และสั่ง `rebuildGLTx` โพสต์บัญชี `trans_flag = 54` เฉพาะใบรับที่ผูกใน `ic_assembly_order.receipt_doc_no` (`bom_assembly.go:1641-1692`, `service.go:2385-2394, 3235-3274`) นอกจากนี้ `normalizeBomAssemblyInput` (`bom_assembly.go:408-441`) รองรับทั้ง Payload แบบแบนและแบบซ้อน `bom` (พร้อม `rmQtyPerYield`), `prepareBomOptionalUpsertParams` (`bom_assembly.go:808-833`) จัดการฟิลด์เสริม (`fg_unit_code_2`, `fg_yield_qty_2`, `active_status`, `remark`) แบบ nullable เพื่อคงค่าเดิมใน DB เมื่อไม่ส่งมาอัปเดต, `saveBomFormula` ตรวจจับสูตรวนลูปหลายทอด (`checkBomCycle` ป้องกัน A → B → A ที่ `bom_assembly.go:975, 1809-1866`), `produceBomAssembly` ตรวจสถานะเปิดใช้งานผ่าน `validateBomActiveForProduction` และล็อกอ่านซ้ำใน Transaction ด้วย `SELECT COALESCE(active_status, 1)::int FROM ic_bom_header WHERE bom_code = $1 FOR SHARE` (`bom_assembly.go:1371-1376, 1419-1445`) เพื่อบล็อกการสั่งผลิตสูตรที่ `active_status = 0` และรองรับโครงสร้าง `ic_formular*` กับ `ic_production_formula*` เดิมใน `02_data_schema.sql` อยู่ด้วย
 
-## 1. ตารางสูตรผลิตและใบสั่งประกอบ (`bom_assembly.go:167-230`)
+## 1. ตารางสูตรผลิตและใบสั่งประกอบ (`bom_assembly.go:186-252`)
 
 ### 1.1 `ic_bom_header` (หัวสูตรผลิต BOM)
 - **SQL Primary Key**: `PRIMARY KEY (bom_code)`

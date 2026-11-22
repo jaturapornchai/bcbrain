@@ -3,7 +3,7 @@ title: "มาตรฐาน UI, Design System, Resizable Grid & Central Report
 audience: dev
 tags: [architecture, frontend, ui, grid, report, pdf, design-system]
 aliases: ["UI Standard BC", "useResizableColumns", "BcDataList", "UniversalReportScreen", "GlobalReportPrintModal", "2-Row Toolbar"]
-sources: ["AGENTS.md:1-66", "frontend/src/app/globals.css:1-75", "frontend/shared/ui/useResizableColumns.tsx:7-915", "frontend/account/master/StockToolBits.tsx:72-185", "frontend/account/master/simpleGridPagination.ts:1-47", "frontend/account/master/BcDataList.tsx:1-70", "frontend/account/report/UniversalReportScreen.tsx:1-75", "frontend/account/report/GlobalReportPrintModal.tsx:1-110", "frontend/shared/layout/MenuBar.tsx:1-70", "frontend/src/lib/numeric.ts:1-66"]
+sources: ["AGENTS.md:1-66", "frontend/src/app/globals.css:1-75", "frontend/shared/ui/useResizableColumns.tsx:7-915", "frontend/account/master/StockToolBits.tsx:72-185", "frontend/account/master/simpleGridPagination.ts:1-47", "frontend/account/master/BcDataList.tsx:1-70", "frontend/account/report/UniversalReportScreen.tsx:1-75", "frontend/account/report/GlobalReportPrintModal.tsx:1-110", "frontend/shared/components/GlobalDocFormPrintModal.tsx:660-870", "frontend/shared/components/doc-print/docFormColumns.ts:1-640", "frontend/shared/components/doc-print/lockedFormTemplates.ts:50-864", "frontend/shared/layout/MenuBar.tsx:1-70", "frontend/src/lib/numeric.ts:1-66"]
 ---
 
 ส่วนติดต่อผู้ใช้ (Frontend) ของ **BC Ai Account** บน Next.js + Tailwind CSS v4 ถูกวางมาตรฐานกลางแบบ **Global-First Design System** เพื่อให้ทุกหน้าจอ ข้อมูลหลัก รายการรายวัน และรายงาน มีพฤติกรรมเดียวกัน 100%
@@ -43,9 +43,13 @@ sources: ["AGENTS.md:1-66", "frontend/src/app/globals.css:1-75", "frontend/share
 
 ---
 
-## 4. Central Report UI & PDF Engine (`UniversalReportScreen.tsx`, `GlobalReportPrintModal.tsx`)
+## 4. Central Report UI, Doc Form Print & PDF Engine (`UniversalReportScreen.tsx`, `GlobalReportPrintModal.tsx`, `GlobalDocFormPrintModal.tsx`)
 
 - **Universal Report Screen**: หน้าจอรายงานกลางที่รองรับ Report Menu กว่า 300 รายการจาก Backend (`runBackendReport`), ส่งออก Excel, Group Hierarchy (`ReportGroupNodeDTO`), แสดง SQL สำหรับ Studio และคลิกเจาะลึกไปเอกสารต้นทาง (`openSourceDocument` + `classifyReportDrillColumn`)
 - **Print & PDF Studio (`GlobalReportPrintModal.tsx`)**:
   - ตั้งค่าหน้ากระดาษ (`A4`, `A3`, `Letter`, `Legal`, `A5`, `Continuous`), แนวตั้ง/แนวนอน, ขนาดตัวอักษร, 6 Print Themes (`bc_emerald`, `corporate_navy`, `executive_amber`, `modern_indigo`, `crimson_ledger`, `minimal_clean`), หัวบริษัท, ลายเซ็น และรองรับเลือกภาษารายงาน `ไทย/English` แยกจากภาษาหน้าจอหลัก
   - พิมพ์เป็น PDF ผ่าน Backend (`fetchBackendReportPdf` -> `/process/report/pdf`) และบันทึกเทมเพลตไว้ใน `erp_report_template`
+- **Global Document Form Print (`GlobalDocFormPrintModal.tsx`, `docFormColumns.ts`, `lockedFormTemplates.ts`)**:
+  - รองรับ 5 โหมดภาษาแบบฟอร์ม (`DocFormLangMode`: `"th" | "en" | "both" | "lo" | "lo_en"`) จำค่าผ่าน `localStorage` (`bc_doc_form_last_lang_v1`) แยกตามเมนู/global และซิงก์ตามภาษาหลักของแอป (`resolveDocFormInitialLangMode`, `mapAppLangToDocFormLang`), แยกหัวตาราง 2 บรรทัดในโหมดคู่ภาษาโดยไม่ต่อคำอังกฤษซ้ำ (`resolveDocTableColHeaderParts`) และแปลป้ายลายเซ็นผ่าน `SIG_LABEL_CODE` (`pickSignatureLabel`)
+  - จำแนกโปรไฟล์คอลัมน์ฟอร์มอัตโนมัติ 9 หมวด (`classifyDocFormCategory` / `getDocFormColumnProfile`: `inventory`, `deposit`, `bills`, `expense`, `income`, `header_amount`, `gl_journal`, `cash_bank`, `cheque`) โดยเอกสารที่ไม่ใช่สินค้าไม่สืบทอดการตั้งค่าคอลัมน์จาก `__GLOBAL__`, โหลดรายการมัดจำ (`DEPOSIT_FORM_FLAGS`) จาก `ap_ar_trans_detail` และสร้างแถวสรุปยอดสำหรับเอกสารหัวบิล (`HEADER_AMOUNT_FORM_FLAGS`)
+  - แม่แบบฟอร์มมาตรฐานใน `lockedFormTemplates.ts` แยก `partyLabelTh` กับ `partyLabelEn` ออกจากกันไม่ให้ซ้ำซ้อนในโหมด 2 ภาษา และ `formatSmlDocRunningPreview` รองรับตัวแทนรหัสสาขา `@system_branch_code@`
