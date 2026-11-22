@@ -3,7 +3,7 @@ title: "แคตตาล็อกรายงาน & menuKey ทั้งห�
 audience: dev
 tags: [api, reports, menukey, pdf, drilldown]
 aliases: ["menuKey ทั้งหมด", "Report Catalog BC", "bc_run_report menuKey", "รหัสรายงาน BC", "Report PDF Engine"]
-sources: ["backend/internal/application/process/report.go:24-680", "backend/internal/application/process/report_menu.go:1-43", "backend/internal/application/process/report_options.go:1-142", "backend/internal/application/process/report_drilldown.go:46-215", "backend/internal/application/process/report_menu_ic.go:115-1380", "backend/internal/application/process/report_menu_ap_ar.go:1121-1200", "backend/internal/application/process/report_menu_cb.go:1-907", "backend/internal/application/process/report_menu_gl_fa.go:1-1881", "backend/internal/application/process/report_menu_so_po.go:1-924", "backend/internal/application/process/report_menu_autocare.go:1-454", "backend/internal/application/process/report_menu_singha.go:1100-1152"]
+sources: ["backend/internal/application/process/report.go:24-750", "backend/internal/application/process/report_menu.go:1-43", "backend/internal/application/process/report_options.go:1-142", "backend/internal/application/process/report_drilldown.go:46-215", "backend/internal/application/process/report_menu_ic.go:115-1380", "backend/internal/application/process/report_menu_ap_ar.go:1121-1200", "backend/internal/application/process/report_menu_cb.go:1-907", "backend/internal/application/process/report_menu_gl_fa.go:1-1881", "backend/internal/application/process/report_menu_so_po.go:1-924", "backend/internal/application/process/report_menu_autocare.go:1-454", "backend/internal/application/process/report_menu_singha.go:1100-1152"]
 ---
 
 **Central Report & PDF Engine** ใช้ร่วมกันทั้งหน้าเว็บ `POST /process/report/run`, PDF `POST /process/report/pdf` (`%PDF-1.4` + `erp_report_template`) และ MCP Tool `bc_run_report` โดยจำแนกตามรหัส `menuKey` ในแผนที่ `menuReports` (`report_menu.go:30-42`)
@@ -13,7 +13,7 @@ sources: ["backend/internal/application/process/report.go:24-680", "backend/inte
 ## 1. สัญญา Input/Output & กฎสำคัญของ Report Engine (`report.go`, `report_options.go`)
 
 - **Input (`RunReportInput`)**: `menuKey` (case-insensitive), `mode` (`"summary"` / `"detail"` หรือ `viewDetail: true`), `dateFrom`, `dateTo` (`YYYY-MM-DD`), `fromCode`, `toCode`, `orderBy`, `keyword`, `options` (`map[string]string` สำหรับตัวกรองเฉพาะรายงาน).
-- **Aliases อัตโนมัติ (`reportCodeAliases` ใน `report.go:209-223`)**:
+- **Aliases อัตโนมัติ (`reportCodeAliases` ใน `report.go:218-236`)**:
   - `rp_so_quotation` -> `menu_so_report_quotation`
   - `rp_so_sale_order` -> `menu_so_report_sale_order`
   - `report_vat_sale` -> `menu_report_vat_sale`
@@ -21,14 +21,17 @@ sources: ["backend/internal/application/process/report.go:24-680", "backend/inte
   - `ic_stock_balance` / `menu_ic_report_stock_balance` / `menu_ic_report_stk_balance` -> `menu_ic_info_stk_balance`
   - `menu_ic_report_stock_movement` -> `menu_ic_info_stk_card`
   - `menu_ic_report_stock_minimum` -> `menu_report_ic_stock_balance_warehouse_min`
+  - `menu_ic_item_detail` / `menu_ic_report_item_detail` -> `menu_ic_detail`
+  - `menu_ar_detail` -> `menu_ar_report_detail_ar`
+  - `menu_ap_detail` -> `menu_ap_report_detail_ap`
   - `menu_po_report_purchase_item` -> `menu_po_recive_by_item`
   - `menu_so_report_sale_item` -> `menu_so_sale_service_by_item`
   - `menu_cb_report_bank_movement` -> `_menu_bank_statement`
   - `menu_fa_report_asset_list` -> `menu_asset_report_list`
-- **สิทธิ์ดูต้นทุนสินค้า (`show_item_cost`)**: หากผู้ใช้ไม่มีสิทธิ์ต้นทุน Engine จะบล็อกรายงานกำไรขั้นต้น/ต้นทุนบางตัว (`ไม่มีสิทธิ์ดูต้นทุนสินค้า`) หรือถอดคอลัมน์ต้นทุนออกอัตโนมัติ (`dropCostColumns` ใน `report.go:406`)
+- **สิทธิ์ดูต้นทุนสินค้า (`show_item_cost`)**: หากผู้ใช้ไม่มีสิทธิ์ต้นทุน Engine จะบล็อกรายงานกำไรขั้นต้น/ต้นทุนบางตัว (`ไม่มีสิทธิ์ดูต้นทุนสินค้า`) หรือถอดคอลัมน์ต้นทุนออกอัตโนมัติ (`dropCostColumns` ใน `report.go:491`)
 - **Strict Pro Menu Keys (`edition_guard.go:11-15`)**: รายงาน VAT ต่างประเทศ `menu_gl_vat_report_sale_inter`, `menu_gl_vat_report_buy_inter`, `menu_gl_vat_report_inter_sum` สงวนไว้เฉพาะ Pro Edition
-- **ปี พ.ศ./ค.ศ. (`applyReportYearType`)**: แปลงวันที่ในแถวและหัวข้อเงื่อนไขตาม `erp_option.year_type`
-- **Option Validation (`normalizeReportOptions`)**: ยอมรับเฉพาะคีย์ตัวเลือกที่รายงานนั้นประกาศไว้ (`checkbox`, `number`, `date`, `select`, `ranges`, `multi`, `text` โดย `ranges`/`text` สามารถระบุ `lookupTable` เช่น `ap_supplier`, `ar_customer`, `erp_branch_list` สำหรับหน้าต่างค้นหารหัส) เพื่อกัน SQL smuggling
+- **ปี พ.ศ./ค.ศ. (`applyReportYearType`, `readErpYearType` ใน `report.go:194-206`)**: แปลงวันที่ในแถวและหัวข้อเงื่อนไขตาม `erp_option.year_type` (`1` = พ.ศ., ค่าอื่น = ค.ศ.; หากอ่านค่าจาก `erp_option` ไม่ได้จะใช้ พ.ศ. `1` เป็นค่าเริ่มต้น)
+- **Option Validation & ConditionText (`normalizeReportOptions`, `appendActiveOptionsToConditionText` ใน `report.go:693-746`)**: ยอมรับเฉพาะคีย์ตัวเลือกที่รายงานนั้นประกาศไว้ (`checkbox`, `number`, `date`, `select`, `ranges`, `multi`, `text` โดย `ranges`/`text` สามารถระบุ `lookupTable` เช่น `ap_supplier`, `ar_customer`, `erp_branch_list` สำหรับหน้าต่างค้นหารหัส) เพื่อกัน SQL smuggling และเติมเงื่อนไขที่เลือก รวมถึง `ranges` ลงใน `ConditionText` โดยอัตโนมัติ (ข้าม `party_ranges` ของ `aparRun` หากจัดรูปแบบไว้ใน `rangeText` แล้ว)
 
 ---
 

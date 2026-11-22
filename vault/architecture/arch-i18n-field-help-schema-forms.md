@@ -34,7 +34,7 @@ sources:
 ## 2. Contextual Field Help & Multi-Language Store/DOM Engine (`bcFieldHelpCatalog.ts`, `bcI18n.tsx`, `bcLangEngine.ts`, `bcLanguageStore.ts`, `GlobalLanguageTranslator.tsx`)
 
 - **Field Help**: `bcFieldHelpCatalog.ts` จับคู่ช่องกรอก ปุ่ม แท็บ และคอลัมน์เข้ากับคลังคำอธิบายภาษาไทยใน `frontend/src/config/help/data/*.json` (`bc_fields.json`, `bc_phrases.json`, `ar_ap.json`, `ic.json`, `gl_tax.json`, `trans.json`) และ endpoint `/api/v1/help`
-- **Compact Language Packs (`bcLanguageStore.ts` + `bcLangEngine.ts`)**: โหลดชุดภาษาจาก Next.js Proxy (`/api/language?pack=<lang>` → Go Backend `GET /api/v1/language/pack` จาก `language.json` ที่มี `6,248` รายการใน `32` กลุ่ม) แบบ Lazy เฉพาะภาษาที่ใช้งาน (`th`, `en`, `lo`) รองรับ `ETag` (`304 Not Modified`) และ `gzip` แล้ว compile เทมเพลตข้อความและดัชนี hash (`cat`, `lex`) ไว้ในหน่วยความจำโดยไม่ bundle คำศัพท์ไว้ฝั่ง Client
+- **Compact Language Packs (`bcLanguageStore.ts` + `bcLangEngine.ts`)**: โหลดชุดภาษาจาก Next.js Proxy (`/api/language?pack=<lang>` → Go Backend `GET /api/v1/language/pack` จาก `language.json` ที่มี `6,252` รายการใน `32` กลุ่ม) แบบ Lazy เฉพาะภาษาที่ใช้งาน (`th`, `en`, `lo`) รองรับ `ETag` (`304 Not Modified`) และ `gzip` แล้ว compile เทมเพลตข้อความและดัชนี hash (`cat`, `lex`) ไว้ในหน่วยความจำโดยไม่ bundle คำศัพท์ไว้ฝั่ง Client
 - **Multi-Language DOM Engine**: `GlobalLanguageTranslator.tsx` (`WeakMap` เก็บข้อความต้นฉบับ + `bcBilingualDataCache.ts` แปลข้อมูลหลักแบบขอดู) แปลป้ายกำกับ UI และข้อความเตือนด้วย `bcI18n.tsx` / `bcLangEngine.ts` โดยข้ามเซลล์ข้อมูลธุรกิจจริง (`isDataCellTextNode`) เพื่อไม่ให้ชื่อลูกค้าหรือชื่อสินค้าถูกแปลเพี้ยน (รองรับทั้ง **ไทย / อังกฤษ / ลาว**)
 
 ---
