@@ -9,14 +9,14 @@ aliases:
   - "ตารางนัดจ่ายชำระหนี้เจ้าหนี้ตาม due_date"
   - "เจ้าหนี้การค้ารายตัว หักใบลดหนี้ซื้อ 16 317"
 sources:
-  - "backend/internal/application/process/report_menu_ap_ar.go:526-562"
-  - "backend/internal/application/process/report_menu_ap_ar.go:644-745"
+  - "backend/internal/application/process/report_menu_ap_ar.go:541-573"
+  - "backend/internal/application/process/report_menu_ap_ar.go:659-758"
   - "backend/internal/application/process/docs.go:600-690"
 ---
 
 # SQL บิลเจ้าหนี้คงค้างรายเอกสารและตารางนัดจ่ายตามวันครบกำหนด
 
-สกัดตรงจาก `aparOpenDocsCTE` ฝั่งเจ้าหนี้ (`report_menu_ap_ar.go:526-558`) และ `docs.go:apDebtWhere/apCreditWhere` ครอบคลุมครบทั้ง **ซื้อเชื่อ (`12`), ตั้งหนี้ทะยอยรับ (`315`), เพิ่มหนี้ซื้อ (`14, 316`), ตั้ง/เพิ่มหนี้ย่อยและยกมา (`81, 83, 87, 89`), ค่าใช้จ่ายอื่นเชื่อ (`260, 264`) และหักใบลดหนี้เจ้าหนี้ (`16, 317, 85, 91, 262`)** (ดูกติกาเครื่องหมายลบของใบลดหนี้ที่ [[doc-impact-ar-ap-deposit]])
+สกัดตรงจาก `aparOpenDocsCTE` ฝั่งเจ้าหนี้ (`report_menu_ap_ar.go:541-573`) และ `docs.go:apDebtWhere/apCreditWhere` ครอบคลุมครบทั้ง **ซื้อเชื่อ (`12`), ตั้งหนี้ทะยอยรับ (`315`), เพิ่มหนี้ซื้อ (`14, 316`), ตั้ง/เพิ่มหนี้ย่อยและยกมา (`81, 83, 87, 89`), ค่าใช้จ่ายอื่นเชื่อ (`260, 264`) และหักใบลดหนี้เจ้าหนี้ (`16, 317, 85, 91, 262`)** (ดูกติกาเครื่องหมายลบของใบลดหนี้ที่ [[doc-impact-ar-ap-deposit]])
 
 ---
 

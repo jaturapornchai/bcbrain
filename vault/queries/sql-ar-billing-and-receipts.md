@@ -9,8 +9,8 @@ aliases:
   - "aparMovementReport ar"
   - "รายงานการรับชำระหนี้แยกช่องทาง เงินสด โอน เช็ค"
 sources:
-  - "backend/internal/application/process/report_menu_ap_ar.go:278-408"
-  - "backend/internal/application/process/report_menu_ap_ar.go:440-524"
+  - "backend/internal/application/process/report_menu_ap_ar.go:293-422"
+  - "backend/internal/application/process/report_menu_ap_ar.go:455-535"
 ---
 
 # SQL ใบวางบิลลูกหนี้ (`235`) ใบเสร็จรับเงินประจำวัน (`239`) และการ์ดเคลื่อนไหวลูกหนี้
@@ -21,7 +21,7 @@ sources:
 
 ## 1. รายงานใบเสร็จรับเงินประจำวัน พร้อมแจกแจงช่องทางการรับชำระ (`aparReceiptDaily`)
 
-สกัดจาก `report_menu_ap_ar.go:338-382` เพื่อดูยอดรับชำระหนี้แต่ละใบ แยกเงินสด เงินโอน เช็ครับ บัตรเครดิต ตัดมัดจำ และภาษีถูกหัก ณ ที่จ่าย:
+สกัดจาก `report_menu_ap_ar.go:353-395` เพื่อดูยอดรับชำระหนี้แต่ละใบ แยกเงินสด เงินโอน เช็ครับ บัตรเครดิต ตัดมัดจำ และภาษีถูกหัก ณ ที่จ่าย:
 
 ### พารามิเตอร์
 - `$1` (`DATE`): วันที่เริ่มต้น
@@ -102,7 +102,7 @@ ORDER BY COALESCE(b.due_date, b.doc_date) ASC, b.doc_no ASC, d.line_number ASC;
 
 ## 3. การ์ดความเคลื่อนไหวลูกหนี้รายตัว พร้อมยอดสะสม (`aparMovementReport`)
 
-สกัดจาก `report_menu_ap_ar.go:384-524` แสดงยอดยกมาก่อน `$1` บวกตั้งหนี้/เพิ่มหนี้ หักลดหนี้และรับชำระหนี้ในงวด พร้อมยอดคงเหลือสะสมรายบรรทัด (`SUM(...) OVER`):
+สกัดจาก `report_menu_ap_ar.go:399-535` แสดงยอดยกมาก่อน `$1` บวกตั้งหนี้/เพิ่มหนี้ หักลดหนี้และรับชำระหนี้ในงวด พร้อมยอดคงเหลือสะสมรายบรรทัด (`SUM(...) OVER`):
 
 ### พารามิเตอร์
 - `$1` (`DATE`): วันที่เริ่มต้นงวด

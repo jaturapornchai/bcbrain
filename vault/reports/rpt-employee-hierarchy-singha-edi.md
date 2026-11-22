@@ -5,7 +5,7 @@ aliases: [การกรองช่วงรหัสรายงาน, ร�
 sources:
   - backend/internal/application/process/report_hierarchy.go:1-663
   - backend/internal/application/process/report_conditions.go:1-120
-  - backend/internal/application/process/report_code_ranges.go:1-134
+  - backend/internal/application/process/report_code_ranges.go:1-137
   - backend/internal/application/process/report_menu_employee.go:1-52
   - backend/internal/application/process/report_menu_singha.go:1-1152
   - frontend/account/report/ReportConditionFields.tsx:1-213

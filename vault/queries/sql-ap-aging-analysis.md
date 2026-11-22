@@ -8,7 +8,7 @@ aliases:
   - "aparMovementReport ap"
   - "การ์ดเจ้าหนี้รายตัว ยอดสะสม"
 sources:
-  - "backend/internal/application/process/report_menu_ap_ar.go:440-642"
+  - "backend/internal/application/process/report_menu_ap_ar.go:455-655"
   - "backend/internal/adapter/inbound/http/mcp/gateway.go:2123-2135"
 ---
 
@@ -83,7 +83,7 @@ ORDER BY overdue_over_90 DESC, net_ap_total DESC;
 
 ## 2. สรุปยอดเคลื่อนไหวเจ้าหนี้รายตัว (ยกมา + ตั้งหนี้ - ลดหนี้ - จ่ายชำระ = ยอดยกไป)
 
-สกัดจาก `aparStatusReport` (`report_menu_ap_ar.go:384-438`) สำหรับกระทบยอดเจ้าหนี้ทั้งบริษัทในช่วงวันที่ `$1` ถึง `$2`:
+สกัดจาก `aparStatusReport` (`report_menu_ap_ar.go:399-448`) สำหรับกระทบยอดเจ้าหนี้ทั้งบริษัทในช่วงวันที่ `$1` ถึง `$2`:
 
 ### พารามิเตอร์
 - `$1` (`DATE`): วันที่เริ่มต้นงวด

@@ -11,7 +11,7 @@ aliases:
   - "bc_query_readonly sql"
 sources:
   - "backend/internal/adapter/inbound/http/mcp/gateway.go:1812-2230"
-  - "backend/internal/application/process/report_menu_ap_ar.go:526-640"
+  - "backend/internal/application/process/report_menu_ap_ar.go:541-655"
   - "backend/internal/application/process/report_menu_gl_fa.go:343-1305"
   - "backend/internal/application/process/report_menu_cb.go:640-845"
   - "backend/internal/application/process/report_menu_so_po.go:524-835"

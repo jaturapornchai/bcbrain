@@ -14,7 +14,7 @@ aliases:
 sources:
   - frontend/src/config/help/data/ar_ap.json:71-102
   - frontend/src/config/help/data/ar_ap.json:714-805
-  - backend/internal/application/process/report_menu_ap_ar.go:278-304
+  - backend/internal/application/process/report_menu_ap_ar.go:293-325
   - backend/internal/application/process/pay_check.go:95-243
 ---
 

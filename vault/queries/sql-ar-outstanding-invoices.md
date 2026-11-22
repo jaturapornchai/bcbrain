@@ -9,14 +9,14 @@ aliases:
   - "OutstandingBills sql"
   - "ลูกหนี้การค้ารายตัว หักใบลดหนี้ 48"
 sources:
-  - "backend/internal/application/process/report_menu_ap_ar.go:526-562"
-  - "backend/internal/application/process/report_menu_ap_ar.go:644-762"
+  - "backend/internal/application/process/report_menu_ap_ar.go:541-573"
+  - "backend/internal/application/process/report_menu_ap_ar.go:659-774"
   - "backend/internal/application/process/docs.go:600-690"
 ---
 
 # SQL บิลลูกหนี้คงค้างรายตัวและรายลูกหนี้ (AR Outstanding Invoices)
 
-คำสั่ง SQL นี้สกัดตรงจาก `aparOpenDocsCTE` (`report_menu_ap_ar.go:526-558`) ซึ่งเป็นสูตรมาตรฐานเดียวกับรายงานลูกหนี้คงค้างและหน้าจอดึงบิลไปวางบิล/รับชำระหนี้ ครอบคลุมครบทั้ง **บิลขายเชื่อ (`44`), เพิ่มหนี้ (`46`), หนี้ย่อย/ยกมา (`93, 95, 99, 101`), รายได้อื่นเชื่อ (`250, 254`), ขายสินทรัพย์ถาวรเชื่อ (`as_trans` `1802`) และหักใบลดหนี้ลูกหนี้ (`48, 97, 103, 252`)** ตามกฎเครื่องหมายจริง (ดูคำอธิบายละเอียดที่ [[doc-impact-ar-ap-deposit]])
+คำสั่ง SQL นี้สกัดตรงจาก `aparOpenDocsCTE` (`report_menu_ap_ar.go:541-573`) ซึ่งเป็นสูตรมาตรฐานเดียวกับรายงานลูกหนี้คงค้างและหน้าจอดึงบิลไปวางบิล/รับชำระหนี้ ครอบคลุมครบทั้ง **บิลขายเชื่อ (`44`), เพิ่มหนี้ (`46`), หนี้ย่อย/ยกมา (`93, 95, 99, 101`), รายได้อื่นเชื่อ (`250, 254`), ขายสินทรัพย์ถาวรเชื่อ (`as_trans` `1802`) และหักใบลดหนี้ลูกหนี้ (`48, 97, 103, 252`)** ตามกฎเครื่องหมายจริง (ดูคำอธิบายละเอียดที่ [[doc-impact-ar-ap-deposit]])
 
 ---
 

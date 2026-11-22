@@ -12,7 +12,7 @@ aliases:
   - รายงานวางบิล
 sources:
   - "frontend/src/config/bcMenu.json:7200-8600"
-  - "backend/internal/application/process/report_menu_ap_ar.go:137-580"
+  - "backend/internal/application/process/report_menu_ap_ar.go:138-655"
   - "backend/internal/application/process/report_menu_ap_ar_opts.go:15-108"
 ---
 

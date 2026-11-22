@@ -11,7 +11,7 @@ aliases:
   - "ลูกหนี้ขายสินทรัพย์ 1802"
 sources:
   - "backend/internal/application/process/docs.go:532-690"
-  - "backend/internal/application/process/report_menu_ap_ar.go:526-562"
+  - "backend/internal/application/process/report_menu_ap_ar.go:541-573"
   - "backend/internal/application/process/trans_deposit.go:25-266"
   - "backend/internal/application/process/report_menu_sopo.go:34-41"
   - "backend/internal/application/process/report_menu_sopo.go:153-180"
@@ -68,7 +68,7 @@ sources:
 | **2. รายการในใบวางบิลลูกหนี้** | `235` | `billing_no` = เลขที่บิล AR, `bill_type` = `trans_flag` ของบิล AR | **ยังไม่ลดหนี้!** เป็นเพียงการจัดกลุ่มบิลเพื่อรอนำใบวางบิลไปรับชำระใน `239` |
 | **3. รายการตัดรับชำระ (`239`) / จ่ายชำระ (`19`)** | `239` (AR) หรือ `19` (AP) | `billing_no` = เลขที่บิลต้นทาง, `bill_type` = `trans_flag` ของบิลต้นทาง, `doc_ref` = เลขที่ใบวางบิล (ถ้าดึงมาจากวางบิล) | **ตัดลดยอดหนี้จริง** ด้วยคอลัมน์ `sum_pay_money` (และ `lost_profit_exchange_amount`) |
 
-### กฎเหล็กเครื่องหมายบนบิลตั้งหนี้ vs ใบลดหนี้ (`report_menu_ap_ar.go:528-558`)
+### กฎเหล็กเครื่องหมายบนบิลตั้งหนี้ vs ใบลดหนี้ (`report_menu_ap_ar.go:541-573`)
 1. **บนบิลตั้งหนี้/เพิ่มหนี้ (`12, 315, 44, 1802` ฯลฯ)**:
    - หัวบิลเก็บ `t.total_amount > 0`
    - เมื่อตัดรับ/จ่ายชำระใน `ap_ar_trans_detail` (`trans_flag = 239` หรือ `19`) ยอด `d.sum_pay_money` จะเก็บเป็น **ค่าบวก (`> 0`)**

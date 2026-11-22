@@ -9,7 +9,7 @@ aliases:
   - "arOverdueSQL"
   - "แบ่งช่วงอายุหนี้ 1-30 31-60 61-90 >90 วัน"
 sources:
-  - "backend/internal/application/process/report_menu_ap_ar.go:563-642"
+  - "backend/internal/application/process/report_menu_ap_ar.go:578-655"
   - "backend/internal/adapter/inbound/http/mcp/gateway.go:2110-2122"
   - "backend/internal/adapter/inbound/http/ai/context_sales_ar.go:38-55"
 ---

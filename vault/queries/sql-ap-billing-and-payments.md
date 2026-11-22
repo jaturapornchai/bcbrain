@@ -8,7 +8,7 @@ aliases:
   - "sql เงินมัดจำจ่ายคงเหลือ เงินจ่ายล่วงหน้า 10 11"
   - "apBillingByInvoice apPaymentDetail"
 sources:
-  - "backend/internal/application/process/report_menu_ap_ar.go:763-910"
+  - "backend/internal/application/process/report_menu_ap_ar.go:778-922"
   - "backend/internal/application/process/report_menu_sopo.go:153-180"
   - "backend/internal/application/process/trans_deposit.go:25-266"
 ---
@@ -21,7 +21,7 @@ sources:
 
 ## 1. รายงานการจ่ายชำระหนี้เจ้าหนี้ (`trans_flag = 19`) แจกแจงช่องทางจ่ายและหัก ณ ที่จ่าย
 
-สกัดจาก `apPaymentDetail` และ `apPaymentDayFields` (`report_menu_ap_ar.go:808-908`):
+สกัดจาก `apPaymentDetail` และ `apPaymentDayFields` (`report_menu_ap_ar.go:823-922`):
 
 ### พารามิเตอร์
 - `$1` (`DATE`): วันที่เริ่มต้น
@@ -59,7 +59,7 @@ ORDER BY h.doc_date ASC, h.doc_no ASC;
 
 ## 2. รายงานใบรับวางบิลเจ้าหนี้ที่ยังค้างจ่าย (`apBillingByInvoice`)
 
-สกัดจาก `report_menu_ap_ar.go:763-801` แสดงใบรับวางบิล (`trans_flag = 213`) ที่รับวางบิลไว้แล้วแต่ยังจ่ายชำระ (`19`) ไม่ครบ:
+สกัดจาก `report_menu_ap_ar.go:778-812` แสดงใบรับวางบิล (`trans_flag = 213`) ที่รับวางบิลไว้แล้วแต่ยังจ่ายชำระ (`19`) ไม่ครบ:
 
 ### พารามิเตอร์
 - `$1` (`DATE`): วันที่รับวางบิลเริ่มต้น
