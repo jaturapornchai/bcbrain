@@ -3,7 +3,7 @@ title: "มาตรฐาน UI, Design System, Resizable Grid & Central Report
 audience: dev
 tags: [architecture, frontend, ui, grid, report, pdf, design-system]
 aliases: ["UI Standard BC", "useResizableColumns", "BcDataList", "UniversalReportScreen", "GlobalReportPrintModal", "2-Row Toolbar"]
-sources: ["AGENTS.md:1-66", "frontend/src/app/globals.css:1-75", "frontend/shared/ui/useResizableColumns.tsx:7-915", "frontend/account/master/StockToolBits.tsx:80-168", "frontend/account/master/simpleGridPagination.ts:1-33", "frontend/account/master/BcDataList.tsx:1-70", "frontend/account/report/UniversalReportScreen.tsx:1-75", "frontend/account/report/GlobalReportPrintModal.tsx:1-110", "frontend/shared/layout/MenuBar.tsx:1-70", "frontend/src/lib/numeric.ts:1-66"]
+sources: ["AGENTS.md:1-66", "frontend/src/app/globals.css:1-75", "frontend/shared/ui/useResizableColumns.tsx:7-915", "frontend/account/master/StockToolBits.tsx:72-185", "frontend/account/master/simpleGridPagination.ts:1-47", "frontend/account/master/BcDataList.tsx:1-70", "frontend/account/report/UniversalReportScreen.tsx:1-75", "frontend/account/report/GlobalReportPrintModal.tsx:1-110", "frontend/shared/layout/MenuBar.tsx:1-70", "frontend/src/lib/numeric.ts:1-66"]
 ---
 
 ส่วนติดต่อผู้ใช้ (Frontend) ของ **BC Ai Account** บน Next.js + Tailwind CSS v4 ถูกวางมาตรฐานกลางแบบ **Global-First Design System** เพื่อให้ทุกหน้าจอ ข้อมูลหลัก รายการรายวัน และรายงาน มีพฤติกรรมเดียวกัน 100%
@@ -38,7 +38,7 @@ sources: ["AGENTS.md:1-66", "frontend/src/app/globals.css:1-75", "frontend/share
   - มีปุ่ม `ResetColumnWidthsButton` สำหรับคืนค่าความกว้างตั้งต้น
   - รองรับ `onHeaderRefresh` เมื่อคลิกหัวตารางเพื่อ Query/Refresh ข้อมูลใหม่
   - มี `GlobalTableColumnResizer` ช่วยอัปเกรดตารางภายใน `.account-workspace` ให้รองรับความสามารถนี้ทั่วทั้งระบบ โดยแยก pass อ่านขนาด Layout (`clientWidth`/`scrollWidth`) ใน `fitNumericCellsInTable` และแคช `data-last-fit-key` เพื่อลดการคำนวณ Reflow ซ้ำเมื่อข้อมูลและความกว้างตารางไม่เปลี่ยน
-- **Auto Pagination (`SimpleGrid` + `paginateRows`)**: ตารางเครื่องมือมาตรฐาน (`StockToolBits.tsx`, `simpleGridPagination.ts`) แบ่งหน้าแสดงผลอัตโนมัติ (ค่าเริ่มต้น `pageSize = 100`) เมื่อมีข้อมูลจำนวนมาก โดยไม่แก้ไขอ้างอิงอาร์เรย์ต้นทาง
+- **Auto Pagination (`SimpleGrid` + `paginateRows` / `resolvePageForRows`)**: ตารางเครื่องมือมาตรฐาน (`StockToolBits.tsx`, `simpleGridPagination.ts`) แบ่งหน้าแสดงผลอัตโนมัติ (ค่าเริ่มต้น `pageSize = 100`) เมื่อมีข้อมูลจำนวนมาก โดยไม่แก้ไขอ้างอิงอาร์เรย์ต้นทาง, รีเซ็ตกลับหน้า 1 อัตโนมัติเมื่อชุดข้อมูลเปลี่ยนผ่าน `resolvePageForRows` (หรือกำหนด `resetPageOnRowsChange={false}` เพื่อคงหน้าเดิมระหว่างแก้ไขค่าในแถว เช่น `SerialStockCountScreen`), และแปลข้อความแถบแบ่งหน้า 3 ภาษา (`ui.pagination_showing_range`, `ui.pagination_prev`, `ui.pagination_page_of`, `ui.pagination_next`) ผ่าน `langText` + `useLanguagePack` พร้อมใส่ `data-no-translate="true"` กัน DOM Translator แปลซ้ำ
 - **Config Persistence**: `BcDataList.tsx` โหลดและบันทึกความกว้าง/ลำดับคอลัมน์ของผู้ใช้ลง DB ผ่าน `/process/master/datalistget` และ `/process/master/datalistsave` พร้อมการค้นหาไทยอัจฉริยะ (`thai-search.ts`)
 
 ---

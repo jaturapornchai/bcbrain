@@ -8,9 +8,9 @@ sources:
   - "frontend/account/tabs/screenRegistry.tsx:501"
   - "frontend/account/transaction/TransTopForm.tsx:772"
   - "frontend/account/transaction/UniversalTransScreen.tsx:2168"
-  - "frontend/account/master/SerialStockCountScreen.tsx:41-349"
+  - "frontend/account/master/SerialStockCountScreen.tsx:41-340"
   - "frontend/account/master/serialStockCountState.ts:1-46"
-  - "frontend/account/master/LotAdjustScreens.tsx:285-952"
+  - "frontend/account/master/LotAdjustScreens.tsx:285-950"
   - "backend/internal/application/process/stock_tools.go:354"
   - "backend/internal/application/process/stock_lot.go:624"
   - "backend/internal/application/process/stock_lot.go:891"
@@ -61,7 +61,7 @@ sources:
 
 1. เปิด **สินค้า › ตรวจนับสต็อกและปรับปรุงจากการตรวจนับ › ตรวจสอบสินค้า Serial Number** (รหัสเมนู **2045**)
 2. เปิดหน้าจอมาจะเข้าสู่โหมดเพิ่มเอกสารใหม่ให้อัตโนมัติ (หากมีสิทธิ์เพิ่ม หรือกด **เพิ่มใหม่**) เลือกวันที่ เวลา **ประเภทเอกสาร** (กดค้นหารูปแบบเอกสารได้) และ **คลัง/ที่เก็บ** ที่ตรวจนับ (รายการคลัง/ที่เก็บจะกรองตามสิทธิ์ของผู้ใช้งาน)
-3. ยิงสแกนบาร์โค้ดหรือพิมพ์หมายเลขเครื่องในช่องสแกนแล้วกดปุ่ม **เพิ่ม Serial** ต่อเนื่อง (ระบบตรวจไม่ให้ป้อนหมายเลขซ้ำ และตรวจว่าหมายเลขนั้นมีอยู่ในทะเบียน **Serial Number** จริง)
+3. ยิงสแกนบาร์โค้ดหรือพิมพ์หมายเลขเครื่องในช่องสแกนแล้วกดปุ่ม **เพิ่ม Serial** ต่อเนื่อง (ระบบตรวจไม่ให้ป้อนหมายเลขซ้ำ ตรวจว่าหมายเลขนั้นมีอยู่ในทะเบียน **Serial Number** จริง มีช่องติ๊กให้เคอร์เซอร์กลับไปช่องสแกนอัตโนมัติ สามารถปรับ **ราคาซื้อ/ขาย** รายแถวพร้อมดู **มูลค่ารวม** และกด **ลบรายการล่าสุด** ได้)
 4. บันทึกเอกสาร (ระบบออกเลขที่เอกสารอัตโนมัติและบันทึกประวัติการตรวจนับ)
 
 > [!TIP]

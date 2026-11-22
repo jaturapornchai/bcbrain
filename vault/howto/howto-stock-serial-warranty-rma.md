@@ -7,7 +7,7 @@ sources:
   - "frontend/account/tabs/screenRegistry.tsx:1210"
   - "frontend/src/config/schemas/icMasterSchemas.ts:1198"
   - "frontend/account/transaction/SerialNumberModal.tsx:31"
-  - "frontend/account/master/StockCheckScreens.tsx:114-190"
+  - "frontend/account/master/StockCheckScreens.tsx:114-185"
   - "frontend/account/master/SerialWarrantyRmaScreen.tsx:141"
   - "frontend/account/master/SerialWarrantyRmaScreen.tsx:519"
   - "backend/internal/application/process/serial_warranty_rma.go:75"
