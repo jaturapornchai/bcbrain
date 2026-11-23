@@ -10,9 +10,13 @@ sources:
   - backend/internal/application/process/trans_validate.go:21-40
   - backend/internal/application/process/trans_save_rules.go:21-48
   - backend/internal/application/process/gl_template.go:265-295
+  - backend/internal/application/process/gl_template.go:730-770
   - backend/internal/application/process/gl_template_defaults.go:148-210
-  - backend/internal/application/process/runtime_options.go:1-130
+  - backend/internal/application/process/runtime_options.go:50-130
+  - backend/internal/application/process/runtime_options.go:315-340
+  - backend/internal/application/process/db_migrate.go:430-440
   - backend/internal/application/process/stock_rebuild.go:110-115
+  - frontend/account/config/useRuntimeOptions.ts:40-200
 ---
 
 # พารามิเตอร์ระบบกลางและ Feature Switchboard (`erp_option`, `erp_feature_option`)
@@ -47,8 +51,8 @@ sources:
 |---|---|---|
 | `vat_type`, `vat_type_1` | `integer` / `varchar` | ประเภท VAT เริ่มต้นฝั่งขาย / ซื้อ (`0 = แยกนอก`, `1 = รวมใน`, `2/3 = ยกเว้น/ไม่กระทบภาษี`) |
 | `vat_rate`, `wht_rate` | `numeric` | อัตรา VAT (เช่น `7`) และ WHT มาตรฐาน |
-| `discout_type` *(สะกดตาม DDL จริง, DEFAULT `1`)* | `smallint` / `varchar` | ลำดับคำนวณ VAT กับส่วนลดท้ายบิล: `0 = VAT ก่อนหักส่วนลด`, `1 = VAT หลังหักส่วนลด` (Default `1`) |
-| `discount_vat_type` | `smallint` / `varchar` | การหักส่วนลดท้ายบิลระหว่างสินค้ามีภาษีกับยกเว้น: `0 = หักสินค้ามีภาษีก่อน`, `1 = เฉลี่ยตามสัดส่วน` (`2` อ่านเป็น `0`) |
+| `discout_type` *(สะกดตาม DDL จริง, DEFAULT `1`)* | `smallint` / `varchar` | ลำดับคำนวณ VAT กับส่วนลดท้ายบิล: `0 = VAT ก่อนหักส่วนลด`, `1 = VAT หลังหักส่วนลด` (Default `1` และ `db_migrate.go:436` backfill `IS NULL` เป็น `1` ให้ครบ) |
+| `discount_vat_type` | `smallint` / `varchar` | การหักส่วนลดท้ายบิลระหว่างสินค้ามีภาษีกับยกเว้น: `0 = หักสินค้ามีภาษีก่อน`, `1 = เฉลี่ยตามสัดส่วน` (`2` อ่านเป็น `0`) — ส่งออกผ่าน `CompanyRuntimeOptions` (`discountVatType`, `roundType`, `discountStepRoundOff`, `itemAmountDecimal`) ใน `runtime_options.go` และ `useRuntimeOptions.ts` เพื่อให้ Frontend คำนวณตรงกับ Go Backend |
 | `discount_step_round_off`, `calc_item_price_discount`, `manual_total` | `smallint` | ปิดการปัดเศษส่วนลดหลายขั้น, ปัดเศษส่วนลดรายบรรทัดตอนคำนวณ Line VAT, อนุญาตกรอกยอดรวมเอง |
 | `check_input_vat` | `smallint` | บังคับกรอก `tax_doc_no` และ `tax_doc_date` สำหรับเอกสารซื้อ/ขายที่มี VAT (`VatType IN (0,1)`) |
 | `gl_trans_type` | `integer` / `varchar` | การบันทึกบัญชี GL: `0 = แยกรายบรรทัด`, `1 = รวมบัญชีที่ซ้ำกันในสาขาเดียวกัน (Compound)` |
@@ -113,8 +117,10 @@ sources:
 -- 1) อ่านค่าสวิตช์สำคัญสำหรับคำนวณ VAT/สต็อก/ปีบัญชี (รองรับกรณีตารางว่าง)
 SELECT COALESCE((SELECT year_type::int FROM erp_option LIMIT 1), 0) AS year_type,
        COALESCE((SELECT vat_rate FROM erp_option LIMIT 1), 7) AS vat_rate,
-       COALESCE((SELECT discout_type::int FROM erp_option LIMIT 1), 0) AS vat_discount_order,
+       COALESCE((SELECT discout_type::int FROM erp_option LIMIT 1), 1) AS vat_discount_order,
        COALESCE((SELECT discount_vat_type::int FROM erp_option LIMIT 1), 0) AS discount_vat_mode,
+       COALESCE((SELECT round_type::int FROM erp_option LIMIT 1), 0) AS round_type,
+       COALESCE((SELECT inventory_gl_post::int FROM erp_option LIMIT 1), 0) AS inventory_gl_post,
        COALESCE((SELECT balance_control_type::int FROM erp_option LIMIT 1), 0) AS stock_check_level,
        COALESCE((SELECT multi_currency FROM erp_option LIMIT 1), 0) AS multi_currency;
 

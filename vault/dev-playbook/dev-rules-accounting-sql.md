@@ -3,7 +3,7 @@ title: "กฎเหล็กบัญชีและ SQL สำหรับน�
 audience: dev
 tags: [dev-playbook, sql-rules, accounting, precision, security]
 aliases: ["กฎ SQL BC", "กฎเหล็กบัญชี", "last_status", "big.Rat", "NUMERIC", "WritePolicy", "มาตรฐาน SQL BC"]
-sources: ["AGENTS.md:1-66", "backend/internal/application/process/service.go:131-240", "backend/internal/application/process/report_menu_ic.go:244-282", "backend/internal/application/process/docs.go:680-810", "backend/internal/application/process/stock_rebuild.go:19-45", "backend/internal/domain/query/query.go:1-521", "backend/internal/domain/query/write_policy.go:1-103", "frontend/src/lib/numeric.ts:1-66"]
+sources: ["AGENTS.md:1-66", "backend/internal/application/process/service.go:131-240", "backend/internal/application/process/report_menu_ic.go:244-282", "backend/internal/application/process/docs.go:680-810", "backend/internal/application/process/stock_rebuild.go:19-45", "backend/internal/domain/query/query.go:1-521", "backend/internal/domain/query/write_policy.go:1-103", "frontend/src/lib/numeric.ts:1-66", "frontend/src/lib/numeric.ts:550-960"]
 ---
 
 การเขียน SQL คิวรีข้อมูลหรือพัฒนาระบบต่อยอดบนฐานข้อมูล PostgreSQL ของ **BC Ai Account** มีกฎเหล็กทางบัญชีและความปลอดภัยที่ต้องปฏิบัติตามอย่างเคร่งครัด เพื่อป้องกันยอดเงินเพี้ยน สต็อกกลับด้าน หรือดึงเอกสารยกเลิกมานับซ้ำ
@@ -15,7 +15,8 @@ sources: ["AGENTS.md:1-66", "backend/internal/application/process/service.go:131
 - **ห้ามใช้ Binary Float โดยเด็ดขาด**:
   - ใน PostgreSQL ต้องใช้ `NUMERIC` / `DECIMAL` (เช่น `NUMERIC(18,2)` หรือ cast `::numeric`) ห้ามใช้ `float4`, `float8`, `real`, `double precision`
   - ใน Go Backend คำนวณผ่าน `*math/big.Rat` ด้วย `ParseDecimalRat` และปัดเศษ `RoundHalfUp` (`service.go:131-210`)
-  - ใน TypeScript Frontend ใช้ helper ใน `frontend/src/lib/numeric.ts` เช่น `cleanNumericString` (ส่งค่าเลขฐานสิบเป็น string) ห้ามใช้ `parseFloat()` หรือ `Number()` มาบวก ลบ คูณ หาร ยอดเงินและภาษี
+  - ใน TypeScript Frontend ใช้ helper ใน `frontend/src/lib/numeric.ts` เช่น `cleanNumericString`, `calcAfterDiscount`, `vatCalc` (คำนวณด้วย `BigInt` ความแม่นยำ 28 หลักเทียบเท่า C# `decimal` / Go `*big.Rat` และรับ `discountType`, `discountVatType`, `roundType`, `discountStepRoundOff` จาก `useRuntimeOptions`; ส่งค่าเลขฐานสิบเป็น string เท่านั้น) ห้ามใช้ `parseFloat()` หรือ `Number()` มาบวก ลบ คูณ หาร ยอดเงินและภาษี
+  - เมื่อเปลี่ยนค่าทศนิยมหรือตัวเลือกคำนวณใน `erp_option` ฝั่ง Frontend เรียก `invalidateBcSettings()` เพื่อล้างแคชทั้งทศนิยมและ `bc_runtime_options_v1` พร้อมแจ้งรีโหลดข้ามคอมโพเนนต์ (`bc:runtime-options-invalidate`)
 - **สเกลทศนิยมอ้างอิงจาก `erp_option`**:
   - Backend อ่านจำนวนหลักทศนิยมราคาและยอดเงินจากตาราง `erp_option` (`stockScales` ใน `service.go`) ก่อนบันทึกและปัดเศษ `HALF_UP`
 - **ความต่างระหว่าง JSON API กับ DB**:

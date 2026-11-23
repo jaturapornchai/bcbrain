@@ -14,11 +14,11 @@ aliases:
 sources:
   - backend/internal/application/process/expense_claim_guard.go:77
   - backend/internal/application/process/expense_claim_guard.go:96
-  - backend/internal/application/process/expense_claim_guard.go:427
+  - backend/internal/application/process/expense_claim_guard.go:499-624
   - backend/internal/application/process/slip_verify.go:69
-  - backend/internal/application/process/slip_verify.go:177
+  - backend/internal/application/process/slip_verify.go:328-400
   - backend/internal/application/process/sme_thai_pack.go:527
-  - backend/internal/application/process/sme_thai_pack.go:661
+  - backend/internal/application/process/sme_thai_pack.go:614-1045
 ---
 
 # ตารางเบิกค่าใช้จ่าย ตรวจสลิป และกล่องรับสลิป LINE
@@ -134,8 +134,17 @@ sources:
 | `slip_image_base64` | `TEXT NOT NULL` | `''` | เนื้อไฟล์ภาพแบบ Base64 *(หมายเหตุ: คอลัมน์ขนาดใหญ่ ควรหลีกเลี่ยงใน query รายการสรุป)* |
 | `signature_verified` | `BOOLEAN NOT NULL` | `FALSE` | `TRUE` = ผ่านการตรวจสอบลายเซ็น Webhook `X-Line-Signature` |
 | `status` | `VARCHAR(30) NOT NULL` | `'PENDING'` | สถานะรายการ: `'PENDING'` (รอดำเนินการ), `'CONVERTED'` (แปลงเป็นเอกสารบัญชีแล้ว) |
-| `converted_target` | `VARCHAR(40) NOT NULL` | `''` | ตาราง/เอกสารปลายทางที่แปลงไป |
-| `converted_doc_no` | `VARCHAR(50) NOT NULL` | `''` | เลขที่เอกสารปลายทาง (เช่น `claim_doc_no` ใน `cb_expense_claim`) |
+| `converted_target` | `VARCHAR(40) NOT NULL` | `''` | เป้าหมายเอกสารที่แปลงไป: `'EXPENSE_CLAIM'` หรือ `'SLIP_LOG'` |
+| `converted_doc_no` | `VARCHAR(50) NOT NULL` | `''` | เลขที่เอกสารปลายทาง (`claim_doc_no` ใน `cb_expense_claim` หรือ `verify_doc_no` ใน `cb_slip_verification_log`) |
+
+### กติกา Transaction และความสอดคล้องของสถานะ (Atomic Convert & Delete Rollback)
+
+- **ฟิลด์อนุพันธ์ใน API Response (`sme_thai_pack.go:614-830`)**: คำสั่ง `list` และ `submit` ของ `LineExpenseInbox` ส่งฟิลด์ `hasSlipImage` (`slip_image_sha256 <> ''`) และ `canVerifySlip` (`lineExpenseInboxCanVerifySlip` = มี `trans_ref` หรือ `slip_image_sha256` หรือ `qr_payload` ที่ถอด `ParseThaiSlipMiniQR` ได้) เพื่อให้ UI เปิด/ปิดปุ่มส่งตรวจสลิปอย่างถูกต้อง
+- **การแปลงรายการแบบ Atomic (`convertLineExpenseInboxTx`)**: รันภายใต้ DB Transaction เดียวพร้อมล็อกแถว `cb_line_expense_inbox` ด้วย `FOR UPDATE` (หาก `status = 'CONVERTED'` และมี `converted_doc_no` แล้วจะคืน `alreadyConverted: true` แบบ idempotent) แล้วเรียก `verifyAndRecordSlipInTx` (`SLIP_LOG`) หรือ `saveExpenseClaimInTx` (`EXPENSE_CLAIM` ด้วยเลขใบเบิกใช้ `id` เต็มไม่ตัด `%10000`) ก่อนอัปเดต `status = 'CONVERTED'` ใน Transaction เดียวกัน
+- **ห้ามลบ Inbox ที่แปลงเอกสารแล้ว (`deleteLineExpenseInboxTx`)**: ล็อกแถว `FOR UPDATE` และปฏิเสธด้วย Conflict error หาก `status = 'CONVERTED'` หรือ `converted_doc_no <> ''` (ต้องลบเอกสารปลายทางก่อน)
+- **ลบเอกสารปลายทางแล้วคืนสถานะ Inbox อัตโนมัติ**:
+  - `deleteExpenseClaimTx` (`expense_claim_guard.go:598-624`) เมื่อลบ `cb_expense_claim` + `cb_expense_claim_detail` จะอัปเดต `cb_line_expense_inbox` ที่ `converted_target = 'EXPENSE_CLAIM' AND converted_doc_no = $1` กลับเป็น `status = 'PENDING'` และล้าง `converted_target`/`converted_doc_no`
+  - `deleteSlipVerificationTx` (`slip_verify.go:328-360`) เมื่อลบ `cb_slip_verification_log` (`RETURNING verify_doc_no`) จะอัปเดต `cb_line_expense_inbox` ที่ `converted_target = 'SLIP_LOG' AND converted_doc_no = $1` กลับเป็น `status = 'PENDING'` ใน Transaction เดียวกัน
 
 ---
 

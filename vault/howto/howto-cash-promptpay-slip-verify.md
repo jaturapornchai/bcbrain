@@ -12,6 +12,7 @@ sources:
   - "frontend/src/app/bill-pay/[token]/page.tsx:202"
   - "backend/internal/application/process/promptpay_qr.go:14"
   - "backend/internal/application/process/slip_verify.go:238"
+  - "backend/internal/application/process/slip_verify.go:328-360"
   - "backend/internal/application/process/slip_verify.go:432"
   - "backend/internal/application/process/public_bill_pay.go:458"
 ---
@@ -51,6 +52,7 @@ sources:
    - **ตรวจบัญชีผู้รับโอน**: เทียบกับสมุดเงินฝากและเลขพร้อมเพย์ที่ตั้งค่าไว้ของกิจการ
    - **เทียบยอดเงิน**: แจ้งเตือนทันทีหากยอดในสลิปไม่ตรงกับยอดที่ต้องชำระ
 4. **พิมพ์ใบรับรองผลการตรวจสอบสลิป PDF** — ใช้แนบหลักฐานบัญชี แสดงสถานะ คะแนนความเสี่ยง ยอดเงิน ผลต่าง รายละเอียดลายนิ้วมือภาพ และช่องลงนามผู้ตรวจสลิป/สมุห์บัญชี
+5. **การลบรายการตรวจสลิปที่มาจากกล่องรับสลิป LINE** — หากรายการตรวจสอบสลิปถูกแปลงมาจากกล่องรับสลิป LINE เมื่อลบรายการตรวจสลิปนี้ออก ระบบจะคืนสถานะรายการต้นทางในกล่องรับสลิปกลับมาเป็น **รอดำเนินการ** ให้อัตโนมัติ
 
 ---
 

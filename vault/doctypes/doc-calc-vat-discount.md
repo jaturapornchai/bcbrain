@@ -10,10 +10,13 @@ aliases:
   - "transcalc"
   - "ขายสด ขายเชื่อ ซื้อสด ซื้อเชื่อ inquiry_type"
 sources:
-  - "backend/internal/application/process/transcalc.go:15-217"
+  - "backend/internal/application/process/transcalc.go:15-220"
+  - "backend/internal/application/process/runtime_options.go:50-70"
   - "backend/internal/application/process/trans_grid.go:227-280"
   - "backend/internal/application/process/trans.go:250-560"
   - "backend/internal/application/process/docs.go:600-635"
+  - "frontend/src/lib/numeric.ts:705-960"
+  - "frontend/account/config/useRuntimeOptions.ts:40-125"
   - "frontend/account/transaction/transLayouts.ts:45-210"
   - "frontend/account/transaction/TransItemGrid.tsx:1212-1244"
 ---
@@ -69,9 +72,14 @@ $$\text{total\_amount} = \text{total\_after\_vat} + \text{total\_except\_vat} \q
   1. ชั้นที่ 1 (`10%`): เหลือ `1,000 - 100 = 900.00`
   2. ชั้นที่ 2 (`50`): เหลือ `900 - 50 = 850.00` → ส่วนลดรวม = `150.00`
 
-### ตัวเลือกใน `erp_option` ที่มีผลต่อส่วนลดและมัดจำ (`transcalc.go`)
-- `item_price_decimal` / `item_amount_decimal`: จำนวนทศนิยมราคาต่อหน่วยและจำนวนเงิน (ค่าเริ่มต้น `2` ตำแหน่ง ปัดเศษแบบ Half-Up)
-- `discout_type` / `discount_vat_type`: กำหนดลำดับการหักส่วนลดท้ายบิลและเงินมัดจำ (`advance_amount`) ว่าหักก่อนคิด VAT หรือหักหลังคิด VAT เพื่อให้ตรงกับใบกำกับภาษีของคู่ค้า
+### ตัวเลือกใน `erp_option` ที่มีผลต่อส่วนลด ปัดเศษ และมัดจำ (`transcalc.go` + `numeric.ts`)
+- `item_price_decimal` / `item_amount_decimal`: จำนวนทศนิยมราคาต่อหน่วยและจำนวนเงิน (ค่าเริ่มต้น `2` ตำแหน่ง)
+- `discout_type` *(Default `1`)*: `0 = คิด VAT ก่อนหักส่วนลดท้ายบิล`, `1 = คิด VAT หลังหักส่วนลดท้ายบิล`
+- `discount_vat_type` *(Default `0`)*: การกระจายส่วนลดท้ายบิลเมื่อบิลมีทั้งสินค้ามีภาษี (`valVat`) และยกเว้นภาษี (`valNoVat`):
+  - `0` = หักจากสินค้ามีภาษีก่อน หาก `valVat < totalDiscount` จึงนำส่วนลดส่วนที่ล้น (`totalDiscount - valVat`) ไปหักจากสินค้ายกเว้นภาษี (`discNoVat`) โดย **ไม่รวมยอดมัดจำ (`advance`) มาหักข้ามฝั่ง** และในโหมดแยกนอก (`vat_type = 0`, `discount_vat_type IN (0, 1)`) ยอดสุทธิคือ `total_amount = total_value - total_discount - advance + vat_value` (`transcalc.go:159-215`)
+  - `1` = เฉลี่ยส่วนลดตามสัดส่วนระหว่างสินค้ามีภาษีและยกเว้นภาษี
+- `round_type` (`0 = C# cascade roundBc`, `1 = RoundHalfUp(v + 0.000001)`) และ `discount_step_round_off` (ปิดการปัดเศษระหว่างขั้นส่วนลดหลายชั้น)
+- **Frontend–Backend Parity (`frontend/src/lib/numeric.ts`)**: หน้าจอเอกสาร (`UniversalTransScreen`, `UniversalCancelConfirmScreen`) ส่งค่า `itemAmountDecimal`, `discountType`, `discountVatType`, `roundType`, `discountStepRoundOff` จาก `useRuntimeOptions` เข้า `vatCalc` / `calcAfterDiscount` ซึ่งใช้ `BigInt` (`roundScaledByType` + `scaleMulRatio` ความแม่นยำ 28 หลักเทียบเท่า C# `decimal` / Go `*big.Rat`) เพื่อให้ยอดคำนวณบนเบราว์เซอร์ตรงกับ Backend 100% ทุกกรณี
 
 ### การแก้ไขช่อง `sum_amount` โดยตรง (`SumAmountManual`)
 - ในตารางสินค้า (`TransItemGrid.tsx`) ผู้ใช้สามารถกรอกช่อง `sum_amount` (คอลัมน์ "จำนวนเงิน") โดยตรงเมื่อ `qty * price` มีเศษปัดทศนิยมไม่ตรงหน้าบิล (`Changed: "sumAmount"`, `SumAmountManual: true`)
