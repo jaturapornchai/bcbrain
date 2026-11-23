@@ -196,18 +196,35 @@ export function detectChanges() {
   const addedFiles = [];
   const modifiedFiles = [];
   const deletedFiles = [];
+  const changedFileDeltas = [];
   let newCommits = [];
   let mode = "incremental";
 
   if (prevState && prevState.files) {
     const prevFiles = prevState.files;
     for (const [rel, meta] of Object.entries(files)) {
-      if (!prevFiles[rel]) addedFiles.push(rel);
-      else if (prevFiles[rel].sha !== meta.sha) modifiedFiles.push(rel);
+      if (!prevFiles[rel]) {
+        addedFiles.push(rel);
+        changedFileDeltas.push({ file: rel, status: "added", prevLines: 0, lines: meta.lines, delta: meta.lines, bytesDelta: meta.bytes });
+      } else if (prevFiles[rel].sha !== meta.sha) {
+        modifiedFiles.push(rel);
+        changedFileDeltas.push({
+          file: rel,
+          status: "modified",
+          prevLines: prevFiles[rel].lines ?? 0,
+          lines: meta.lines,
+          delta: meta.lines - (prevFiles[rel].lines ?? 0),
+          bytesDelta: meta.bytes - (prevFiles[rel].bytes ?? 0),
+        });
+      }
     }
     for (const rel of Object.keys(prevFiles)) {
-      if (!files[rel]) deletedFiles.push(rel);
+      if (!files[rel]) {
+        deletedFiles.push(rel);
+        changedFileDeltas.push({ file: rel, status: "deleted", prevLines: prevFiles[rel].lines ?? 0, lines: 0, delta: -(prevFiles[rel].lines ?? 0), bytesDelta: -(prevFiles[rel].bytes ?? 0) });
+      }
     }
+    changedFileDeltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || a.file.localeCompare(b.file));
     if (prevState.sourceHead && prevState.sourceHead !== head) {
       const logOut = gitReadOnly(SRC_DIR, ["log", `${prevState.sourceHead}..HEAD`, "--date=iso", "--format=%h %ad %s"]);
       newCommits = logOut ? logOut.split(/\r?\n/).filter(Boolean) : [];
@@ -286,6 +303,7 @@ export function detectChanges() {
     addedFiles,
     modifiedFiles,
     deletedFiles,
+    changedFileDeltas,
     brokenNotes,
     impactedNotes,
     uncoveredChangedFiles,

@@ -12,6 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { detectChanges } from "./detect-changes.mjs";
 import { loadBcMenuTruth, loadLocalEnv, redactLogText } from "./load-env.mjs";
+import { computeIncrementalDiffs, saveBaselineSnapshot } from "./sync-cache.mjs";
 
 loadLocalEnv();
 
@@ -29,6 +30,8 @@ const PLAN_ONLY = process.argv.includes("--plan-only");
 const FINALIZE_ONLY = process.argv.includes("--finalize");
 const RECORD_NOOP = process.argv.includes("--record-noop");
 const JSON_OUT = process.argv.includes("--json");
+const DIFF_OUT = process.argv.includes("--diff");
+const VERBOSE_OUT = process.argv.includes("--verbose");
 const NO_DEPLOY = process.argv.includes("--no-deploy");
 const FORCE = process.argv.includes("--force");
 const argNum = (flag, fallback) => {
@@ -557,13 +560,44 @@ async function main() {
       .slice(0, 24)
       .map((t) => ({ note: t.note, changedSources: t.changedSources }));
     const { snapshot, ...summary } = report;
-    const payload = {
-      ...summary,
-      selected,
-      pendingAfterBatch: remainingPending.length,
-    };
     if (JSON_OUT) {
-      console.log(JSON.stringify(payload, null, 2));
+      if (VERBOSE_OUT) {
+        console.log(JSON.stringify({ ...summary, selected, pendingAfterBatch: remainingPending.length }, null, 2));
+      } else if (!report.hasChanges) {
+        console.log(
+          JSON.stringify({
+            hasChanges: false,
+            mode: report.mode,
+            sourceHeadShort: report.sourceHeadShort,
+            trackedSourceCount: report.trackedSourceCount,
+            vaultNoteCount: report.vaultNoteCount,
+            elapsedMs: report.elapsedMs,
+          }),
+        );
+      } else {
+        const compact = {
+          hasChanges: true,
+          mode: report.mode,
+          sourceHeadShort: report.sourceHeadShort,
+          sourceHeadDate: report.sourceHeadDate,
+          elapsedMs: report.elapsedMs,
+          trackedSourceCount: report.trackedSourceCount,
+          vaultNoteCount: report.vaultNoteCount,
+          pendingCount: report.pendingCount,
+          impactedCount: report.impactedNotes.length,
+          uncoveredTableCount: report.uncoveredTables.length,
+          ...(report.newCommits.length ? { newCommits: report.newCommits.slice(0, 10) } : {}),
+          ...(report.changedFileDeltas?.length ? { changedFileDeltas: report.changedFileDeltas } : { modifiedFiles: report.modifiedFiles }),
+          ...(report.brokenNotes.length ? { brokenNotes: report.brokenNotes } : {}),
+          ...(report.menuParityMismatches.length ? { menuParityMismatches: report.menuParityMismatches } : {}),
+          ...(report.uncoveredMenus.length ? { uncoveredMenus: report.uncoveredMenus.slice(0, 15) } : {}),
+          ...(report.uncoveredChangedFiles.length ? { uncoveredChangedFiles: report.uncoveredChangedFiles } : {}),
+          ...(DIFF_OUT && report.changedFileDeltas?.length ? { diffs: computeIncrementalDiffs(SRC_DIR, report.changedFileDeltas) } : {}),
+          selected,
+          pendingAfterBatch: remainingPending.length,
+        };
+        console.log(JSON.stringify(compact));
+      }
     } else {
       console.log(`plan-only (${report.mode}): head=${report.sourceHeadShort} hasChanges=${report.hasChanges} selected=${selected.length}/${targets.length}`);
       for (const s of selected) console.log(`  -> ${s.note} [pri=${s.priority}] (${s.reasons[0] ?? ""})`);
@@ -627,7 +661,8 @@ async function main() {
         pendingNotes: remainingPending,
       };
       fs.writeFileSync(STATE_FILE, JSON.stringify(nextState), "utf8");
-      log(`FINALIZE DONE in ${((Date.now() - t0) / 1000).toFixed(1)}s (updated=${modifiedVault.length}, pending=${remainingPending.length})`);
+      const snap = saveBaselineSnapshot(SRC_DIR, report.snapshot.files);
+      log(`FINALIZE DONE in ${((Date.now() - t0) / 1000).toFixed(1)}s (updated=${modifiedVault.length}, pending=${remainingPending.length}, cache=${snap.cachedFiles}f/${(snap.gzBytes / 1024).toFixed(0)}KB)`);
       return;
     }
 
@@ -641,7 +676,8 @@ async function main() {
         pendingNotes: [],
       };
       fs.writeFileSync(STATE_FILE, JSON.stringify(nextState), "utf8");
-      log("RECORD-NOOP: Gates 1-3 clean, .sync-state.json updated");
+      const snap = saveBaselineSnapshot(SRC_DIR, report.snapshot.files);
+      log(`RECORD-NOOP: Gates 1-3 clean, .sync-state.json & baseline cache updated (${snap.cachedFiles}f)`);
       return;
     }
 
@@ -751,7 +787,8 @@ async function main() {
       pendingNotes: remainingPending,
     };
     fs.writeFileSync(STATE_FILE, JSON.stringify(nextState), "utf8");
-    log(`DONE in ${((Date.now() - t0) / 1000).toFixed(1)}s (updated=${finalUpdated.length}, pending=${remainingPending.length}, cost=$${totalCost.toFixed(4)})`);
+    const snap = saveBaselineSnapshot(SRC_DIR, report.snapshot.files);
+    log(`DONE in ${((Date.now() - t0) / 1000).toFixed(1)}s (updated=${finalUpdated.length}, pending=${remainingPending.length}, cost=$${totalCost.toFixed(4)}, cache=${snap.cachedFiles}f)`);
   } catch (err) {
     rollbackBackups(backups);
     log(`ABORT & ROLLED BACK: ${err.message}`);

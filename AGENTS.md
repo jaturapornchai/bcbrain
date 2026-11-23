@@ -34,3 +34,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## 4. ความลับและตัวแปรสภาพแวดล้อม
 - เก็บ `BC_DEPLOY_HOST` ใน `.env.local` เท่านั้น (ถูก ignore ด้วย `.env*` ห้าม commit/log/พิมพ์ค่าลงแชทเด็ดขาด) ดูรูปแบบตัวอย่างที่ `.env.example`
+
+## 5. กฎประหยัด Token Gemini (Token-Budget Protocol)
+- **NOOP จบใน 1 เทิร์น**: รัน `node scripts/hourly-sync.mjs --plan-only --json --diff` (compact payload ~120B สำหรับ NOOP / ~1.5–4KB พร้อม line-level diff ตั้งแต่รอบซิงก์ก่อนจาก `.sync-cache/baseline.json.gz`; เพิ่ม `--verbose` เมื่อต้องการรายละเอียดเต็ม) — หาก `hasChanges === false` ห้ามอ่านไฟล์อื่น จบทันที
+- **อ่านเฉพาะจุดที่เปลี่ยนจริง**: ใช้ `diffs` จาก `--diff` (เทียบกับ baseline รอบซิงก์ล่าสุด แทนการรัน `git diff HEAD` ที่พ่น diff สะสมทั้งสัปดาห์) และข้ามไฟล์ที่ `status === "whitespaceOnly"` ทันที; ใช้ `read_file` เฉพาะช่วงบรรทัดที่จำเป็น แทนการอ่านไฟล์ขนาดหลายพันบรรทัดทั้งไฟล์
+- **ลดรอบ LLM Turn**: แบตช์ `read_file` และ `edit_file` หลายโน้ตพร้อมกันในเทิร์นเดียว และไม่ต้องอ่าน `docs/extract-brief.md` ซ้ำทุกชั่วโมงหากแค่แก้ไขโน้ตเดิมเล็กน้อย (อ่านเมื่อสร้างโน้ตใหม่หรือติด Gate 1–3)
+- **MCP Response กระชับ**: `app/mcp/route.ts` ตัด `mediaLines` ซ้ำซ้อนใน `ask_brain` (เพราะมี `## Media & Reference Links` รวมท้ายคำตอบแล้ว), จำกัด `links`/`backlinks` (6 ใน `ask_brain`, 16 ใน `read_note`), บีบ `search_brain` snippet/videos, รองรับ `compact: true` และ `max_notes` ใน `ask_brain`, และตัดหาง hit คะแนนต่ำเมื่อ `confidence === "high"` เพื่อประหยัด Token ให้ Gemini ทุกตัวที่เชื่อมต่อ `https://brain.bcsmethai.com/mcp`
