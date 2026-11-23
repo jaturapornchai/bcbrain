@@ -533,6 +533,38 @@ export type VaultRow = {
   tags: string[];
 };
 
+export type MenuLookupEntry = {
+  code: string;
+  legacyCode: string;
+  name: string;
+  menuPath: string;
+  edition: string;
+  catalogSlug: string;
+  relatedSlugs: string[];
+  haystack: string;
+};
+
+export type TableLookupEntry = {
+  table: string;
+  schemaSlug: string;
+  schemaTitle: string;
+  relatedSlugs: string[];
+};
+
+export type DirectLookupResult = {
+  kind: "menu" | "table" | "mixed" | "none";
+  menus: (Omit<MenuLookupEntry, "haystack"> & { docs: { slug: string; title: string; folder: string; audience: Audience }[] })[];
+  tables: (TableLookupEntry & { docs: { slug: string; title: string; folder: string }[] })[];
+};
+
+type DirectIndex = {
+  menuByCode: Map<string, MenuLookupEntry>;
+  menuByLegacy: Map<string, MenuLookupEntry>;
+  menus: MenuLookupEntry[];
+  tableByName: Map<string, TableLookupEntry>;
+  tables: TableLookupEntry[];
+};
+
 type VaultBundle = {
   notes: Map<string, Note>;
   builtAt: number;
@@ -545,6 +577,7 @@ type VaultBundle = {
   searches: Map<string, SearchHit[]>;
   noteTokens: Map<string, NoteTokens> | null;
   indexes: Map<AudienceFilter, SearchIndex>;
+  directIndex: DirectIndex | null;
 };
 
 // ponytail: whole vault + derived indexes in memory; prod persists per redeploy, dev/test uses 5s TTL for hot reload without thrashing loops
@@ -566,9 +599,14 @@ function getBundle(): VaultBundle {
       searches: new Map(),
       noteTokens: null,
       indexes: new Map(),
+      directIndex: null,
     };
   }
   return bundleCache;
+}
+
+export function bundleVersion(): number {
+  return getBundle().builtAt;
 }
 
 export function vault(): Map<string, Note> {
@@ -1184,6 +1222,7 @@ export function warmVaultIndexes(): void {
   getSearchIndex(b, "all");
   getSearchIndex(b, "user");
   getSearchIndex(b, "dev");
+  getDirectIndex(b);
   indexesWarmed = true;
 }
 
@@ -1559,10 +1598,19 @@ export function connectedNeighbors(
     .map(({ step, shared }) => ({ ...step, shared }));
 }
 
-// long notes for ask_brain: the intro plus the "## " sections that mention the query most, within budget, and say what was left out
-export function excerpt(body: string, ts: string[], budget: number): string {
-  if (body.length <= budget) return body;
+const SEE_ALSO_HEADING = /^##\s+(?:ดูต่อที่เกี่ยวข้อง|ดูเพิ่มเติม|ลิงก์ที่เกี่ยวข้อง)(?:\s|$)/;
+
+export function stripSeeAlso(body: string): string {
   const parts = body.split(/\n(?=## )/);
+  const kept = parts.filter((p, idx) => idx === 0 || !SEE_ALSO_HEADING.test(p.trimStart()));
+  return kept.join("\n").replace(/\n---\s*$/, "").trimEnd();
+}
+
+// long notes for ask_brain / quick_answer: intro plus matching "## " sections within budget, optionally stripping duplicated "ดูต่อที่เกี่ยวข้อง" footers
+export function excerpt(body: string, ts: string[], budget: number, stripFooter = false): string {
+  const source = stripFooter ? stripSeeAlso(body) : body;
+  if (source.length <= budget) return source;
+  const parts = source.split(/\n(?=## )/);
   const hits = parts.map((p) => {
     const np = normalizeText(p);
     let h = 0;
@@ -1586,7 +1634,239 @@ export function excerpt(body: string, ts: string[], budget: number): string {
     if (fenceCount % 2 === 1) cut += "\n```";
     cut += " …";
   }
-  return `${cut}\n\n[excerpt — ${omitted.length ? `omitted sections: ${omitted.join(" | ")}. ` : ""}read_note for the full note]`;
+  return `${cut}\n\n[excerpt — ${omitted.length ? `omitted sections: ${omitted.slice(0, 6).join(" | ")}${omitted.length > 6 ? " …" : ""}. ` : ""}read_note for the full note]`;
+}
+
+// ---------- O(1) Direct Menu Code (1001–9070) & SQL Table Lookup Index ----------
+const MENU_ROW_RE =
+  /^\|\s*\*\*(\d{4})\*\*\s*\|\s*(?:\*\*)?([^|*\n]+?)(?:\*\*)?\s*\|\s*\*\*([^*\n]+)\*\*(?:<br>([^|\n]+))?\s*\|\s*([^|\n]+?)\s*\|$/gm;
+const MENU_REF_RE = /(?:รหัสเมนู|เมนู|menu)\s*\*{0,2}`?([1-9]\d{3})`?\*{0,2}|\*\*([1-9]\d{3})\*\*/gi;
+
+function getDirectIndex(b: VaultBundle): DirectIndex {
+  if (b.directIndex) return b.directIndex;
+  const menuByCode = new Map<string, MenuLookupEntry>();
+  const menuByLegacy = new Map<string, MenuLookupEntry>();
+  const menus: MenuLookupEntry[] = [];
+  const menuNoteRefs = new Map<string, Set<string>>();
+
+  // Collect menu-code citations across non-catalog notes so lookup_menu links directly to howto/troubleshoot/dev notes
+  for (const n of b.notes.values()) {
+    if (n.slug.startsWith("menu-cat-") || n.slug === "menu-catalog-overview" || n.slug === "index") continue;
+    for (const m of n.body.matchAll(MENU_REF_RE)) {
+      const code = m[1] || m[2];
+      if (!code) continue;
+      const num = Number(code);
+      if ((num >= 2015 && num <= 2035) || (num >= 2555 && num <= 2585)) continue;
+      let s = menuNoteRefs.get(code);
+      if (!s) {
+        s = new Set();
+        menuNoteRefs.set(code, s);
+      }
+      s.add(n.slug);
+    }
+  }
+
+  for (const n of b.notes.values()) {
+    if (!n.slug.startsWith("menu-cat-")) continue;
+    for (const m of n.body.matchAll(MENU_ROW_RE)) {
+      const code = m[1].trim();
+      if (menuByCode.has(code)) continue;
+      const legacyCode = m[2].trim();
+      const name = m[3].trim();
+      const menuPath = (m[4] ?? "").trim() || name;
+      const edition = m[5].trim();
+      const refs = [...(menuNoteRefs.get(code) ?? [])].sort((a, z) => {
+        const na = b.notes.get(a);
+        const nz = b.notes.get(z);
+        const pa = na?.folder === "howto" ? 0 : na?.folder === "start" ? 1 : na?.folder === "troubleshoot" ? 2 : 3;
+        const pz = nz?.folder === "howto" ? 0 : nz?.folder === "start" ? 1 : nz?.folder === "troubleshoot" ? 2 : 3;
+        return pa - pz || a.localeCompare(z);
+      });
+      const entry: MenuLookupEntry = {
+        code,
+        legacyCode,
+        name,
+        menuPath,
+        edition,
+        catalogSlug: n.slug,
+        relatedSlugs: refs.slice(0, 6),
+        haystack: normalizeText(`${code} ${legacyCode} ${name} ${menuPath}`),
+      };
+      menuByCode.set(code, entry);
+      if (legacyCode && /^\d+(?:\.\d+)+$/.test(legacyCode) && !menuByLegacy.has(legacyCode)) {
+        menuByLegacy.set(legacyCode, entry);
+      }
+      menus.push(entry);
+    }
+  }
+  menus.sort((a, z) => a.code.localeCompare(z.code));
+
+  const tableByName = new Map<string, TableLookupEntry>();
+  const tables: TableLookupEntry[] = [];
+  for (const n of b.notes.values()) {
+    if (n.folder !== "schema") continue;
+    const candidates = new Set<string>();
+    const fromSlug = n.slug.replace(/^tbl-/, "").replace(/-/g, "_");
+    if (TABLE_IDENT.test(fromSlug)) candidates.add(fromSlug);
+    for (const a of n.aliases) {
+      const low = a.trim().toLowerCase();
+      if (TABLE_IDENT.test(low)) candidates.add(low);
+    }
+    for (const m of n.title.matchAll(BODY_IDENT)) {
+      candidates.add(m[0].toLowerCase());
+    }
+    const related = [
+      ...new Set([
+        ...n.inEdges.filter((e) => b.notes.get(e.slug)?.audience === "dev").map((e) => e.slug),
+        ...n.outEdges.filter((e) => b.notes.get(e.slug)?.audience === "dev").map((e) => e.slug),
+      ]),
+    ].slice(0, 6);
+    for (const tbl of candidates) {
+      if (tableByName.has(tbl)) continue;
+      const entry: TableLookupEntry = {
+        table: tbl,
+        schemaSlug: n.slug,
+        schemaTitle: n.title,
+        relatedSlugs: related,
+      };
+      tableByName.set(tbl, entry);
+      tables.push(entry);
+    }
+  }
+  tables.sort((a, z) => a.table.localeCompare(z.table));
+
+  b.directIndex = { menuByCode, menuByLegacy, menus, tableByName, tables };
+  return b.directIndex;
+}
+
+export function lookupDirect(query: string, filter: AudienceFilter = "all", limit = 6): DirectLookupResult {
+  const b = getBundle();
+  const idx = getDirectIndex(b);
+  const maxItems = Math.min(15, Math.max(1, limit));
+  const raw = query.trim();
+  const norm = normalizeText(raw);
+  if (!norm) return { kind: "none", menus: [], tables: [] };
+
+  const hydrateMenu = (m: MenuLookupEntry) => {
+    const docs = m.relatedSlugs
+      .map((s) => b.notes.get(s))
+      .filter((n): n is Note => Boolean(n && matchesAudience(n.audience, filter)))
+      .slice(0, 4)
+      .map((n) => ({ slug: n.slug, title: n.title, folder: n.folder, audience: n.audience }));
+    return {
+      code: m.code,
+      legacyCode: m.legacyCode,
+      name: m.name,
+      menuPath: m.menuPath,
+      edition: m.edition,
+      catalogSlug: m.catalogSlug,
+      relatedSlugs: docs.map((d) => d.slug),
+      docs,
+    };
+  };
+
+  const hydrateTable = (t: TableLookupEntry) => {
+    const docs = t.relatedSlugs
+      .map((s) => b.notes.get(s))
+      .filter((n): n is Note => Boolean(n && matchesAudience(n.audience, filter)))
+      .slice(0, 4)
+      .map((n) => ({ slug: n.slug, title: n.title, folder: n.folder }));
+    return { ...t, docs };
+  };
+
+  const foundMenus: MenuLookupEntry[] = [];
+  const seenMenu = new Set<string>();
+  const addMenu = (m?: MenuLookupEntry) => {
+    if (!m || seenMenu.has(m.code)) return;
+    seenMenu.add(m.code);
+    foundMenus.push(m);
+  };
+
+  const foundTables: TableLookupEntry[] = [];
+  const seenTable = new Set<string>();
+  const addTable = (t?: TableLookupEntry) => {
+    if (!t || seenTable.has(t.table)) return;
+    seenTable.add(t.table);
+    foundTables.push(t);
+  };
+
+  // 1. O(1) exact 4-digit menu codes & legacy dotted codes (e.g. "4013", "เมนู 1005", "4.13")
+  for (const m of raw.matchAll(/\b([1-9]\d{3})\b/g)) addMenu(idx.menuByCode.get(m[1]));
+  for (const m of raw.matchAll(/\b([1-9](?:\.\d+){1,3})\b/g)) addMenu(idx.menuByLegacy.get(m[1]));
+
+  // 2. O(1) exact SQL table lookup (dev / all only — strictly hidden from user zone)
+  if (filter !== "user") {
+    for (const m of norm.matchAll(BODY_IDENT)) {
+      addTable(idx.tableByName.get(m[0]));
+    }
+    if (!foundTables.length && norm.includes("_")) {
+      for (const t of idx.tables) {
+        if (t.table.includes(norm)) {
+          addTable(t);
+          if (foundTables.length >= maxItems) break;
+        }
+      }
+    }
+  }
+
+  // 3. Fast in-memory scan over 735 menu names/paths when query has Thai/English words
+  if (foundMenus.length < maxItems && (filter !== "dev" || foundTables.length === 0)) {
+    const qTerms = terms(raw).filter((t) => !/^(?:เมนู|รหัส|รหัสเมนู|menu|หน้าจอ|เข้า|ตาราง|table)$/.test(t));
+    if (qTerms.length) {
+      const scored: { entry: MenuLookupEntry; score: number }[] = [];
+      for (const m of idx.menus) {
+        if (seenMenu.has(m.code)) continue;
+        let hitCount = 0;
+        let score = 0;
+        if (m.haystack.includes(norm)) score += 30;
+        const nameNorm = normalizeText(m.name);
+        if (nameNorm === norm) score += 60;
+        else if (nameNorm.includes(norm)) score += 25;
+        for (const qt of qTerms) {
+          if (nameNorm.includes(qt)) {
+            hitCount++;
+            score += 10;
+          } else if (m.haystack.includes(qt)) {
+            hitCount++;
+            score += 4;
+          }
+        }
+        if (hitCount > 0 && (hitCount === qTerms.length || score >= 14)) {
+          scored.push({ entry: m, score: score + (hitCount === qTerms.length ? 15 : 0) });
+        }
+      }
+      scored.sort((a, z) => z.score - a.score || a.entry.code.localeCompare(z.entry.code));
+      for (const s of scored) {
+        addMenu(s.entry);
+        if (foundMenus.length >= maxItems) break;
+      }
+    }
+  }
+
+  // 4. Dev table prefix/keyword fallback when user asked for table in dev mode
+  if (filter !== "user" && foundTables.length < maxItems && !foundMenus.length) {
+    const qTerms = terms(raw);
+    for (const t of idx.tables) {
+      if (seenTable.has(t.table)) continue;
+      const titleNorm = normalizeText(`${t.table} ${t.schemaTitle}`);
+      if (qTerms.length && qTerms.every((qt) => titleNorm.includes(qt))) {
+        addTable(t);
+        if (foundTables.length >= maxItems) break;
+      }
+    }
+  }
+
+  const menusOut = filter === "dev" && foundTables.length > 0 ? [] : foundMenus.slice(0, maxItems).map(hydrateMenu);
+  const tablesOut = filter === "user" ? [] : foundTables.slice(0, maxItems).map(hydrateTable);
+  const kind =
+    menusOut.length && tablesOut.length
+      ? "mixed"
+      : menusOut.length
+        ? "menu"
+        : tablesOut.length
+          ? "table"
+          : "none";
+  return { kind, menus: menusOut, tables: tablesOut };
 }
 
 // ---------- Media Graph Aggregation & Lookup for MCP AI Agents ----------

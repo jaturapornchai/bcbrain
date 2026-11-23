@@ -1001,9 +1001,13 @@ export default function Brain3D({ nodes, links, rels, children }: Props) {
                         ? ev.totalHits > 0
                           ? `พบ ${ev.totalHits} สื่อ`
                           : "ไม่พบสื่อที่ตรง"
-                        : ev.totalHits > 0
-                          ? `พบ ${ev.totalHits} โน้ต`
-                          : "ไม่พบโน้ตที่ตรง"}
+                        : ev.tool === "lookup_menu"
+                          ? ev.totalHits > 0
+                            ? `พบ ${ev.totalHits} รายการ`
+                            : "ไม่พบเมนู/ตารางที่ตรง"
+                          : ev.totalHits > 0
+                            ? `พบ ${ev.totalHits} โน้ต`
+                            : "ไม่พบโน้ตที่ตรง"}
                     </span>
                     {ev.hits.map((h) => {
                       const idx = slugIndex.get(h.slug);

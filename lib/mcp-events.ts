@@ -1,4 +1,13 @@
-export type McpToolName = "ask_brain" | "search_brain" | "traverse_brain" | "read_note" | "list_notes" | "find_media";
+export type McpToolName =
+  | "quick_answer"
+  | "lookup_menu"
+  | "batch_read"
+  | "ask_brain"
+  | "search_brain"
+  | "traverse_brain"
+  | "read_note"
+  | "list_notes"
+  | "find_media";
 
 export type McpEventHit = {
   slug: string;

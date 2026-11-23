@@ -21,7 +21,7 @@ registerHooks({
 });
 
 const { GROUPS, RELATION_TYPES, groupOf, inferRelation, matchesAudience } = await import("../lib/groups.ts");
-const { collectRelatedMedia, connectedNeighbors, excerpt, expandSynonyms, extractNoteMedia, findMedia, getNote, graph, parseYouTubeUrl, renderNote, resolveBcImageUrl, search, searchWithMeta, terms, traverseGraph, vault } = await import("../lib/vault.ts");
+const { collectRelatedMedia, connectedNeighbors, excerpt, expandSynonyms, extractNoteMedia, findMedia, getNote, graph, lookupDirect, parseYouTubeUrl, renderNote, resolveBcImageUrl, search, searchWithMeta, stripSeeAlso, terms, traverseGraph, vault } = await import("../lib/vault.ts");
 type NoteType = import("../lib/vault.ts").Note;
 
 // 1. Groups & Audience contract
@@ -406,5 +406,61 @@ assert.ok(
   fmt1015.hits.some((h) => h.slug === "start-doc-formats" || h.slug === "menu-cat-1-setup"),
   `1015 search should retrieve start-doc-formats or menu-cat-1-setup, got ${JSON.stringify(fmt1015.hits.map((h) => h.slug))}`,
 );
+
+// 12. Newly synced behavioral knowledge + incremental sync-cache diff test
+const payGuardDev = search("isPayTabEnabled payTabEnabled", 4, "dev");
+assert.ok(
+  payGuardDev.some((h) => h.slug === "doc-calc-vat-discount" || h.slug === "arch-ui-grid-report-standard"),
+  `isPayTabEnabled dev search failed: ${JSON.stringify(payGuardDev.map((h) => h.slug))}`,
+);
+const dateBoxDev = search("DateBox onCommit", 4, "dev");
+assert.ok(
+  dateBoxDev.some((h) => h.slug === "arch-ui-grid-report-standard"),
+  `DateBox onCommit dev search failed: ${JSON.stringify(dateBoxDev.map((h) => h.slug))}`,
+);
+const { saveBaselineSnapshot, computeIncrementalDiffs } = await import("./sync-cache.mjs");
+const diffRoot = fs.mkdtempSync(path.join(os.tmpdir(), "bcbrain-synccache-"));
+try {
+  const cacheFile = path.join(diffRoot, "baseline.json.gz");
+  fs.writeFileSync(path.join(diffRoot, "a.ts"), "const x = 1;\nconst y = 2;\n", "utf8");
+  fs.writeFileSync(path.join(diffRoot, "ws.ts"), "const z = 3;\n", "utf8");
+  const snap = saveBaselineSnapshot(diffRoot, { "a.ts": { bytes: 26 }, "ws.ts": { bytes: 13 } }, cacheFile);
+  assert.equal(snap.cachedFiles, 2);
+  fs.writeFileSync(path.join(diffRoot, "a.ts"), "const x = 1;\nconst y = 99;\n", "utf8");
+  fs.writeFileSync(path.join(diffRoot, "ws.ts"), "const z = 3;   \n", "utf8");
+  const inc = computeIncrementalDiffs(
+    diffRoot,
+    [
+      { file: "a.ts", status: "modified" },
+      { file: "ws.ts", status: "modified" },
+    ],
+    { cacheFile },
+  );
+  assert.equal(inc.hasBaseline, true);
+  assert.equal(inc.files.find((f: { file: string }) => f.file === "ws.ts")?.status, "whitespaceOnly");
+  const aDiff = inc.files.find((f: { file: string }) => f.file === "a.ts");
+  assert.equal(aDiff?.status, "modified");
+  assert.ok(aDiff?.hunks.some((l: string) => l.includes("+const y = 99;")), "incremental diff captures exact line delta");
+} finally {
+  fs.rmSync(diffRoot, { recursive: true, force: true });
+}
+
+// 13. Fast O(1) lookupDirect (menu codes 1001–9070 + SQL tables) & stripSeeAlso
+const m4013 = lookupDirect("4013", "user");
+assert.equal(m4013.kind, "menu", "lookupDirect('4013') finds menu");
+assert.equal(m4013.menus[0]?.code, "4013");
+assert.ok(m4013.menus[0]?.docs.every((d: { audience: string }) => d.audience !== "dev"), "lookupDirect(user) never exposes dev docs");
+
+const m1005 = lookupDirect("1005", "user");
+assert.equal(m1005.menus[0]?.code, "1005", "lookupDirect('1005') finds ปรับปรุงภาษา");
+
+const tDev = lookupDirect("ic_trans", "dev");
+assert.equal(tDev.kind, "table", "lookupDirect('ic_trans', 'dev') finds SQL table");
+assert.equal(tDev.tables[0]?.table, "ic_trans");
+const tUser = lookupDirect("ic_trans", "user");
+assert.equal(tUser.tables.length, 0, "lookupDirect('ic_trans', 'user') strictly hides dev SQL tables");
+
+const stripped = stripSeeAlso("# หัวข้อ\n\nเนื้อหาหลัก\n\n---\n\n## ดูต่อที่เกี่ยวข้อง\n- [[index]]");
+assert.ok(!stripped.includes("ดูต่อที่เกี่ยวข้อง") && stripped.includes("เนื้อหาหลัก"), "stripSeeAlso drops duplicated footer");
 
 console.log(`selftest ok (1005=${JSON.stringify(lang1005.hits.slice(0, 3).map((h) => h.slug))}, 1015=${fmt1015.hits[0]?.slug})`);

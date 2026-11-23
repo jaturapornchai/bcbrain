@@ -25,7 +25,9 @@ Skill สำหรับให้ AI เชื่อมต่อและดึ�
 ## 2. ลำดับการเชื่อมต่อ MCP (`https://brain.bcsmethai.com/mcp`)
 
 1. **ทางหลัก — เรียก MCP Tools ของ server `bcbrain` โดยตรง**
-   - Tools ที่มี (6 ตัว): `ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `read_note`, `list_notes` (ในบางเครื่องมืออาจขึ้นชื่อเป็น `mcp_bcbrain_<tool>`, `mcp__bcbrain__<tool>` หรือเรียกผ่าน `call_mcp_tool` ด้วย server `"bcbrain"`)
+   - Tools ที่มี (9 ตัว — เน้นความเร็ว & ประหยัด Token):
+     - **กลุ่มตอบเร็วสุด (แนะนำใช้เป็นค่าเริ่มต้น)**: `quick_answer` (จบใน 1 รอบ ~2,000 อักษร ประหยัด Token ~85%), `lookup_menu` (ค้นรหัสเมนู 4 หลัก / ชื่อเมนู / ตาราง SQL แบบ O(1) ใน `< 1 ms`), `batch_read` (อ่าน 1–5 โน้ตพร้อมกันใน 1 รอบ)
+     - **กลุ่มค้นเชิงลึก / สื่อ / กราฟ**: `ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `read_note`, `list_notes` (ในบางเครื่องมืออาจขึ้นชื่อเป็น `mcp_bcbrain_<tool>`, `mcp__bcbrain__<tool>` หรือเรียกผ่าน `call_mcp_tool` ด้วย server `"bcbrain"`)
 2. **ทางสำรองทันที — Stateless HTTP JSON-RPC (เมื่อ session ปัจจุบันยังไม่ได้ผูก MCP `bcbrain`)**
    - Endpoint `https://brain.bcsmethai.com/mcp` เป็น Public Read-Only Stateless Streamable HTTP (ไม่ต้องใช้ API key) สามารถเรียกผ่าน Node.js one-liner ได้ทันที:
 
@@ -91,23 +93,27 @@ console.log(j.result?.content?.[0]?.text ?? JSON.stringify(j));
 
 ---
 
-## 3. ลำดับการค้นแบบประหยัด Token (Cheap Retrieval Workflow)
+## 3. ลำดับการค้นแบบเร็วสุดและประหยัด Token (Ultra-Fast Retrieval Workflow)
 
 ### โหมดนักพัฒนา (`audience: "dev"`)
-1. เปิดงานครั้งแรก อ่าน `read_note({ slug: "playbook-dev" })` เพื่อดูแผนที่ Hub (`dev-rules-accounting-sql`, `dev-integration-quickstart`, `schema-overview`, `sql-overview`, `doctypes-overview`, `api-overview`, `api-mcp-gateway`, `arch-overview`)
-2. โจทย์เป็นคำถามรวม → เรียก `ask_brain({ question, audience: "dev" })` (ได้โน้ตตรงจุดสูงสุด 4 เรื่องในรอบเดียว)
-3. รู้ชื่อตารางหรือคำเฉพาะ → เรียก `search_brain({ query, limit: 8, audience: "dev" })` แล้ว `read_note({ slug })` เฉพาะใบที่ใช้จริง หรือดูสารบัญรายหมวดด้วย `list_notes({ folder, audience: "dev" })`
-   - โฟลเดอร์ฝั่ง dev: `dev-playbook`, `schema`, `queries`, `doctypes`, `api`, `architecture`
+1. **ตอบไวใน 1 รอบ (ไม่ต้องเสียรอบอ่าน playbook ก่อนทุกครั้ง)**:
+   - ถามโจทย์เทคนิคทั่วไป → เรียก `quick_answer({ question, audience: "dev" })`
+   - หาตาราง SQL / รหัสเมนูตรงตัว → เรียก `lookup_menu({ query: "ic_trans", audience: "dev" })`
+   - รู้ชื่อ slug 2–5 ใบที่ต้องใช้ → เรียก `batch_read({ slugs: [...], audience: "dev", query })` ในรอบเดียว (ห้ามวนเรียก `read_note` ทีละใบ)
+2. ต้องการบริบทหลายโน้ต + กราฟ 1 ทอด → เรียก `ask_brain({ question, audience: "dev", compact: true })` (หรือดูแผนที่ Hub เต็มที่ `playbook-dev` เมื่อจำเป็น)
+3. ค้นเฉพาะคำหรือดูสารบัญ → `search_brain({ query, limit: 5, audience: "dev" })` / `list_notes({ folder, audience: "dev" })` (โฟลเดอร์ฝั่ง dev: `dev-playbook`, `schema`, `queries`, `doctypes`, `api`, `architecture`)
 4. ไล่สายสัมพันธ์หลายทอด / หาผลกระทบข้ามหน้าจอ-โค้ด-ตาราง → เรียก `traverse_brain({ slug, depth: 2, audience: "dev" })` (หรือ `audience: "all"` เพื่อไล่ไซแนปส์ `bridges_zone` ข้ามจากหน้าจอผู้ใช้ไปยังไฟล์ Go/TS, ผังบัญชี Dr/Cr และตาราง SQL!) หรือหาเส้นทางสั้นสุดด้วย `traverse_brain({ slug, to_slug, audience })` (รองรับ 18 ชนิดความสัมพันธ์ เช่น `uses_table`, `writes_table`, `posts_rule`, `has_query`, `implements_code`, `bridges_zone`, `shares_menu`, `solves_issue`)
 
 ### โหมดผู้ใช้ทั่วไป / Call Center / ฝ่ายขาย (`audience: "user"`)
-1. เปิดบทสนทนาครั้งแรก อ่าน `read_note({ slug: "playbook-call-center" })` (วิธีใช้/แก้ปัญหา/ผังคัดกรองอาการด่วน) หรือ `read_note({ slug: "playbook-sales" })` (จุดเด่น/ตารางราคา 4 รุ่น/โครงการสำนักงานบัญชี Partner)
-2. ค้นหาชื่อเมนู รหัสเมนู 4 หลัก (`1001`–`9070` ครบ 735 หน้าจอ) หรือรหัสจุดเดิม (`1.3.1`, `4.13`) → เรียก `search_brain` / `ask_brain` ด้วยรหัสเมนูได้โดยตรง หรือดูสารบัญที่ `menu-catalog-overview` (`menu-cat-1-setup` ถึง `menu-cat-9-gl`), คีย์ลัดและเมนูคลิกขวาที่ `howto-screen-shortcuts-workbench`, หน้าจัดการระบบที่ `howto-admin-system-management`, วิดีโอสอน YouTube (`PLO9P7tPZLXB0`) และรูปหน้าจอจริงที่ `video-visual-tutorials`, และแผนผังเว็บ/บทความทั้งหมดที่ `website-manual-and-blog-directory`
+1. **ตอบไวสุดใน 1 รอบ (เหมาะกับ Call Center / LINE OA / Voice Bot — ไม่ต้องเสียรอบอ่าน playbook ก่อนทุกครั้ง)**:
+   - คำถามวิธีใช้/แก้ปัญหาทั่วไป → เรียก `quick_answer({ question, audience: "user", include_media: true })` จบใน 1 call (~2,000 อักษร + ลิงก์ภาพ/YouTube กระชับ)
+   - หารหัสเมนู 4 หลัก (`1001`–`9070` ครบ 735 หน้าจอ) หรือรหัสจุดเดิม (`4.13`) → เรียก `lookup_menu({ query: "4013", audience: "user" })` ตอบทันทีใน `< 1 ms`
+   - ต้องอ่านหลายโน้ตพร้อมกัน → เรียก `batch_read({ slugs: [...], audience: "user" })` ในรอบเดียว (ใช้ `playbook-call-center` / `playbook-sales` เมื่อต้องดูสคริปต์คัดกรองหรือรายละเอียดขายฉบับเต็ม)
+2. ต้องการคำตอบละเอียดหลายโน้ต + รวมสื่อครบ → เรียก `ask_brain({ question, audience: "user", compact: true })` (รวม `## Media & Reference Links` อัตโนมัติ)
 3. การดึงลิงก์รูปภาพหน้าจอจริง (`https://bcaccount.com/...`) และคลิปวิดีโอสอน YouTube (`PLO9P7tPZLXB0` พร้อม `thumbnailUrl` / `embedUrl`):
-   - `ask_brain({ question, audience: "user" })` จะรวมส่วน `## Media & Reference Links` ไว้ท้ายคำตอบอัตโนมัติ (รวมจากโน้ตที่ค้นเจอและโน้ตในหัวข้อเดียวกันอีก 1 ทอด แม้ถามเรื่องย่อยก็ได้ลิงก์ภาพและคลิปครบ)
-   - `search_brain` คืนอาร์เรย์ `images` และ `videos` ในแต่ละผลลัพธ์ JSON และ `read_note` แสดงบรรทัด `youtube_videos:`, `images:`, `web_pages:`
+   - `quick_answer({ ..., include_media: true })` แนบลิงก์คลิป/รูปหลัก 1 บรรทัดกระชับ และ `ask_brain({ question, audience: "user" })` รวมส่วน `## Media & Reference Links` ไว้ท้ายคำตอบอัตโนมัติ
    - หากต้องการค้นหาเฉพาะสื่อเพื่อนำไปแสดงการ์ดรูปหรือส่งลิงก์คลิปให้ลูกค้าโดยตรง เรียก `find_media({ query, kind: "all" | "image" | "youtube" | "webpage", limit: 12, audience: "user" })`
-4. ทุกครั้งที่เรียก `ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `list_notes` **ต้องส่ง `audience: "user"` เสมอ**
+4. ทุกครั้งที่เรียก `quick_answer`, `lookup_menu`, `batch_read`, `ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `list_notes` **ต้องส่ง `audience: "user"` เสมอ**
    - โฟลเดอร์ฝั่ง user: `playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`
 
 ---

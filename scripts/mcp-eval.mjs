@@ -24,19 +24,37 @@ const fails = [];
 const check = (ok, msg) => ok || fails.push(msg);
 
 // ---- protocol ----
+const getRes = await fetch(URL_, { method: "GET", headers: { Accept: "text/event-stream" } });
+check(getRes.status === 405, `GET /mcp stateless endpoint returns 405 immediately (got ${getRes.status})`);
+
 const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "eval", version: "1" } });
 check(init.result?.serverInfo?.name === "bcbrain", "initialize serverInfo");
 const instr = init.result?.instructions ?? "";
-check(instr.includes("playbook-dev") && instr.includes("playbook-call-center") && instr.includes("audience"), "initialize instructions cover both modes");
+check(
+  instr.includes("quick_answer") && instr.includes("playbook-dev") && instr.includes("playbook-call-center") && instr.includes("audience"),
+  "initialize instructions cover speed tools and both modes",
+);
 
 const listedTools = (await rpc("tools/list")).result?.tools ?? [];
-for (const t of ["ask_brain", "search_brain", "find_media", "traverse_brain", "read_note", "list_notes"]) {
+for (const t of ["quick_answer", "lookup_menu", "batch_read", "ask_brain", "search_brain", "find_media", "traverse_brain", "read_note", "list_notes"]) {
   const tool = listedTools.find((x) => x.name === t);
   check(!!tool, `tools/list has ${t}`);
   if (t !== "read_note") check(!!tool?.inputSchema?.properties?.audience, `${t} exposes audience param`);
 }
 const travTool = listedTools.find((x) => x.name === "traverse_brain");
 check(!!travTool?.inputSchema?.properties?.to_slug, "traverse_brain exposes to_slug param");
+
+// JSON-RPC batch request support
+const batchRes = await fetch(URL_, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+  body: JSON.stringify([
+    { jsonrpc: "2.0", id: 9001, method: "ping" },
+    { jsonrpc: "2.0", id: 9002, method: "tools/call", params: { name: "lookup_menu", arguments: { query: "4013", audience: "user" } } },
+  ]),
+});
+const batchJson = await batchRes.json();
+check(Array.isArray(batchJson) && batchJson.length === 2 && batchJson[1]?.result?.content?.[0]?.text?.includes("4013"), "JSON-RPC batch array works");
 
 for (const slug of ["index", "INDEX", "[[index]]", "index.md", "sales-overview", "playbook-dev"]) {
   const r = await call("read_note", { slug });
@@ -121,6 +139,38 @@ check(
     askQuote.includes("https://www.youtube.com/watch?v=") &&
     askQuote.includes("https://bcaccount.com/"),
   "ask_brain(user) appends ready-to-share YouTube & bcaccount.com links even on sub-note queries",
+);
+check(!askQuote.includes("youtube_videos:"), "ask_brain omits redundant per-note youtube_videos line (token saving)");
+const askCompact = (await call("ask_brain", { question: "ทำใบเสนอราคาขายยังไง", audience: "user", compact: true })).text;
+check(
+  askCompact.length > 100 && askCompact.length < askQuote.length && askCompact.includes("## Media & Reference Links"),
+  `ask_brain(compact=true) reduces token payload (${askCompact.length} vs ${askQuote.length})`,
+);
+
+// ---- ultra-fast speed tools: quick_answer, lookup_menu, batch_read ----
+const qaUser = (await call("quick_answer", { question: "เปิดบิลขายออกใบกำกับภาษีทำยังไง", audience: "user" })).text;
+check(
+  qaUser.startsWith("[quick_answer") && qaUser.length > 200 && qaUser.length < 3200 && !qaUser.includes("| audience: dev |") && !qaUser.includes("verified_sources:"),
+  `quick_answer(user) returns ultra-compact isolated answer (${qaUser.length} chars)`,
+);
+const qaMedia = (await call("quick_answer", { question: "เปิดบิลขายออกใบกำกับภาษีทำยังไง", audience: "user", include_media: true })).text;
+check(qaMedia.includes("media: ") && (qaMedia.includes("youtube.com") || qaMedia.includes("bcaccount.com")), "quick_answer(include_media=true) appends compact media line");
+const qaTrap = (await call("quick_answer", { question: "สูตรทำแกงเขียวหวานไก่ใส่กะทิสด", audience: "user" })).text;
+check(qaTrap.includes("🛑 Abstain"), "quick_answer strictly abstains on out-of-domain trap");
+
+const lm4013 = (await call("lookup_menu", { query: "4013", audience: "user" })).text;
+check(lm4013.includes("**4013**") && lm4013.includes("ขายสินค้า/บริการ"), "lookup_menu(4013) finds sales invoice menu");
+const lm1005 = (await call("lookup_menu", { query: "1005", audience: "user" })).text;
+check(lm1005.includes("**1005**"), "lookup_menu(1005) finds language dictionary menu");
+const lmTableDev = (await call("lookup_menu", { query: "ic_trans", audience: "dev" })).text;
+check(lmTableDev.includes("`ic_trans`") && lmTableDev.includes("tbl-ic-trans"), "lookup_menu(ic_trans, dev) finds schema slug");
+const lmTableUser = (await call("lookup_menu", { query: "ic_trans", audience: "user" })).text;
+check(!lmTableUser.includes("tbl-ic-trans"), "lookup_menu(ic_trans, user) strictly blocks dev SQL tables");
+
+const brRes = (await call("batch_read", { slugs: ["howto-sale-invoice", "ts-stock-negative-control", "tbl-ic-trans"], audience: "user", max_chars_per_note: 1200 })).text;
+check(
+  brRes.includes("slug: howto-sale-invoice") && brRes.includes("slug: ts-stock-negative-control") && brRes.includes("outside audience=user"),
+  "batch_read reads multiple notes in 1 call and strictly enforces audience isolation",
 );
 const mediaHits = JSON.parse((await call("search_brain", { query: "วิดีโอสอนใช้งาน YouTube คลิปสอน", limit: 3, audience: "user" })).text || "[]");
 check(
