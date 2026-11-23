@@ -15,9 +15,14 @@ sources:
   - "backend/internal/application/process/trans_grid.go:227-280"
   - "backend/internal/application/process/trans.go:250-560"
   - "backend/internal/application/process/docs.go:600-635"
+  - "backend/internal/application/process/pay_check.go:30-50"
   - "frontend/src/lib/numeric.ts:705-960"
   - "frontend/account/config/useRuntimeOptions.ts:40-125"
   - "frontend/account/transaction/transLayouts.ts:45-210"
+  - "frontend/account/transaction/transLayouts.ts:470-499"
+  - "frontend/account/transaction/UniversalTransScreen.tsx:3245-3260"
+  - "frontend/account/transaction/TransExtraTabs.tsx:1010-1036"
+  - "frontend/account/transaction/TransItemGrid.tsx:205-225"
   - "frontend/account/transaction/TransItemGrid.tsx:1212-1244"
 ---
 
@@ -44,6 +49,14 @@ sources:
 > - บนใบลดหนี้ซื้อ (`16`, `317`): เงินเชื่อคือ **`inquiry_type IN (0, 1)`** (ส่วน `2, 3` เป็นรับเงินสดคืน)
 > - บนใบลดหนี้ขาย (`48`): เงินเชื่อคือ **`inquiry_type IN (0, 2, 4)`** (ส่วน `1, 3, 5` เป็นจ่ายเงินสดคืน!)
 > ดูเงื่อนไข SQL มาตรฐานครบทุก `trans_flag` ได้ที่ [[doc-impact-ar-ap-deposit]] และ [[sql-ar-outstanding-invoices]]
+
+### กฎเปิด/ปิดแท็บการรับ-จ่ายชำระเงินตาม `inquiry_type` (`isPayTabEnabled` / `payTabEnabled`)
+ทั้ง Backend (`pay_check.go:payTabEnabled`) และ Frontend (`transLayouts.ts:isPayTabEnabled`, `UniversalTransScreen.tsx:payTabAllowed`, `TransExtraTabs.tsx:payDisabled`) ใช้เงื่อนไขตรงกันสำหรับเอกสารกลุ่ม `PAY_INQUIRY_FLAGS` (`11, 12, 16, 44, 48, 250, 252, 254, 260, 262, 264, 315, 317`):
+- `trans_flag = 11` (จ่ายเงินมัดจำซื้อ): เปิดแท็บชำระเงินเฉพาะ `inquiry_type = 0` (เงินสด)
+- `trans_flag IN (16, 317)` (ส่งคืน/ลดหนี้ซื้อ): เปิดเฉพาะ `inquiry_type IN (2, 3)` (รับเงินสดคืน)
+- `trans_flag = 48` (รับคืน/ลดหนี้ขาย): เปิดเฉพาะ `inquiry_type IN (1, 3, 5)` (จ่ายเงินสดคืน)
+- เอกสารอื่นในกลุ่ม (`12, 44, 250, 252, 254, 260, 262, 264, 315`): เปิดเฉพาะ `inquiry_type IN (1, 3)` (เงินสด)
+- หากเลือกประเภทรายการเป็นเงินเชื่อ/เครดิต UI จะปิดแท็บรับ/จ่ายชำระเงิน (`disabled`) สลับออกจากแท็บอัตโนมัติ และแสดงข้อความ `"รายการนี้เลือกประเภทเป็นเงินเชื่อ / เครดิต ระบบปิดการรับ/จ่ายชำระเงิน"`
 
 ---
 
@@ -85,6 +98,7 @@ $$\text{total\_amount} = \text{total\_after\_vat} + \text{total\_except\_vat} \q
 - ในตารางสินค้า (`TransItemGrid.tsx`) ผู้ใช้สามารถกรอกช่อง `sum_amount` (คอลัมน์ "จำนวนเงิน") โดยตรงเมื่อ `qty * price` มีเศษปัดทศนิยมไม่ตรงหน้าบิล (`Changed: "sumAmount"`, `SumAmountManual: true`)
 - `trans_grid.go` (`onSumAmount`) จะปัด `sum_amount` ตามทศนิยม `amount` และคำนวณ `price` ย้อนกลับด้วย `*big.Rat` (ถ้าไม่มีส่วนลดหรือราคาเป็น 0; หาก `qty = 0` และ `sum_amount != 0` จะตั้ง `qty = 1` และ `price = sum_amount`) พร้อมคง `sum_amount` ตามที่กรอกไว้ไม่ให้ `qty * price` ทับ และยังคงตรวจสิทธิ์ขายต่ำกว่าทุน/ราคามาตรฐานตามปกติ
 - หากผู้ใช้แก้ `itemCode`, `qty`, `unitCode`, `price`, `discount` หรือ `vatType` ภายหลัง ระบบจะรีเซ็ต `SumAmountManual = false` เพื่อคำนวณยอดตามสูตรปกติอีกครั้ง
+- ยกเว้น **ใบเบิกสินค้า/วัตถุดิบ (`trans_flag = 56`)**: `getTransLayout` กำหนด `showPrice = false` และ `showSumAmount = false` (`TransItemGrid.tsx:hideSumAmount`) เพื่อซ่อนคอลัมน์ราคาและจำนวนเงินรวมในตารางสินค้า (แสดงคอลัมน์ต้นทุนเฉลี่ยเฉพาะเมื่อ `rt.stockIssueShowCost && !rt.disableItemCost`)
 
 ---
 

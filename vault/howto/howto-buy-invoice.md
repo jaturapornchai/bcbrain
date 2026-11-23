@@ -6,9 +6,12 @@ sources:
   - backend/internal/application/process/bcMenu.json:4033-4045
   - frontend/account/transaction/transLayouts.ts:36-38
   - frontend/account/transaction/transLayouts.ts:82
+  - frontend/account/transaction/transLayouts.ts:488-499
+  - frontend/account/transaction/TransExtraTabs.tsx:1010-1036
   - backend/internal/application/process/trans_validate.go:100-145
   - backend/internal/application/process/trans_validate.go:280-310
   - backend/internal/application/process/trans_save_rules.go:1-220
+  - backend/internal/application/process/pay_check.go:30-50
   - backend/internal/application/process/pay_check.go:255-356
   - frontend/account/master/OcrThreeWayMatchScreen.tsx:52-260
 ---
@@ -43,7 +46,7 @@ sources:
 6. ตรวจสอบแท็บด้านล่างตามกรณีใช้งาน:
    - **ใช้เงินมัดจำ** / **หักเงินจ่ายล่วงหน้า**: ดึงใบจ่ายเงินมัดจำมาหักยอดบิล (สำหรับบิล **ซื้อสินค้าเงินสด** สามารถหักเงินจ่ายล่วงหน้าเพื่อลดยอดเงินสดที่ต้องจ่ายได้ด้วย ดู [[howto-buy-deposit-advance]])
    - **ข้อมูลภาษี (VAT/WHT)**: ตรวจยอดภาษีซื้อและกรอกข้อมูลภาษีหัก ณ ที่จ่าย (กรณีซื้อบริการ)
-   - **การรับ/จ่ายชำระเงิน**: ใช้สำหรับ **ซื้อสินค้าเงินสด** เพื่อบันทึกเงินสด โอน หรือเช็คจ่าย
+   - **การรับ/จ่ายชำระเงิน**: เปิดใช้งานเฉพาะ **ซื้อสินค้าเงินสด** เพื่อบันทึกเงินสด โอน หรือเช็คจ่าย — หากเลือกประเภทเป็น **ซื้อสินค้าเงินเชื่อ** ระบบจะปิดแท็บการรับ/จ่ายชำระเงินอัตโนมัติพร้อมแจ้งข้อความ **"รายการนี้เลือกประเภทเป็นเงินเชื่อ / เครดิต ระบบปิดการรับ/จ่ายชำระเงิน"**
    - **การลงบัญชี (GL)**: ตรวจสอบคู่บัญชีเดบิต-เครดิต
 7. กด **บันทึก** (คีย์ลัด Ctrl+S)
 
