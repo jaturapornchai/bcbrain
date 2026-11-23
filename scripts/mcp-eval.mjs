@@ -36,7 +36,7 @@ check(
 );
 
 const listedTools = (await rpc("tools/list")).result?.tools ?? [];
-for (const t of ["quick_answer", "lookup_menu", "batch_read", "ask_brain", "search_brain", "find_media", "traverse_brain", "read_note", "list_notes"]) {
+for (const t of ["quick_answer", "batch_ask", "lookup_menu", "batch_read", "ask_brain", "search_brain", "find_media", "traverse_brain", "read_note", "list_notes"]) {
   const tool = listedTools.find((x) => x.name === t);
   check(!!tool, `tools/list has ${t}`);
   if (t !== "read_note") check(!!tool?.inputSchema?.properties?.audience, `${t} exposes audience param`);
@@ -172,6 +172,42 @@ check(
   brRes.includes("slug: howto-sale-invoice") && brRes.includes("slug: ts-stock-negative-control") && brRes.includes("outside audience=user"),
   "batch_read reads multiple notes in 1 call and strictly enforces audience isolation",
 );
+
+const qaUltra = (await call("quick_answer", { question: "ปิดงวดบัญชีไม่ได้ต้องทำยังไง", audience: "user", mode: "ultra" })).text;
+check(
+  qaUltra.startsWith("[quick_answer:ultra") && qaUltra.length > 80 && qaUltra.length < 1100,
+  `quick_answer(mode=ultra) returns ultra-compact TL;DR (${qaUltra.length} chars)`,
+);
+
+const baRes = (await call("batch_ask", { questions: ["เช็คเด้งทำยังไง", "เปิดบิลขายเมนูอะไร", "สูตรทำแกงเขียวหวานไก่ใส่กะทิสด"], audience: "user", mode: "ultra" })).text;
+check(
+  baRes.includes("## Q1:") && baRes.includes("## Q2:") && baRes.includes("## Q3:") && baRes.includes("🛑 Abstain"),
+  "batch_ask answers multiple questions in 1 call and strictly abstains ungrounded items",
+);
+
+// ---- Fast cacheable REST endpoints (/api/fast, /api/bootstrap-pack, /api/vault-pack) ----
+const origin = new URL(URL_).origin;
+const fastRes = await fetch(`${origin}/api/fast?q=${encodeURIComponent("เช็คเด้งทำยังไง")}&audience=user&mode=ultra`);
+const fastJson = await fastRes.json();
+check(
+  fastRes.status === 200 && fastJson.ok && !fastJson.abstained && (fastRes.headers.get("cache-control") ?? "").includes("s-maxage"),
+  "/api/fast returns cacheable ultra-fast JSON answer",
+);
+const bootRes = await fetch(`${origin}/api/bootstrap-pack?audience=user`);
+const bootText = await bootRes.text();
+check(
+  bootRes.status === 200 && bootText.includes("**4013**") && !bootText.includes("ic_trans_detail") && !!bootRes.headers.get("etag"),
+  "/api/bootstrap-pack(user) returns ETag-cached context pack without dev leaks",
+);
+const packRes = await fetch(`${origin}/api/vault-pack`);
+const packBuf = Buffer.from(await packRes.arrayBuffer());
+const packEtag = packRes.headers.get("etag") ?? "";
+check(
+  packRes.status === 200 && packBuf[0] === 0x1f && packBuf[1] === 0x8b && packBuf.length > 200_000 && packEtag.startsWith('"bcbrain-'),
+  `/api/vault-pack returns valid gzipped vault mirror (${(packBuf.length / 1024).toFixed(0)} KB)`,
+);
+const pack304 = await fetch(`${origin}/api/vault-pack`, { headers: { "If-None-Match": packEtag } });
+check(pack304.status === 304, `/api/vault-pack supports ETag 304 Not Modified (got ${pack304.status})`);
 const mediaHits = JSON.parse((await call("search_brain", { query: "วิดีโอสอนใช้งาน YouTube คลิปสอน", limit: 3, audience: "user" })).text || "[]");
 check(
   Array.isArray(mediaHits[0]?.videos) && mediaHits[0].videos.length > 0 && Array.isArray(mediaHits[0]?.images) && mediaHits[0].images.length > 0,

@@ -1,5 +1,6 @@
 export type McpToolName =
   | "quick_answer"
+  | "batch_ask"
   | "lookup_menu"
   | "batch_read"
   | "ask_brain"

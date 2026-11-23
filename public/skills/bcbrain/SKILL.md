@@ -25,9 +25,13 @@ Skill สำหรับให้ AI เชื่อมต่อและดึ�
 ## 2. ลำดับการเชื่อมต่อ MCP (`https://brain.bcsmethai.com/mcp`)
 
 1. **ทางหลัก — เรียก MCP Tools ของ server `bcbrain` โดยตรง**
-   - Tools ที่มี (9 ตัว — เน้นความเร็ว & ประหยัด Token):
-     - **กลุ่มตอบเร็วสุด (แนะนำใช้เป็นค่าเริ่มต้น)**: `quick_answer` (จบใน 1 รอบ ~2,000 อักษร ประหยัด Token ~85%), `lookup_menu` (ค้นรหัสเมนู 4 หลัก / ชื่อเมนู / ตาราง SQL แบบ O(1) ใน `< 1 ms`), `batch_read` (อ่าน 1–5 โน้ตพร้อมกันใน 1 รอบ)
+   - Tools ที่มี (10 ตัว — เน้นความเร็ว & ประหยัด Token):
+     - **กลุ่มตอบเร็วสุด (แนะนำใช้เป็นค่าเริ่มต้น)**: `quick_answer` (จบใน 1 รอบ ~2,000 อักษร หรือส่ง `mode: "ultra"` เหลือ ~600 อักษร TL;DR), `batch_ask` (ถาม 1–5 คำถามพร้อมกันใน 1 รอบ), `lookup_menu` (ค้นรหัสเมนู 4 หลัก / ชื่อเมนู / ตาราง SQL แบบ O(1) ใน `< 1 ms`), `batch_read` (อ่าน 1–5 โน้ตพร้อมกันใน 1 รอบ)
      - **กลุ่มค้นเชิงลึก / สื่อ / กราฟ**: `ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `read_note`, `list_notes` (ในบางเครื่องมืออาจขึ้นชื่อเป็น `mcp_bcbrain_<tool>`, `mcp__bcbrain__<tool>` หรือเรียกผ่าน `call_mcp_tool` ด้วย server `"bcbrain"`)
+   - **REST & Local Mirror ความเร็วสูงสุด**:
+     - `GET https://brain.bcsmethai.com/api/fast?q=<คำถาม>&audience=user&mode=ultra` (รองรับ CDN Edge cache `s-maxage=300`)
+     - `GET https://brain.bcsmethai.com/api/bootstrap-pack?audience=user` (แพ็กสรุปสำหรับ Prompt Caching ฝั่งบอท → 0 ms คำถามพื้นฐาน)
+     - Local Stdio MCP (`node scripts/mcp-stdio.ts --sync` ดึงแพ็ก gzip ~670 KB จาก `/api/vault-pack` มาแคชใน RAM บนเครื่อง → `< 1 ms` ไร้ RTT)
 2. **ทางสำรองทันที — Stateless HTTP JSON-RPC (เมื่อ session ปัจจุบันยังไม่ได้ผูก MCP `bcbrain`)**
    - Endpoint `https://brain.bcsmethai.com/mcp` เป็น Public Read-Only Stateless Streamable HTTP (ไม่ต้องใช้ API key) สามารถเรียกผ่าน Node.js one-liner ได้ทันที:
 

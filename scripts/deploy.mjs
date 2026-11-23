@@ -53,8 +53,9 @@ function rollbackServer() {
         if [ -d ${APP} ]; then mv ${APP} ${APP}.bad; fi
         mv ${APP}.prev ${APP}
         systemctl restart bcbrain
+        if systemctl list-unit-files bcbrain-mcp.service | grep -q bcbrain-mcp; then systemctl restart bcbrain-mcp || true; fi
         for i in 1 2 3 4 5 6 7 8 9 10; do curl -fsS -o /dev/null http://127.0.0.1:3951/ && break; sleep 1; done
-        curl -sS -o /dev/null -w 'rollback health: %{http_code}\\n' http://127.0.0.1:3951/
+        curl -sS -o /dev/null -w 'rollback health web: %{http_code}\\n' http://127.0.0.1:3951/
       else
         echo "rollback skipped: no ${APP}.prev"
       fi`,
@@ -81,33 +82,55 @@ try {
     }
   }
 
-  console.log("deploy: packing standalone bundle + public + vault...");
+  console.log("deploy: packing standalone bundle + public + vault + mcp-sidecar...");
   fs.rmSync(deployDir, { recursive: true, force: true });
   fs.mkdirSync(deployDir, { recursive: true });
   copyDir(path.join(ROOT, ".next", "standalone"), deployDir);
   copyDir(path.join(ROOT, ".next", "static"), path.join(deployDir, ".next", "static"));
   copyDir(path.join(ROOT, "public"), path.join(deployDir, "public"));
   copyDir(path.join(ROOT, "vault"), path.join(deployDir, "vault"));
+  copyDir(path.join(ROOT, "lib"), path.join(deployDir, "lib"));
+  for (const dep of ["yaml", "marked", "zod"]) {
+    copyDir(path.join(ROOT, "node_modules", dep), path.join(deployDir, "node_modules", dep));
+  }
+  fs.mkdirSync(path.join(deployDir, "scripts"), { recursive: true });
+  fs.copyFileSync(path.join(ROOT, "scripts", "mcp-server.ts"), path.join(deployDir, "scripts", "mcp-server.ts"));
 
   if (fs.existsSync(tarPath)) fs.rmSync(tarPath, { force: true });
   run("tar", ["-czf", "bcbrain.tar.gz", "-C", ".deploy", "."], { timeout: 120_000 });
 
-  console.log("deploy: uploading bundle and systemd unit via scp...");
-  run("scp", ["-q", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", "bcbrain.tar.gz", "deploy/bcbrain.service", `${HOST}:/tmp/`], {
-    timeout: 180_000,
-  });
+  console.log("deploy: uploading bundle and systemd units via scp...");
+  run(
+    "scp",
+    [
+      "-q",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "ConnectTimeout=15",
+      "bcbrain.tar.gz",
+      "deploy/bcbrain.service",
+      "deploy/bcbrain-mcp.service",
+      `${HOST}:/tmp/`,
+    ],
+    { timeout: 180_000 },
+  );
 
-  console.log("deploy: atomically swapping release and restarting bcbrain.service...");
+  console.log("deploy: atomically swapping release and restarting bcbrain + bcbrain-mcp...");
   const remoteOut = runSsh(
     `set -e
     rm -rf ${APP}.new && mkdir -p ${APP}.new && tar -xzf /tmp/bcbrain.tar.gz -C ${APP}.new && rm -f /tmp/bcbrain.tar.gz
     rm -rf ${APP}.prev; if [ -d ${APP} ]; then mv ${APP} ${APP}.prev; fi; mv ${APP}.new ${APP}
     mv /tmp/bcbrain.service /etc/systemd/system/bcbrain.service
-    systemctl daemon-reload && systemctl enable -q bcbrain && systemctl restart bcbrain
-    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do curl -fsS -o /dev/null http://127.0.0.1:3951/ && break; sleep 1; done
-    code=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3951/)
-    echo "local health: $code"
-    test "$code" = "200"`,
+    mv /tmp/bcbrain-mcp.service /etc/systemd/system/bcbrain-mcp.service
+    systemctl daemon-reload
+    systemctl enable -q bcbrain bcbrain-mcp
+    systemctl restart bcbrain bcbrain-mcp
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do curl -fsS -o /dev/null http://127.0.0.1:3951/ && curl -fsS -o /dev/null http://127.0.0.1:3961/healthz && break; sleep 1; done
+    webCode=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3951/)
+    mcpCode=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3961/healthz)
+    echo "local health: web=$webCode mcp=$mcpCode"
+    test "$webCode" = "200" && test "$mcpCode" = "200"`,
     120_000,
   );
   console.log(redactLogText(remoteOut.trim()));

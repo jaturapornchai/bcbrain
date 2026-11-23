@@ -1,5 +1,7 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 import { parse as parseYaml } from "yaml";
 import { marked } from "marked";
 import {
@@ -56,6 +58,12 @@ export type MediaItem = {
   noteTitle: string;
 };
 
+export type NoteSection = {
+  heading: string;
+  raw: string;
+  norm: string;
+};
+
 export type Note = {
   slug: string;
   folder: string;
@@ -65,6 +73,9 @@ export type Note = {
   aliases: string[];
   sources: string[];
   body: string;
+  cleanBody?: string;
+  tldr?: string;
+  sections?: NoteSection[];
   links: string[];
   backlinks: string[];
   outEdges: Edge[];
@@ -268,9 +279,67 @@ export function extractNoteMedia(body: string, noteTitle = ""): NoteMedia {
   return { images, videos, webPages };
 }
 
-function load(): Map<string, Note> {
-  const notes = new Map<string, Note>();
-  const rawLinks = new Map<string, { target: string; explicitRel?: RelationType }[]>();
+function buildNoteTldr(title: string, cleanBody: string, explicit?: unknown): string {
+  if (typeof explicit === "string" && explicit.trim()) return explicit.trim().slice(0, 500);
+  const lines = cleanBody.split("\n");
+  const picked: string[] = [];
+  let chars = 0;
+  let inCode = false;
+  for (const raw of lines) {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("```")) {
+      inCode = !inCode;
+      continue;
+    }
+    if (inCode || !trimmed) continue;
+    if (trimmed.startsWith("# ")) continue;
+    if (trimmed === "---" || /^!\[/.test(trimmed) || /^\[🎬/.test(trimmed) || /^> \[!/.test(trimmed)) continue;
+    if (trimmed.startsWith("|---") || trimmed.startsWith("| :---")) continue;
+    // Prioritize intro paragraph, menu lines, and concise bullets/steps
+    const clean = trimmed
+      .replace(/^>\s*/, "")
+      .replace(/\[\[(?:[a-z_]+::)?([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]/g, (_m, slug, lbl) => lbl ?? slug)
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, "$1");
+    if (!clean || clean === title) continue;
+    if (picked.length === 0 && clean.startsWith("## ")) continue;
+    const nextLen = chars + clean.length + 1;
+    if (picked.length >= 1 && nextLen > 420) break;
+    picked.push(clean.length > 260 ? `${clean.slice(0, 257)}…` : clean);
+    chars = nextLen;
+    if (picked.length >= 5) break;
+  }
+  return picked.join("\n") || title;
+}
+
+function splitPrecomputedSections(cleanBody: string): NoteSection[] {
+  return cleanBody.split(/\n(?=## )/).map((raw) => ({
+    heading: raw.split("\n")[0].replace(/^#+\s*/, "").trim(),
+    raw,
+    norm: normalizeText(raw),
+  }));
+}
+
+function readRawVaultEntries(): { slug: string; folder: string; text: string }[] {
+  const packFile = process.env.BC_VAULT_PACK_FILE?.trim();
+  if (packFile && fs.existsSync(packFile)) {
+    try {
+      const rawBuf = fs.readFileSync(packFile);
+      const jsonText = packFile.endsWith(".gz") || (rawBuf[0] === 0x1f && rawBuf[1] === 0x8b)
+        ? zlib.gunzipSync(rawBuf).toString("utf8")
+        : rawBuf.toString("utf8");
+      const parsed = JSON.parse(jsonText) as { notes?: { slug: string; folder: string; raw: string }[] };
+      if (Array.isArray(parsed.notes) && parsed.notes.length > 0) {
+        return parsed.notes.map((n) => ({
+          slug: String(n.slug).toLowerCase(),
+          folder: String(n.folder || "root"),
+          text: String(n.raw ?? "").replace(/\r\n/g, "\n"),
+        }));
+      }
+    } catch (e) {
+      console.warn(`[vault] failed reading BC_VAULT_PACK_FILE (${packFile}):`, e instanceof Error ? e.message : e);
+    }
+  }
+  const out: { slug: string; folder: string; text: string }[] = [];
   for (const file of walk(VAULT_DIR)) {
     let text: string;
     try {
@@ -278,7 +347,23 @@ function load(): Map<string, Note> {
     } catch {
       continue;
     }
+    const slug = path.basename(file, ".md").toLowerCase();
+    const rel = path.relative(VAULT_DIR, file).split(path.sep);
+    const folder = rel.length > 1 ? rel[0] : "root";
+    out.push({ slug, folder, text });
+  }
+  return out;
+}
+
+function load(): Map<string, Note> {
+  const notes = new Map<string, Note>();
+  const rawLinks = new Map<string, { target: string; explicitRel?: RelationType }[]>();
+  for (const { slug, folder, text } of readRawVaultEntries()) {
     if (!text.trim()) continue;
+    if (notes.has(slug)) {
+      console.warn(`[vault] duplicate slug ${slug}: ignored`);
+      continue;
+    }
     const fm = text.match(/^---\n([\s\S]*?)\n---\n?/);
     let meta: Record<string, unknown> = {};
     if (fm) {
@@ -289,13 +374,6 @@ function load(): Map<string, Note> {
       }
     }
     const body = fm ? text.slice(fm[0].length) : text;
-    const slug = path.basename(file, ".md").toLowerCase();
-    if (notes.has(slug)) {
-      console.warn(`[vault] duplicate slug ${slug}: ${file} ignored`);
-      continue;
-    }
-    const rel = path.relative(VAULT_DIR, file).split(path.sep);
-    const folder = rel.length > 1 ? rel[0] : "root";
     const rawAud = typeof meta.audience === "string" ? meta.audience.trim().toLowerCase() : "";
     const audience: Audience = VALID_AUDIENCES.has(rawAud as Audience)
       ? (rawAud as Audience)
@@ -303,6 +381,8 @@ function load(): Map<string, Note> {
     const title = String(meta.title ?? body.match(/^#\s+(.+)$/m)?.[1] ?? slug);
     const tags = asList(meta.tags);
     const aliases = asList(meta.aliases);
+    const cleanBody = stripSeeAlso(body);
+    const tldr = buildNoteTldr(title, cleanBody, meta.tldr);
     const parsedLinks = [...body.matchAll(WIKILINK)].map((m) => ({
       target: linkTarget(m[2]),
       explicitRel: m[1] && isRelationType(m[1]) ? m[1] : undefined,
@@ -317,6 +397,8 @@ function load(): Map<string, Note> {
       aliases,
       sources: asList(meta.sources),
       body,
+      cleanBody,
+      tldr,
       links: [...new Set(parsedLinks.map((x) => x.target))],
       backlinks: [],
       outEdges: [],
@@ -578,6 +660,8 @@ type VaultBundle = {
   noteTokens: Map<string, NoteTokens> | null;
   indexes: Map<AudienceFilter, SearchIndex>;
   directIndex: DirectIndex | null;
+  vaultPackGzip: { gz: Buffer; etag: string; noteCount: number; rawBytes: number } | null;
+  bootstrapPacks: Map<"user" | "dev", { text: string; etag: string; chars: number }>;
 };
 
 // ponytail: whole vault + derived indexes in memory; prod persists per redeploy, dev/test uses 5s TTL for hot reload without thrashing loops
@@ -600,6 +684,8 @@ function getBundle(): VaultBundle {
       noteTokens: null,
       indexes: new Map(),
       directIndex: null,
+      vaultPackGzip: null,
+      bootstrapPacks: new Map(),
     };
   }
   return bundleCache;
@@ -607,6 +693,12 @@ function getBundle(): VaultBundle {
 
 export function bundleVersion(): number {
   return getBundle().builtAt;
+}
+
+export function reloadVaultBundle(): void {
+  bundleCache = null;
+  indexesWarmed = false;
+  warmVaultIndexes();
 }
 
 export function vault(): Map<string, Note> {
@@ -1223,6 +1315,9 @@ export function warmVaultIndexes(): void {
   getSearchIndex(b, "user");
   getSearchIndex(b, "dev");
   getDirectIndex(b);
+  for (const n of b.notes.values()) {
+    if (!n.sections) n.sections = splitPrecomputedSections(n.cleanBody ?? stripSeeAlso(n.body));
+  }
   indexesWarmed = true;
 }
 
@@ -1604,6 +1699,170 @@ export function stripSeeAlso(body: string): string {
   const parts = body.split(/\n(?=## )/);
   const kept = parts.filter((p, idx) => idx === 0 || !SEE_ALSO_HEADING.test(p.trimStart()));
   return kept.join("\n").replace(/\n---\s*$/, "").trimEnd();
+}
+
+export function getNoteTldr(n: Note): string {
+  if (n.tldr) return n.tldr;
+  n.cleanBody ??= stripSeeAlso(n.body);
+  n.tldr = buildNoteTldr(n.title, n.cleanBody);
+  return n.tldr;
+}
+
+// Fast zero-split excerpt using pre-split & pre-normalized note sections
+export function excerptNote(n: Note, ts: string[], budget: number, stripFooter = true): string {
+  if (!stripFooter) return excerpt(n.body, ts, budget, false);
+  const clean = n.cleanBody ?? (n.cleanBody = stripSeeAlso(n.body));
+  if (clean.length <= budget) return clean;
+  const secs = n.sections ?? (n.sections = splitPrecomputedSections(clean));
+  const hits = new Int32Array(secs.length);
+  for (let si = 0; si < secs.length; si++) {
+    const np = secs[si].norm;
+    let h = 0;
+    for (let i = 0; i < ts.length; i++) {
+      const w = /^[1-9]\d{3}$|^[1-9](?:\.\d+){1,3}$/.test(ts[i]) ? 20 : 1;
+      h += count(np, ts[i]) * w;
+    }
+    hits[si] = h;
+  }
+  const keep = new Set([0]);
+  let used = secs[0]?.raw.length ?? 0;
+  const order = Array.from({ length: Math.max(0, secs.length - 1) }, (_, k) => k + 1).sort((a, b) => hits[b] - hits[a]);
+  for (const i of order) {
+    if (used + secs[i].raw.length <= budget) {
+      keep.add(i);
+      used += secs[i].raw.length;
+    }
+  }
+  const omitted: string[] = [];
+  const keptRaw: string[] = [];
+  for (let i = 0; i < secs.length; i++) {
+    if (keep.has(i)) keptRaw.push(secs[i].raw);
+    else if (secs[i].heading) omitted.push(secs[i].heading);
+  }
+  const out = keptRaw.join("\n");
+  let cut = out.length > budget ? out.slice(0, budget) : out;
+  if (out.length > budget) {
+    const fenceCount = (cut.match(/^```/gm) ?? []).length;
+    if (fenceCount % 2 === 1) cut += "\n```";
+    cut += " …";
+  }
+  return `${cut}\n\n[excerpt — ${omitted.length ? `omitted sections: ${omitted.slice(0, 6).join(" | ")}${omitted.length > 6 ? " …" : ""}. ` : ""}read_note for the full note]`;
+}
+
+// Pre-gzipped full vault pack (~670 KB) for Local Stdio MCP / Mirror sync (ETag-cached)
+export function getVaultPackGzip(): { gz: Buffer; etag: string; noteCount: number; rawBytes: number } {
+  const b = getBundle();
+  if (b.vaultPackGzip) return b.vaultPackGzip;
+  const entries = readRawVaultEntries();
+  const payload = JSON.stringify({
+    version: "2.3.0",
+    syncCommit,
+    updatedAt,
+    noteCount: entries.length,
+    notes: entries.map((e) => ({ slug: e.slug, folder: e.folder, raw: e.text })),
+  });
+  const rawBuf = Buffer.from(payload, "utf8");
+  const gz = zlib.gzipSync(rawBuf, { level: 6 });
+  const hash = crypto.createHash("sha256").update(gz).digest("hex").slice(0, 16);
+  const etag = `"bcbrain-${syncCommit || "local"}-${hash}"`;
+  b.vaultPackGzip = { gz, etag, noteCount: entries.length, rawBytes: rawBuf.length };
+  return b.vaultPackGzip;
+}
+
+// Compact Context-Caching Bootstrap Pack for bots (Call Center / Voice / LINE OA / Dev IDE) -> 0ms basic answers
+export function getBootstrapPack(audience: "user" | "dev"): { text: string; etag: string; chars: number } {
+  const b = getBundle();
+  const cached = b.bootstrapPacks.get(audience);
+  if (cached) return cached;
+
+  const idx = getDirectIndex(b);
+  const lines: string[] = [];
+  if (audience === "user") {
+    lines.push(
+      `# BC Brain Bootstrap Pack (User / Call Center / Voice / LINE OA)`,
+      `updated: ${updatedAt}${syncCommit ? ` · source bcaiaccount@${syncCommit}` : ""} · 735 screens (1001–9070)`,
+      `กฎตอบลูกค้า: ภาษาไทยเข้าใจง่ายเป็นขั้นตอน ระบุชื่อเมนู+รหัส 4 หลัก ห้ามพูดชื่อตาราง SQL/โค้ด หากเกินข้อมูลให้เรียก quick_answer(audience:"user") หรือ lookup_menu`,
+      "",
+      "## รหัสเมนูยอดฮิต (Hot 4-Digit Menu Codes)",
+    );
+    const hotCodes = [
+      "1002", "1003", "1004", "1005", "1015", "1097", "1098",
+      "2001", "2007", "2020", "2034", "2050",
+      "3001", "3003", "3009", "3011", "3014", "3021", "3026",
+      "4001", "4005", "4011", "4013", "4014", "4017", "4026",
+      "5001", "5012", "5023",
+      "6001", "6012", "6023", "6024", "6032",
+      "7001", "7006", "7009", "7036", "7037",
+      "8001", "9001", "9006", "9029",
+    ];
+    for (const c of hotCodes) {
+      const m = idx.menuByCode.get(c);
+      if (m) lines.push(`- **${m.code}** ${m.name} (${m.menuPath})`);
+    }
+    const coreSlugs = [
+      "sales-pricing-packages",
+      "sales-support-implementation-contact",
+      "start-first-day",
+      "ts-common-period-closed",
+      "ts-stock-negative-control",
+      "ts-stock-cost-mismatch-rebuild",
+      "ts-arap-balance-recalc",
+      "ts-menu-missing-switchboard",
+      "howto-sale-invoice",
+      "howto-buy-invoice",
+      "howto-ar-receipt-fifo",
+      "howto-cheque-received",
+      "howto-tax-vat-input-output",
+      "howto-gl-period-open-close",
+      "faq-stock-cost",
+    ];
+    lines.push("", "## สรุปสั้นหัวข้อหลัก (TL;DR)");
+    for (const slug of coreSlugs) {
+      const n = b.notes.get(slug);
+      if (!n || n.audience === "dev") continue;
+      lines.push(`### ${n.title} [${n.slug}]`, getNoteTldr(n), "");
+    }
+    lines.push("สื่อทางการ: https://bcaccount.com · YouTube Playlist: https://www.youtube.com/playlist?list=PLO9P7tPZLXB0 · ใบเสนอราคา: https://bcaccount.com/quotation · LINE @bcaccount · โทร 089-922-3131");
+  } else {
+    lines.push(
+      `# BC Brain Bootstrap Pack (Developer / SQL / Schema / API)`,
+      `updated: ${updatedAt}${syncCommit ? ` · source bcaiaccount@${syncCommit}` : ""}`,
+      `กฎเหล็ก: PostgreSQL NUMERIC (ห้าม float/double), กรอง COALESCE(last_status, 0) = 0 เสมอ, ตาราง ic_trans_detail ต้องกรอง trans_flag + COALESCE(is_doc_copy,0)=0 + notpos, เขียนเอกสารผ่าน /process/* เท่านั้น (WritePolicy บล็อก /query/exec บนตารางเงิน/สต็อก)`,
+      "",
+      "## ตารางหลัก (Core SQL Tables — เรียก lookup_menu หรือ batch_read เมื่อต้องการรายละเอียด)",
+    );
+    const hotTables = [
+      "ic_trans", "ic_trans_detail", "ic_inventory", "ic_unit_use", "ic_warehouse", "ic_shelf", "ic_bom_header",
+      "ar_customer", "ap_supplier", "ap_ar_trans", "ap_ar_trans_detail",
+      "cb_trans", "cb_trans_detail", "cb_chq_list",
+      "gl_journal", "gl_journal_detail", "gl_chart_of_account", "gl_vat_list", "gl_wht_list",
+      "erp_option", "erp_doc_format", "erp_user",
+    ];
+    for (const t of hotTables) {
+      const entry = idx.tableByName.get(t);
+      if (entry) lines.push(`- \`${entry.table}\` → \`${entry.schemaSlug}\` (${entry.schemaTitle})`);
+    }
+    const coreDevSlugs = [
+      "dev-rules-accounting-sql",
+      "doctypes-overview",
+      "api-overview",
+      "api-process-engine",
+      "api-query-gateway",
+      "arch-overview",
+    ];
+    lines.push("", "## สรุปสั้นสถาปัตยกรรมและกฎกลาง (TL;DR)");
+    for (const slug of coreDevSlugs) {
+      const n = b.notes.get(slug);
+      if (!n) continue;
+      lines.push(`### ${n.title} [${n.slug}]`, getNoteTldr(n), "");
+    }
+  }
+
+  const text = lines.join("\n").trim();
+  const hash = crypto.createHash("sha256").update(text).digest("hex").slice(0, 16);
+  const pack = { text, etag: `"bcpack-${audience}-${syncCommit || "local"}-${hash}"`, chars: text.length };
+  b.bootstrapPacks.set(audience, pack);
+  return pack;
 }
 
 // long notes for ask_brain / quick_answer: intro plus matching "## " sections within budget, optionally stripping duplicated "ดูต่อที่เกี่ยวข้อง" footers

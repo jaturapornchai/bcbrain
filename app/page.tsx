@@ -4,7 +4,8 @@ import { graph, updatedAt } from "@/lib/vault";
 const MCP_URL = "https://brain.bcsmethai.com/mcp";
 const SKILL_URL = "https://brain.bcsmethai.com/skills/bcbrain/SKILL.md";
 const TOOLS = [
-  ["quick_answer", "ตอบเร็วสุดใน 1 ครั้ง (~2,000 อักษร ประหยัด Token ~85%) เหมาะกับ Call Center, LINE/Voice Bot และการถามเร็ว มีระบบ Abstain กันหลอน"],
+  ["quick_answer", "ตอบเร็วสุดใน 1 ครั้ง (~2,000 อักษร หรือส่ง mode: 'ultra' เหลือ ~600 อักษร TL;DR) เหมาะกับ Call Center, Voice/LINE Bot มีด่าน Abstain กันหลอน"],
+  ["batch_ask", "ถาม 1–5 คำถามพร้อมกันใน 1 รอบเดียว (ค่าเริ่มต้น mode: 'ultra') ลดรอบเรียก LLM สำหรับคำถามหลายประเด็น"],
   ["lookup_menu", "ค้นรหัสเมนู 4 หลัก (1001–9070), ชื่อเมนู หรือชื่อตาราง SQL แบบ O(1) ใน < 1 ms พร้อมลิงก์โน้ตที่เกี่ยวข้องทันที"],
   ["batch_read", "อ่าน 1–5 โน้ตพร้อมกันใน 1 รอบ (รองรับตัดเฉพาะหัวข้อตาม query และจำกัดความยาว) ลดรอบการเรียก read_note ซ้ำ"],
   ["ask_brain", "ถามแบบสังเคราะห์หลายโน้ต (กรอง audience: user/dev/all) พร้อมลิงก์รูปภาพ & YouTube อัตโนมัติ และบริบทกราฟ 1 ทอด (รองรับ compact: true)"],

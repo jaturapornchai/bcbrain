@@ -11,10 +11,15 @@
 ## For AI agents (MCP)
 - MCP endpoint (Streamable HTTP): https://brain.bcsmethai.com/mcp
 - Public and read-only: no key or auth header needed.
-- Tools (9 tools — speed-first, zero-overhead stateless JSON-RPC + LRU cache):
-  - `quick_answer(question, audience?, max_chars?, include_media?)` — **FASTEST default** for real-time Q&A, Call Center, voice/LINE bots, and focused lookups: 1 single call (~2,000 chars, ~85% fewer tokens than `ask_brain`), strict `🛑 Abstain` guardrail, optional compact 1-line media
+- Tools (10 tools — dedicated raw HTTP sidecar + LRU Buffer cache + pre-split sections):
+  - `quick_answer(question, audience?, mode?, max_chars?, include_media?)` — **FASTEST default**: 1 call (~2,000 chars `normal`, or ~600-char TL;DR with `mode: "ultra"` for voice/LINE bots), strict `🛑 Abstain` guardrail
+  - `batch_ask(questions, audience?, mode?, max_chars_per_answer?, include_media?)` — answer 1–5 questions in ONE single MCP call (defaults to `mode: "ultra"`)
   - `lookup_menu(query, audience?, limit?)` — **instant O(1)** lookup for 4-digit menu codes (`1001`–`9070`), legacy dotted codes (`4.13`), Thai menu names, or SQL table names (`ic_trans`, `gl_journal`, etc. in `dev`/`all` mode)
   - `batch_read(slugs, audience?, query?, max_chars_per_note?, strip_links?)` — read 1–5 notes in ONE single call with optional query-focused section excerpting and strict audience isolation
+- Fast Cacheable REST & Local Mirror Endpoints:
+  - `GET https://brain.bcsmethai.com/api/fast?q=...&audience=user&mode=ultra` (or `?menu=4013`) — Edge-cacheable REST (`s-maxage=300`, ETag)
+  - `GET https://brain.bcsmethai.com/api/bootstrap-pack?audience=user|dev` — compact Prompt-Caching bootstrap pack (`0 ms` basic answers for bots)
+  - `GET https://brain.bcsmethai.com/api/vault-pack` — ETag-cached gzipped full vault (`~670 KB`) for zero-RTT Local Stdio MCP (`node scripts/mcp-stdio.ts --sync`)
   - `ask_brain(question, audience?, compact?, max_notes?)` — multi-note synthesis (`audience`: `"all" | "user" | "dev"`), ready-to-share `Media & Reference Links` (YouTube tutorials + `bcaccount.com` screenshots + website pages), and 1-hop Connected Graph Context
   - `search_brain(query, limit?, audience?)` — BM25 length-normalized Thai + 4-digit menu code + SQL identifier search (default `limit=5` for low latency) with `images` and `videos` media arrays
   - `find_media(query?, kind?, limit?, audience?)` — returns structured JSON of official screenshot URLs (`https://bcaccount.com/...`), YouTube video/playlist URLs (`PLO9P7tPZLXB0` with `thumbnailUrl` and `embedUrl`), and website pages

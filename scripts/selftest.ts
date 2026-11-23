@@ -21,7 +21,8 @@ registerHooks({
 });
 
 const { GROUPS, RELATION_TYPES, groupOf, inferRelation, matchesAudience } = await import("../lib/groups.ts");
-const { collectRelatedMedia, connectedNeighbors, excerpt, expandSynonyms, extractNoteMedia, findMedia, getNote, graph, lookupDirect, parseYouTubeUrl, renderNote, resolveBcImageUrl, search, searchWithMeta, stripSeeAlso, terms, traverseGraph, vault } = await import("../lib/vault.ts");
+const { collectRelatedMedia, connectedNeighbors, excerpt, excerptNote, expandSynonyms, extractNoteMedia, findMedia, getBootstrapPack, getNote, getNoteTldr, getVaultPackGzip, graph, lookupDirect, parseYouTubeUrl, renderNote, resolveBcImageUrl, search, searchWithMeta, stripSeeAlso, terms, traverseGraph, vault } = await import("../lib/vault.ts");
+const { dispatchJsonRpcRaw, runFastRestQuery } = await import("../lib/mcp-engine.ts");
 type NoteType = import("../lib/vault.ts").Note;
 
 // 1. Groups & Audience contract
@@ -463,4 +464,30 @@ assert.equal(tUser.tables.length, 0, "lookupDirect('ic_trans', 'user') strictly 
 const stripped = stripSeeAlso("# หัวข้อ\n\nเนื้อหาหลัก\n\n---\n\n## ดูต่อที่เกี่ยวข้อง\n- [[index]]");
 assert.ok(!stripped.includes("ดูต่อที่เกี่ยวข้อง") && stripped.includes("เนื้อหาหลัก"), "stripSeeAlso drops duplicated footer");
 
-console.log(`selftest ok (1005=${JSON.stringify(lang1005.hits.slice(0, 3).map((h) => h.slug))}, 1015=${fmt1015.hits[0]?.slug})`);
+// 14. Pre-split excerptNote, TL;DR, ultra mode, batch_ask, bootstrap-pack & gzipped vault-pack
+const saleNote = getNote("howto-sale-invoice")!;
+const saleTldr = getNoteTldr(saleNote);
+assert.ok(saleTldr.length > 40 && saleTldr.length <= 520, `getNoteTldr concise (${saleTldr.length})`);
+const fastEx = excerptNote(saleNote, terms("ขายสินค้าติดลบ"), 900, true);
+assert.ok(!fastEx.includes("## ดูต่อที่เกี่ยวข้อง") && fastEx.length <= 1200, "excerptNote strips footer cleanly");
+
+const bootUser = getBootstrapPack("user");
+assert.ok(bootUser.text.includes("**4013**") && !bootUser.text.includes("ic_trans_detail"), "bootstrap-pack(user) has hot menus & no dev SQL tables");
+const bootDev = getBootstrapPack("dev");
+assert.ok(bootDev.text.includes("`ic_trans`") && bootDev.text.includes("NUMERIC"), "bootstrap-pack(dev) has core SQL tables & rules");
+
+const vpack = getVaultPackGzip();
+assert.ok(vpack.gz[0] === 0x1f && vpack.gz[1] === 0x8b && vpack.noteCount >= 365 && vpack.etag.startsWith('"bcbrain-'), "getVaultPackGzip produces valid gzip & ETag");
+
+const ultraRes = runFastRestQuery({ q: "เปิดบิลขายออกใบกำกับภาษีทำยังไง", audience: "user", mode: "ultra" });
+assert.ok(ultraRes.ok && !ultraRes.abstained && ultraRes.answer.length < 1100, `ultra mode compact (${ultraRes.answer.length})`);
+
+const batchAskRaw = dispatchJsonRpcRaw({
+  jsonrpc: "2.0",
+  id: 77,
+  method: "tools/call",
+  params: { name: "batch_ask", arguments: { questions: ["เช็คเด้งทำยังไง", "สูตรทำแกงเขียวหวานไก่ใส่กะทิสด"], audience: "user", mode: "ultra" } },
+});
+assert.ok(batchAskRaw && batchAskRaw.includes("Q1:") && batchAskRaw.includes("Q2:") && batchAskRaw.includes("🛑 Abstain"), "batch_ask answers grounded Q1 and abstains Q2");
+
+console.log(`selftest ok (1005=${JSON.stringify(lang1005.hits.slice(0, 3).map((h) => h.slug))}, 1015=${fmt1015.hits[0]?.slug}, pack=${(vpack.gz.length / 1024).toFixed(0)}KB gz)`);
