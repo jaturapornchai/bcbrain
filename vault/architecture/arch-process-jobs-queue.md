@@ -5,6 +5,7 @@ tags: [architecture, process-queue, redis-streams, outbox, autoscaler, worker, c
 aliases: ["JobEngine", "proc_jobs_engine", "bc_process_job", "bc_process_outbox", "procqueue AutoScaler", "Distributed Worker Daemon", "คิวประมวลผลเบื้องหลัง BC"]
 sources:
   - backend/internal/application/process/proc_jobs_engine.go:1-1880
+  - backend/internal/application/process/proc_jobs_gl.go:15-238
   - backend/internal/platform/procqueue/types.go:1-125
   - backend/internal/platform/procqueue/autoscaler.go:1-367
   - backend/internal/platform/procqueue/resilient_broker.go:1-26
@@ -53,6 +54,10 @@ sources:
   2. **Server-Aware `AutoScaler` + `DynamicGate`**: สุ่มวัด CPU/RAM (`gopsutil`) และ PostgreSQL Pool ทุก `1.5s` โดยสงวน Pool ไว้ให้ HTTP หน้าเว็บ `DBReserveRatio = 0.35` (35%) พร้อมวงจร **AIMD** ลดจำนวน Worker ลงครึ่งหนึ่งเมื่อ latency เฉลี่ย `> 2000ms` หรือเกิด DB contention (`40P01`, `40001`, `55P03`) และค่อยๆ คืนค่าเมื่อทำเร็ว `< 400ms` ต่อเนื่อง 5 ครั้ง
   3. **Atomic Shard Commit & Retry (`executeShardWithRetry`, `executeShardOnce`)**: ล็อกแถว `bc_process_job_shard ... FOR UPDATE OF s`, รันด้วย `*big.Rat` (เช่น `aggDebt`, `aggChq`, `aggBill` สำหรับ AR/AP), Retry สูงสุด `3` ครั้งเมื่อเจอ PG deadlock/serialization แล้วอัปเดต `completed_shards` / `processed_items` ใน Commit เดียวกับผลลัพธ์
 - **Auto-Chaining (`finalizeJob`)**: หาก `stock_rebuild` สำเร็จและ `erp_option.inventory_gl_post == 1` (`autoChainGl` ไม่เป็น false) ระบบจะแตกงานลูก `gl_rebuild` สำหรับเอกสารที่ต้นทุนเปลี่ยน (`changedDocs`) และ `chainNext` ทั้งหมดใน Transaction เดียวก่อน Commit
+- **GL Micro-Batch Shards & Deadlock-Free Locking (`proc_jobs_gl.go:49-239`)**:
+  - `buildGLRebuildDocsQuery` / `resolveGLRebuildDocsTx` รวบรวมเอกสารงวดบัญชีเปิด (`erp_account_period.status = 0` และไม่ทับใบสำคัญคีย์มือ `gl_journal.trans_direct = 1`) ครบทั้ง **6 แหล่ง** (`ic_trans` ปกติ, `ap_ar_trans` `19/239`, `ic_trans` template-only เช่น `72`, `as_trans` `1802`, ใบยกเลิก `ic_trans` และใบยกเลิก `ap_ar_trans`)
+  - `rebuildGLShardTx` ล็อกลำดับเดียวกับ `lockTransDoc`: ล็อก per-document `pg_advisory_xact_lock(hashtext('ic_trans:<docNo>:<transFlag>'))` เรียงลำดับ hash ก่อนแล้วจึงขอ `lockGLShared` ทำให้การบันทึก POS/ขายเอกสารอื่นทำงานขนานได้โดยไม่ถูกบล็อก
+  - ก่อน Commit ตรวจ **Double-Entry Invariant** (`SUM(debit) == SUM(credit)`) ด้วย `*big.Rat` (`RoundHalfUp` 2 ตำแหน่ง) ครบทุกเอกสารใน Shard หากไม่สมดุลจะ Rollback ทันที
 
 ---
 

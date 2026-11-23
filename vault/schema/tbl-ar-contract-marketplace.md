@@ -12,6 +12,7 @@ sources:
   - backend/internal/application/process/public_bill_pay.go:187-212
   - backend/internal/application/process/marketplace_reconcile.go:153-246
   - backend/internal/application/process/sme_thai_pack.go:1440-1476
+  - backend/internal/application/process/sme_thai_pack.go:1782-1841
   - backend/internal/application/process/trans_party.go:200-255
 ---
 
@@ -69,7 +70,7 @@ sources:
 | ตาราง (ที่มา) | PK / Unique / Index | คอลัมน์สำคัญทางธุรกิจ |
 |---|---|---|
 | `ar_public_bill_link` (`public_bill_pay.go:187-209`) | `doc_no VARCHAR(30) PRIMARY KEY` | ลิงก์รับชำระเงินออนไลน์ + แนบสลิป: `cust_code`, `status` (`OPEN`/`PAID` ฯลฯ), `expires_at`, `promptpay_id`, `wht_rate`, `wht_income_type`, `slip_paid_amount`, `slip_wht_deducted`, `slip_transfer_ref`, `slip_transfer_date`, `slip_transfer_time`, `slip_payer_note`, `slip_mime`, `slip_data_base64`, `slip_submitted_at`, `receipt_doc_no`, `created_by`, `updated_at` |
-| `ar_mobile_quick_bill` (`sme_thai_pack.go:1440-1465`) | `doc_no VARCHAR(40) PRIMARY KEY` | ออกบิลด่วน 30 วินาทีบนมือถือพร้อม PromptPay QR: `doc_type` (`INVOICE`/`QUOTATION`), `doc_date`, `due_date`, `cust_code`, `cust_name`, `cust_tax_id`, `vat_type`, `before_vat`, `vat_amount`, `total_amount`, `promptpay_id`, `promptpay_payload`, `share_path`, `status`, `lines_json JSONB`, `remark` |
+| `ar_mobile_quick_bill` (`sme_thai_pack.go:1440-1465, 1782-1841`) | `doc_no VARCHAR(40) PRIMARY KEY` | ออกบิลด่วน 30 วินาทีบนมือถือพร้อม PromptPay QR: `doc_type` (`INVOICE`/`QUOTATION`), `doc_date`, `due_date`, `cust_code`, `cust_name`, `cust_tax_id`, `vat_type`, `before_vat`, `vat_amount`, `total_amount`, `promptpay_id`, `promptpay_payload`, `share_path`, `status`, `lines_json JSONB`, `remark` *(การลบผ่าน `deleteMobileQuickBillTx` ล็อก `FOR UPDATE` ทั้ง `ar_mobile_quick_bill` และ `ar_public_bill_link`, ปฏิเสธหาก `status = 'RECEIPTED'` หรือ `receipt_doc_no <> ''` และลบลิงก์สาธารณะพร้อมกันเฉพาะกรณีที่มีแถวใน `ar_mobile_quick_bill` เพื่อไม่กระทบเอกสาร AR ปกติ)* |
 | `ar_marketplace_connection` (`marketplace_reconcile.go:210-224`) | `id BIGSERIAL PRIMARY KEY`, `UNIQUE (platform, shop_id)` | ตั้งค่าเชื่อมต่อร้านค้า (`SHOPEE`/`TIKTOK`/`LAZADA`): `platform`, `shop_id`, `shop_name`, `auto_sync_enabled BOOLEAN`, `default_bank_account`, `default_revenue_account`, `oauth_status`, `last_sync_at`, `updated_at` *(เก็บ config เชิงบัญชีแยกต่างหาก ไม่นำข้อมูล credential ออกเผยแพร่)* |
 | `ar_marketplace_settlement` (`marketplace_reconcile.go:153-183,206-208`) | `batch_doc_no VARCHAR(50) PRIMARY KEY`; `idx_ar_marketplace_settlement_hash`, `_date` | หัวกระทบยอดเงินโอนจาก Marketplace: `platform`, `settlement_date`, `order_count`, `gross_sales`, `total_platform_fee`, `total_payment_fee`, `total_shipping_diff`, `total_ads_fee`, `total_refund`, `total_fees`, `fee_vat_amount`, `wht_deducted`, `expected_payout`, `actual_bank_received`, `variance_amount`, `bank_account_code`, `revenue_account_code`, `fee_expense_account_code`, `shipping_expense_account_code`, `gl_doc_no`, `abb_doc_no`, `batch_hash` |
 | `ar_marketplace_settlement_detail` (`marketplace_reconcile.go:185-204`) | `PRIMARY KEY (batch_doc_no, line_number)` | รายละเอียดระดับคำสั่งซื้อ (`order_id`, `order_date`, `gross_sales`, `platform_fee`, `payment_fee`, `shipping_diff`, `ads_fee`, `refund_amount`, `fee_vat_amount`, `wht_deducted`, `net_payout`) |
