@@ -381,11 +381,34 @@ func TestHTTPEndpointsAndMCPTools(t *testing.T) {
 	}
 
 	resp, _ = http.Get(ts.URL + "/api/fast?menu=4013&audience=user")
+	fastEtag := resp.Header.Get("ETag")
 	var fastRes FastRestResult
 	_ = json.NewDecoder(resp.Body).Decode(&fastRes)
 	resp.Body.Close()
-	if !fastRes.OK || !strings.Contains(fastRes.Answer, "**4013**") {
-		t.Fatalf("/api/fast?menu=4013 failed: %+v", fastRes)
+	if !fastRes.OK || !strings.Contains(fastRes.Answer, "**4013**") || fastEtag == "" {
+		t.Fatalf("/api/fast?menu=4013 failed: etag=%q res=%+v", fastEtag, fastRes)
+	}
+	// Regression: default JSON /api/fast ETag must stay deterministic across uncached->cached calls and return 304
+	reqFast304, _ := http.NewRequest("GET", ts.URL+"/api/fast?menu=4013&audience=user", nil)
+	reqFast304.Header.Set("If-None-Match", fastEtag)
+	respFast304, _ := http.DefaultClient.Do(reqFast304)
+	respFast304.Body.Close()
+	if respFast304.StatusCode != 304 {
+		t.Fatalf("/api/fast (json) expected 304 on If-None-Match %s, got %d", fastEtag, respFast304.StatusCode)
+	}
+	// Also verify query-mode /api/fast (uncached -> cached) returns 304 in default JSON format
+	respQ1, _ := http.Get(ts.URL + "/api/fast?q=%E0%B9%80%E0%B8%9B%E0%B8%B4%E0%B8%94%E0%B8%9A%E0%B8%B4%E0%B8%A5%E0%B8%82%E0%B8%B2%E0%B8%A2&audience=user&mode=ultra")
+	fastQEtag := respQ1.Header.Get("ETag")
+	respQ1.Body.Close()
+	if respQ1.StatusCode != 200 || fastQEtag == "" {
+		t.Fatalf("/api/fast?q=... call 1 failed: status=%d etag=%q", respQ1.StatusCode, fastQEtag)
+	}
+	reqQ304, _ := http.NewRequest("GET", ts.URL+"/api/fast?q=%E0%B9%80%E0%B8%9B%E0%B8%B4%E0%B8%94%E0%B8%9A%E0%B8%B4%E0%B8%A5%E0%B8%82%E0%B8%B2%E0%B8%A2&audience=user&mode=ultra", nil)
+	reqQ304.Header.Set("If-None-Match", fastQEtag)
+	respQ304, _ := http.DefaultClient.Do(reqQ304)
+	respQ304.Body.Close()
+	if respQ304.StatusCode != 304 {
+		t.Fatalf("/api/fast?q=... (json) expected 304 on If-None-Match %s, got %d", fastQEtag, respQ304.StatusCode)
 	}
 
 	resp, _ = http.Get(ts.URL + "/mcp/events?snapshot=1")

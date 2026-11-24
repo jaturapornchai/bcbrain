@@ -384,7 +384,27 @@ func (s *Server) handleFast(w http.ResponseWriter, r *http.Request) {
 	if commit == "" {
 		commit = "local"
 	}
-	sum := sha256.Sum256(body)
+	// Hash deterministic content only (exclude volatile telemetry fields ms & cached so ETag + 304 works on JSON)
+	etagPayload, _ := json.Marshal(struct {
+		Format     string     `json:"f"`
+		Kind       string     `json:"k"`
+		Audience   string     `json:"a"`
+		Mode       string     `json:"m"`
+		Confidence string     `json:"c"`
+		Abstained  bool       `json:"ab"`
+		Answer     string     `json:"ans"`
+		Hits       []EventHit `json:"h"`
+	}{
+		Format:     fmtMode,
+		Kind:       res.Kind,
+		Audience:   res.Audience,
+		Mode:       res.Mode,
+		Confidence: res.Confidence,
+		Abstained:  res.Abstained,
+		Answer:     res.Answer,
+		Hits:       res.Hits,
+	})
+	sum := sha256.Sum256(etagPayload)
 	etag := fmt.Sprintf(`"bcfast-%s-%s"`, commit, hex.EncodeToString(sum[:])[:12])
 	cacheHeader := "no-store"
 	if res.OK {
