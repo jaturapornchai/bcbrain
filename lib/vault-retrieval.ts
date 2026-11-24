@@ -1305,6 +1305,7 @@ export function queryErrorIndex(
   const qNorm = canonicalErrorKey(raw, normalizeText);
   const qStripped = strippedTemplateKey(raw, normalizeText);
   const scoreMap = new Map<number, number>();
+  const exactHits = new Set<number>();
 
   const bump = (idx: number, delta: number) => {
     const entry = index.entries[idx];
@@ -1313,15 +1314,29 @@ export function queryErrorIndex(
   };
 
   // 1. O(1) exact hash hits
-  for (const idx of index.exactMap.get(qNorm) ?? []) bump(idx, 120);
+  for (const idx of index.exactMap.get(qNorm) ?? []) {
+    if (matchesAudience(index.entries[idx].audience, filter)) {
+      exactHits.add(idx);
+      bump(idx, 120);
+    }
+  }
   if (qStripped && qStripped !== qNorm) {
-    for (const idx of index.exactMap.get(qStripped) ?? []) bump(idx, 100);
+    for (const idx of index.exactMap.get(qStripped) ?? []) {
+      if (matchesAudience(index.entries[idx].audience, filter)) {
+        exactHits.add(idx);
+        bump(idx, 100);
+      }
+    }
   }
 
-  // 2. Inverted token posting lookup (fast O(postings))
-  const qTerms = [...new Set([...tokenize(qNorm), ...tokenize(qStripped)])];
+  // 2. Inverted token posting lookup (use stripped template terms so concrete IDs/dates do not dilute coverage)
+  const strippedToks = tokenize(qStripped);
+  const qTerms = [...new Set(strippedToks.length ? strippedToks : tokenize(qNorm))];
+  const qualified = new Set<number>(exactHits);
+
   if (qTerms.length) {
     const matchCounts = new Map<number, number>();
+    const rawTokenScores = new Map<number, number>();
     for (const t of qTerms) {
       const posting = index.tokenPostings.get(t);
       if (!posting) continue;
@@ -1331,21 +1346,41 @@ export function queryErrorIndex(
         const entry = index.entries[ei];
         if (!matchesAudience(entry.audience, filter)) continue;
         matchCounts.set(ei, (matchCounts.get(ei) ?? 0) + 1);
-        bump(ei, 10 * idf);
+        const add = 10 * idf;
+        rawTokenScores.set(ei, (rawTokenScores.get(ei) ?? 0) + add);
+        bump(ei, add);
       }
     }
 
-    // Bonus for substring containment, full term coverage, and troubleshoot folder authority
+    // Strict relevance & coverage gate BEFORE applying folder authority bonus (prevents out-of-domain Thai traps)
     for (const [ei, mCount] of matchCounts) {
       const normText = index.normTexts[ei];
       const stripped = index.strippedTexts[ei];
-      if (qNorm.length >= 5 && (normText.includes(qNorm) || qNorm.includes(normText))) {
-        bump(ei, 45);
-      } else if (qStripped.length >= 5 && stripped.length >= 5 && (stripped.includes(qStripped) || qStripped.includes(stripped))) {
-        bump(ei, 35);
-      }
+      const hasNormSubstr =
+        qNorm.length >= 6 &&
+        normText.length >= 6 &&
+        ((normText.includes(qNorm) && qNorm.length >= 8) || (qNorm.includes(normText) && normText.length >= 8));
+      const hasStrippedSubstr =
+        qStripped.length >= 6 &&
+        stripped.length >= 6 &&
+        ((stripped.includes(qStripped) && qStripped.length >= 8) || (qStripped.includes(stripped) && stripped.length >= 8));
+
+      const cov = mCount / qTerms.length;
+      const tokScore = rawTokenScores.get(ei) ?? 0;
+      const passesCoverage =
+        exactHits.has(ei) ||
+        hasNormSubstr ||
+        hasStrippedSubstr ||
+        (qTerms.length >= 2 ? mCount >= 2 && cov >= 0.45 && tokScore >= 18 : tokScore >= 18);
+
+      if (!passesCoverage) continue;
+      qualified.add(ei);
+
+      if (hasNormSubstr) bump(ei, 45);
+      else if (hasStrippedSubstr) bump(ei, 35);
+
       if (mCount === qTerms.length) bump(ei, 25);
-      else if (mCount / qTerms.length >= 0.6) bump(ei, 10);
+      else if (cov >= 0.6) bump(ei, 10);
 
       const folder = index.entries[ei].folder;
       if (folder === "troubleshoot") bump(ei, 12);
@@ -1353,9 +1388,10 @@ export function queryErrorIndex(
     }
   }
 
-  // Require meaningful match when not an exact hit
-  const ranked = [...scoreMap.entries()]
-    .filter(([, sc]) => sc >= 14)
+  // Only emit entries that passed exact, substring, or strict multi-term coverage gating
+  const ranked = [...qualified]
+    .map((ei): [number, number] => [ei, scoreMap.get(ei) ?? 0])
+    .filter(([, sc]) => sc >= 18)
     .sort((a, b) => b[1] - a[1] || a[0] - b[0]);
 
   const out: ErrorLookupEntry[] = [];

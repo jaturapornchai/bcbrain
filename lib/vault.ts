@@ -2009,7 +2009,9 @@ export function excerptNote(
   const trimmed = trimBlockAware(out, budget, trimOpts);
   let cut = trimmed.text;
   if (trimmed.truncated) {
-    cut = cut.endsWith("```") ? `${cut}\n…` : `${cut} …`;
+    const lastLine = cut.slice(cut.lastIndexOf("\n") + 1).trim();
+    const endsAtomicLine = lastLine.endsWith("```") || lastLine.startsWith("|") || lastLine.endsWith("|");
+    cut = endsAtomicLine ? `${cut}\n…` : `${cut} …`;
   }
   return `${cut}\n\n[excerpt — ${omitted.length ? `omitted sections: ${omitted.slice(0, 6).join(" | ")}${omitted.length > 6 ? " …" : ""}. ` : ""}read_note for the full note]`;
 }
@@ -2165,7 +2167,9 @@ export function excerpt(
   const trimmed = trimBlockAware(out, budget, trimOpts);
   let cut = trimmed.text;
   if (trimmed.truncated) {
-    cut = cut.endsWith("```") ? `${cut}\n…` : `${cut} …`;
+    const lastLine = cut.slice(cut.lastIndexOf("\n") + 1).trim();
+    const endsAtomicLine = lastLine.endsWith("```") || lastLine.startsWith("|") || lastLine.endsWith("|");
+    cut = endsAtomicLine ? `${cut}\n…` : `${cut} …`;
   }
   return `${cut}\n\n[excerpt — ${omitted.length ? `omitted sections: ${omitted.slice(0, 6).join(" | ")}${omitted.length > 6 ? " …" : ""}. ` : ""}read_note for the full note]`;
 }

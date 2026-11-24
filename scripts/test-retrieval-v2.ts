@@ -132,7 +132,33 @@ console.log(`[INIT] warmVaultIndexes() completed in ${warmMs.toFixed(1)} ms (${v
   const exCompat = excerpt("intro\n## A\n" + "x".repeat(50) + "\n## B gold\ngold", ["gold"], 30);
   assert.ok(exCompat.includes("omitted sections: A") && exCompat.includes("read_note for the full note]"), "excerpt suffix contract preserved");
 
-  console.log(`[1] Block-Aware Trimming OK (Thai ratio=${ratio.toFixed(2)} chars/tok, table/list/code/token guards passed)`);
+  // (f) Full-vault sweep across all 366 notes x budgets [300, 700, 1200]: zero corrupted table rows & zero unclosed code fences
+  const sweepTerms = ["ราคา", "ตาราง", "sql", "เมนู"];
+  let badTableRows = 0;
+  let badCodeFences = 0;
+  for (const n of vault().values()) {
+    for (const b of [300, 700, 1200]) {
+      const ex = excerptNote(n, sweepTerms, b, true);
+      const bodyPart = ex.split("\n\n[excerpt —")[0] ?? ex;
+      if (((bodyPart.match(/^```/gm) ?? []).length % 2) !== 0) badCodeFences++;
+      let inCode = false;
+      for (const line of bodyPart.split("\n")) {
+        const tr = line.trim();
+        if (tr.startsWith("```")) {
+          inCode = !inCode;
+          continue;
+        }
+        if (inCode) continue;
+        if (tr.startsWith("|") && (!tr.endsWith("|") || tr.includes("| …"))) {
+          badTableRows++;
+        }
+      }
+    }
+  }
+  assert.equal(badTableRows, 0, `full-vault excerptNote sweep must have 0 corrupted table rows (got ${badTableRows})`);
+  assert.equal(badCodeFences, 0, `full-vault excerptNote sweep must have 0 unclosed code fences (got ${badCodeFences})`);
+
+  console.log(`[1] Block-Aware Trimming OK (Thai ratio=${ratio.toFixed(2)} chars/tok, 0 bad table rows / 0 unclosed fences across ${vault().size * 3} sweeps)`);
 }
 
 // ============================================================
@@ -328,6 +354,22 @@ console.log(`[INIT] warmVaultIndexes() completed in ${warmMs.toFixed(1)} ms (${v
     lookupError("ยอดมัดจำมากกว่ามูลค่าสุทธิ", "user", 3)[0]?.fixSnippet.includes("ลดยอดตัดมัดจำ"),
     "ยอดมัดจำมากกว่ามูลค่าสุทธิ returns inline cause+fix snippet",
   );
+
+  // Strict out-of-domain Thai trap rejection on lookupError (must return 0 false-positive hits!)
+  for (const trap of [
+    "สูตรทำแกงเขียวหวานไก่ใส่กะทิสด",
+    "วิธีปลูกทุเรียนภูเขาไฟ",
+    "ยานอวกาศ ดาวอังคาร บั้งไฟพญานาค คอนโดหรู",
+    "วิธีซ่อมแอร์บ้านน้ำหยดและล้างคอยล์เย็น",
+    "สูตรหมักหมูย่างเกาหลีน้ำจิ้มแจ่ว",
+  ]) {
+    const trapHits = lookupError(trap, "user", 5);
+    assert.equal(
+      trapHits.length,
+      0,
+      `lookupError("${trap}") must return 0 hits on out-of-domain trap (got ${JSON.stringify(trapHits.map((h) => `${h.slug}:${h.errorText}`))})`,
+    );
+  }
 
   // Strict cross-zone isolation check on dev-only error string
   const devOnlyErr = "รายการนี้เลือกประเภทเป็นเงินเชื่อ / เครดิต ระบบปิดการรับ/จ่ายชำระเงิน";
