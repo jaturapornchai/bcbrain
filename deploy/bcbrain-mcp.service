@@ -1,22 +1,31 @@
 [Unit]
-Description=BC Brain Fast MCP & REST Sidecar (brain.bcsmethai.com/mcp, port 3961)
+Description=BC Brain Compiled Go MCP & REST Sidecar (brain.bcsmethai.com/mcp, port 3961)
 After=network.target
 
 [Service]
 Type=simple
 Environment=PORT=3961
 Environment=HOSTNAME=127.0.0.1
-Environment=NODE_ENV=production
+Environment=BC_GO_PACK_FILE=/opt/bcbrain/public/go-brain-pack.json
 WorkingDirectory=/opt/bcbrain
-ExecStart=/usr/bin/node scripts/mcp-server.ts
+ExecStart=/opt/bcbrain/bcbrain-mcp
 Restart=always
 RestartSec=2
-# least privilege: throwaway user, read-only system, no privilege escalation
+# resource bounds (~20 MB typical RSS for compiled Go sidecar)
+MemoryHigh=96M
+MemoryMax=160M
+# least privilege: throwaway user, read-only system, strict kernel/fs hardening
 DynamicUser=yes
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+LockPersonality=yes
 
 [Install]
 WantedBy=multi-user.target
