@@ -12,7 +12,7 @@
 เปิดสาธารณะ 3 ช่องทางพร้อมรองรับ Google SEO & AI Search (GEO/AEO):
 - **หน้าแรก (`/`)**: สมอง 3 มิติพร้อมตัวสลับโหมด (`ทั้งหมด` · `ผู้ใช้ทั่วไป` · `นักพัฒนา (Dev)`)
 - **หน้าคลังโน้ต (`/n`, `/n/[slug]`)**: ค้นหาและอ่านรายโน้ต รองรับ `?mode=all|user|dev` และ `?q=...` พร้อม JSON-LD (`Organization`, `WebSite`, `SoftwareApplication`, `CollectionPage`, `BreadcrumbList`, `TechArticle`), OpenGraph/Twitter Card (`/icon.png`, `/opengraph-image.png`), `/robots.txt`, `/sitemap.xml` และ `/llms.txt`
-- **MCP Server (`/mcp`, `v2.3.0`, Dedicated Raw HTTP Sidecar `:3961`)**: แยกออกจาก Next.js App Router เป็น Raw Node HTTP Sidecar (`scripts/mcp-server.ts`) ด้านหลัง Caddy พร้อม **10 Tools** (`quick_answer` โหมด `normal`/`ultra`, `batch_ask`, `lookup_menu`, `batch_read`, ...), Pre-Split Sections + TL;DR, LRU Pre-Serialized JSON Cache, JSON-RPC Batch, Strict `🛑 Abstain`, REST Edge Endpoints (`/api/fast`, `/api/bootstrap-pack`, `/api/vault-pack`) และ Local Stdio MCP (`scripts/mcp-stdio.ts`, `< 1 ms`)
+- **MCP & REST Sidecar (`/mcp`, `/api/*`, `v3.0.0`, Compiled Go 1.26 Zero-CGO Sidecar `:3961`, `< 1 ms`)**: แยกออกจาก Next.js App Router เป็น Compiled Go HTTP Sidecar (`cmd/bcbrain-mcp`) ด้านหลัง Caddy พร้อม **15 MCP Tools** (`quick_answer` โหมด `normal`/`fast`/`ultra` + Structured Facts, `batch_ask`, `lookup_menu`, `lookup_error`, `search_sections`, `get_facts`, `verify_reference`, `whats_new`, `batch_read`, `ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `read_note`, `list_notes`), Hybrid Multi-Signal RRF + Section BM25 + 256-dim Dense Semantic + Block-Aware Trimming, Runtime Grounding Verifier (`public/grounding-index.json`), Sanitized Gap Telemetry, **REST API + OpenAPI 3.1.0** (`/api/fast`, `/api/error`, `/api/sections`, `/api/facts`, `/api/whats-new`, `/api/verify`, `/api/gaps`, `/api/bootstrap-pack`, `/api/vault-pack`, `/api/openapi.json`, `/healthz`) และ Local Stdio MCP (`scripts/mcp-stdio.ts`, `< 1 ms`)
 
 | หน้าต่าง MCP LIVE Terminal แบบเรียลไทม์ (ลากย้าย & ปรับขนาดได้) | คลังความรู้แยกโซน (`ทั้งหมด` · `ผู้ใช้ทั่วไป` · `นักพัฒนา`) |
 |---|---|
@@ -34,35 +34,37 @@
      6. `npm run test:deep` (`scripts/deep-test.ts` — 6 มิติ, Top1/Top5 100%, 0 isolation leaks)
      7. `node scripts/deploy.mjs` → `npm run build` + แพ็ก standalone/public/vault + สลับ `/opt/bcbrain` แบบ atomic (สำรอง `/opt/bcbrain.prev`) + ยิง `scripts/mcp-eval.mjs https://brain.bcsmethai.com/mcp` บน Production จริง (**หากไม่ผ่านจะ rollback `/opt/bcbrain.prev` บนเซิร์ฟเวอร์อัตโนมัติทันที**)
 2. `npm run build` → `prebuild` รัน `scripts/scan-secrets.mjs` สแกนความลับใน `vault/` และไฟล์ skill หากพบ build จะหยุดทันที (พิมพ์เฉพาะ `ไฟล์:บรรทัด`)
-3. Caddy (`brain.bcsmethai.com`) แยกเส้นทางความเร็วสูง: `/mcp`, `/mcp/events` (`flush_interval -1`), `/api/fast`, `/api/bootstrap-pack`, `/api/vault-pack` → **`127.0.0.1:3961`** (`bcbrain-mcp.service` Raw Node HTTP) และหน้าเว็บ `/`, `/n/*` → **`127.0.0.1:3951`** (`bcbrain.service` Next.js)
+3. Caddy (`brain.bcsmethai.com`) แยกเส้นทางความเร็วสูง: `@mcp_fast path /mcp /api/* /healthz` และ `/mcp/events` (`flush_interval -1`) → **`127.0.0.1:3961`** (`bcbrain-mcp.service` Compiled Go Sidecar `< 1 ms`) และหน้าเว็บ `/`, `/n/*` → **`127.0.0.1:3951`** (`bcbrain.service` Next.js)
 
 โครงสร้างโค้ดหลัก:
 - `lib/groups.ts` — นิยาม 16 โฟลเดอร์ (`root` = `both`, 9 โฟลเดอร์โซน `user`, 6 โฟลเดอร์โซน `dev`), สี, ชื่อภาษาไทย, `groupOf()`, `matchesAudience()`, `RelationType`, `RELATION_LABEL`, `inferRelation()`
-- `lib/vault.ts` — Lean In-Memory GraphRAG: โหลด `vault/` (หรือแพ็ก gzip จาก `BC_VAULT_PACK_FILE`) แบบ atomic `VaultBundle`, สร้างเส้นประสาทเชื่อมโยงอัตโนมัติ 4 ชั้น, Pre-Split & Pre-Normalized Sections (`excerptNote()` ไม่ split/regex ซ้ำต่อ query), Pre-Computed `tldr` สำหรับโหมด `ultra`, ดัชนี O(1) (`lookupDirect()`), `getBootstrapPack()` (Context Caching), `getVaultPackGzip()` (~670 KB gzip + ETag), อินเด็กซ์กลับด้าน pre-warmed (`warmVaultIndexes()`), ตัดคำไทย `Intl.Segmenter` + คำพ้องไทย-SQL + BM25 + 1-hop graph boost, ระบบวัดความมั่นใจกันหลอน (`searchWithMeta()`), พิกัดสมอง 3D (`computeBrainLayout()`), แคช HTML กัน XSS และ `traverseGraph()`
-- `lib/mcp-engine.ts`, `scripts/mcp-server.ts`, `scripts/mcp-stdio.ts` — ศูนย์กลาง Stateless JSON-RPC 2.0 MCP (`v2.3.0`, **10 Tools**) + Pre-Serialized LRU Cache (`512` รายการ) ใช้ร่วมกันทั้ง Raw Node HTTP Sidecar (`:3961`), Next.js `app/mcp/route.ts`, REST `/api/fast`, และ Local Stdio MCP (`< 1 ms`, auto-sync ผ่าน ETag ทุก 30 นาที)
+- `lib/vault.ts`, `lib/vault-retrieval.ts` — Lean In-Memory GraphRAG v3: โหลด `vault/` (หรือแพ็ก gzip จาก `BC_VAULT_PACK_FILE`) แบบ atomic `VaultBundle`, สร้างเส้นประสาทเชื่อมโยงอัตโนมัติ 4 ชั้น, Block-Aware Trimming (`trimBlockAware`), Pre-Split Sections + Section-Level Inverted BM25 (`searchSections`), 256-dim Dense Semantic Vectors + Multi-Signal RRF, Structured Facts Extractor (`[menu]`, `[rule]`, `[limit]`, `[error]`, `[formula]`), O(1) Thai Error-Message Index (`lookupError`), Temporal Recency (`getWhatsNew`), ดัชนี O(1) (`lookupDirect()`), `getBootstrapPack()`, `getVaultPackGzip()` (~675 KB gzip + ETag), ระบบวัดความมั่นใจกันหลอน (`searchWithMeta()`), พิกัดสมอง 3D (`computeBrainLayout()`), แคช HTML กัน XSS และ `traverseGraph()`
+- `cmd/bcbrain-mcp/*`, `scripts/export-go-pack.mjs` — Compiled Go 1.26 zero-CGO Single-Binary MCP & REST Sidecar (`v3.0.0`, **15 MCP Tools** + 10 REST Routes + OpenAPI 3.1 + Grounding Verifier + Section BM25 + Sanitized Gap Log + SSE `/mcp/events`) ตอบใน `< 1 ms` (~40 MB heap)
+- `lib/mcp-engine.ts`, `lib/grounding-runtime.ts`, `lib/gap-log.ts`, `lib/openapi.ts`, `scripts/mcp-server.ts`, `scripts/mcp-stdio.ts` — ศูนย์กลาง Stateless JSON-RPC 2.0 MCP (`v3.0.0`, **15 Tools**) + Runtime Ground-Truth Verifier + Sanitized Gap Telemetry + OpenAPI 3.1.0 Spec + Pre-Serialized LRU Cache (`512` รายการ) ใช้ร่วมกันทั้ง Next.js App Router, REST `/api/*`, และ Local Stdio MCP (`< 1 ms`, auto-sync ผ่าน ETag ทุก 30 นาที)
 - `lib/mcp-events.ts`, `app/mcp/events/route.ts` — Bus เหตุการณ์และสตรีม SSE (`/mcp/events`) สำหรับแสดง Terminal สดและปล่อยสัญญาณแสงบนสมอง 3D ทันทีเมื่อ `/mcp` ถูกเรียก (กรองความลับ/อีเมล/IP/เบอร์โทรอัตโนมัติ)
-- `app/api/fast/route.ts`, `app/api/bootstrap-pack/route.ts`, `app/api/vault-pack/route.ts` — REST Endpoints รองรับ CDN/Edge caching (`s-maxage=300..600`, `ETag` / `304`) สำหรับบอทและ Local Mirror
-- `scripts/detect-changes.mjs`, `scripts/sync-cache.mjs`, `scripts/verify-grounding.mjs`, `scripts/hourly-sync.mjs`, `scripts/deploy.mjs`, `scripts/load-env.mjs`, `scripts/install-hourly-task.mjs` — ชุดระบบอัปเดตสมองอัตโนมัติทุก 1 ชม. แบบอ่านอย่างเดียว + Incremental diff cache + 7 ด่านตรวจกันหลอน + deploy และ rollback อัตโนมัติ
+- `app/api/*/route.ts` — REST Endpoints รองรับ CDN/Edge caching (`ETag` / `304`): `/api/fast`, `/api/error`, `/api/sections`, `/api/facts`, `/api/whats-new`, `/api/verify`, `/api/gaps` (`no-store`), `/api/bootstrap-pack`, `/api/vault-pack`, `/api/openapi.json`
+- `scripts/detect-changes.mjs`, `scripts/sync-cache.mjs`, `scripts/verify-grounding.mjs`, `scripts/wiki-lint.mjs`, `scripts/symbol-truth.mjs`, `scripts/grounding-lock.mjs`, `scripts/export-grounding-index.mjs`, `scripts/hourly-sync.mjs`, `scripts/deploy.mjs`, `scripts/load-env.mjs`, `scripts/install-hourly-task.mjs` — ชุดระบบอัปเดตสมองอัตโนมัติทุก 1 ชม. แบบอ่านอย่างเดียว + Incremental diff cache + Wiki-Lint + Symbol/Column Grounding + 7 ด่านตรวจกันหลอน + Cross-Compile Go Sidecar + Atomic Deploy & Auto-Rollback
 - `components/Brain3D.tsx`, `components/Shell.tsx`, `app/page.tsx`, `app/n/page.tsx`, `app/n/[slug]/page.tsx` — หน้าเว็บสมอง 3 มิติ (ใช้พิกัดที่คำนวณจากเซิร์ฟเวอร์ทันที) และหน้าคลังโน้ตพร้อมตัวสลับโหมด 3 ปุ่ม
-- `app/layout.tsx`, `app/robots.ts`, `app/sitemap.ts`, `public/llms.txt`, `public/sync-meta.json`, `app/icon.png`, `app/opengraph-image.png`, `next.config.ts` — Metadata, OpenGraph/Twitter Image, Sitemap/Robots/LLMs index และ HTTP Security & `Cache-Control` headers
+- `app/layout.tsx`, `app/robots.ts`, `app/sitemap.ts`, `public/llms.txt`, `public/sync-meta.json`, `public/grounding-index.json`, `app/icon.png`, `app/opengraph-image.png`, `next.config.ts` — Metadata, OpenGraph/Twitter Image, Sitemap/Robots/LLMs index และ HTTP Security & `Cache-Control` headers
 - `.agents/skills/bcbrain/SKILL.md`, `public/skills/bcbrain/SKILL.md` — Skill `/bcbrain` สำหรับเชื่อมและเรียกใช้สมอง BC ผ่าน MCP (หรือ HTTP JSON-RPC fallback) ดาวน์โหลดได้ที่ `/skills/bcbrain/SKILL.md`
 
 ## Config
 | ค่า | ที่ไหน | ความหมาย |
 |---|---|---|
-| `PORT=3951` / `PORT=3961`, `HOSTNAME=127.0.0.1` | `deploy/bcbrain.service`, `deploy/bcbrain-mcp.service` | Next.js Web (`:3951`) + Raw HTTP MCP Sidecar (`:3961`) หลัง Caddy |
+| `PORT=3951` / `PORT=3961`, `HOSTNAME=127.0.0.1` | `deploy/bcbrain.service`, `deploy/bcbrain-mcp.service` | Next.js Web (`:3951`) + Compiled Go MCP & REST Sidecar (`:3961`) หลัง Caddy |
+| `BC_GO_PACK_FILE` | `deploy/bcbrain-mcp.service` | พาธไฟล์แพ็กความรู้ที่ Export ให้ Go Sidecar (`/opt/bcbrain/public/go-brain-pack.json`) |
 | `BC_DEPLOY_HOST` | `.env.local` (gitignored, ดู `.env.example`) | ปลายทาง SSH สำหรับ `scripts/deploy.mjs` และ `deploy/deploy.sh` |
-| `MAX_BODY_BYTES = 32768`, `RATE_LIMIT_MAX = 300` | `lib/mcp-engine.ts` | จำกัดขนาดคำขอ `/mcp` ไม่เกิน 32 KB และไม่เกิน 300 ครั้ง/นาทีต่อ IP พร้อม CORS |
-| `CACHE_MAX = 512`, `DEV_TTL_MS = 5000` | `lib/mcp-engine.ts`, `lib/vault.ts` | ขนาด Pre-Serialized LRU cache ของคำตอบ MCP และอายุแคช `VaultBundle` ในโหมด `dev` |
-| `Cache-Control` headers | `next.config.ts`, `app/mcp/route.ts` | `/llms.txt`, `/skills/*` (`max-age=300`), `/n`, `/n/*` (`max-age=60`), `/mcp` (`no-store`) |
+| `MAX_BODY_BYTES = 32768`, `RATE_LIMIT_MAX = 300` | `lib/mcp-engine.ts`, `cmd/bcbrain-mcp/main.go` | จำกัดขนาดคำขอ `/mcp` และ `POST /api/verify` ไม่เกิน 32 KB และไม่เกิน 300 ครั้ง/นาทีต่อ IP พร้อม CORS |
+| `CACHE_MAX = 512`, `DEV_TTL_MS = 5000` | `lib/mcp-engine.ts`, `cmd/bcbrain-mcp/mcp.go`, `lib/vault.ts` | ขนาด Pre-Serialized LRU cache ของคำตอบ MCP และอายุแคช `VaultBundle` ในโหมด `dev` |
+| `Cache-Control` headers | `next.config.ts`, `cmd/bcbrain-mcp/main.go` | `/llms.txt`, `/skills/*` (`max-age=300`), `/api/*` (`s-maxage=300..600` + ETag `304`), `/api/gaps` และ `/mcp` (`no-store`) |
 | โฟลเดอร์, สี, โซน `audience` | `lib/groups.ts` | แมป 16 โฟลเดอร์ (`root`, 9 user, 6 dev) → ชื่อไทย, สีเซลล์, `audience` |
-| กติกา AI สองโหมด & Speed-First | `app/mcp/route.ts` (`INSTRUCTIONS`), `vault/playbook/`, `vault/dev-playbook/` | แนะนำ `quick_answer` / `lookup_menu` / `batch_read` เพื่อตอบไวใน 1 รอบ พร้อมแยกโซน `user` / `dev` เข้มงวด |
+| กติกา AI สองโหมด & Speed-First | `lib/mcp-engine.ts` / `cmd/bcbrain-mcp/mcp.go`, `vault/playbook/`, `vault/dev-playbook/` | แนะนำ `quick_answer` / `lookup_menu` / `lookup_error` / `search_sections` / `verify_reference` เพื่อตอบไวและกันหลอน พร้อมแยกโซน `user` / `dev` เข้มงวด |
 | ยกเว้นบรรทัดที่ไม่ใช่ความลับ | ใส่ `secret-scan:allow` ในบรรทัดนั้น | ข้าม `scripts/scan-secrets.mjs` เฉพาะบรรทัดที่ตรวจยืนยันแล้ว |
 
 ไม่มี env ลับ ไม่มี API key ทั้งหน้าเว็บและ MCP เป็นระบบสาธารณะแบบอ่านอย่างเดียว (`.env.local` ใช้เฉพาะฝั่ง deploy เครื่องพัฒนาและถูก ignore ด้วย `.gitignore`)
 
 ## Dependency
-Node 24+ (`"type": "module"`, รัน `.ts` โดยตรงในเทสต์), Next.js 16.4 (standalone), React 19.3, three 0.187, `@modelcontextprotocol/sdk` 1.32, marked 18.1, yaml 2.9, zod 4.6, TypeScript 7 · เซิร์ฟเวอร์: systemd + Caddy
+Node 24+ (`"type": "module"`, รัน `.ts` โดยตรงในเทสต์), Go 1.26+ (zero-CGO compiled sidecar `cmd/bcbrain-mcp`), Next.js 16.4 (standalone), React 19.3, three 0.187, `@modelcontextprotocol/sdk` 1.32, marked 18.1, yaml 2.9, zod 4.6, TypeScript 7 · เซิร์ฟเวอร์: systemd + Caddy
 
 ## Usage example
 ```bash
@@ -71,45 +73,57 @@ npm run dev              # http://localhost:3000
 npx tsc --noEmit         # ตรวจ TypeScript
 npm test                 # selftest: groups, isolation, ตัดคำไทย, BM25, O(1) lookup, sync-cache, กัน XSS, ตัวสแกนความลับ
 npm run test:deep        # deep-test: 6 มิติ (ตัดคำ/คำพ้อง 27 ข้อ, ค้นหา 116 เคส, แยกโซน 366 โน้ต, กราฟ 3D/XSS/PNG, fuzz, throughput)
+node scripts/test-retrieval-v2.ts   # ทดสอบ retrieval v3 (block-aware trim, semantic RRF, facts, sections, error index, whats_new, traps)
+go vet -C cmd/bcbrain-mcp ./... && go test -C cmd/bcbrain-mcp -v ./...  # ทดสอบ Go Sidecar 15 Tools + REST + ETag 304
 npm run check            # ตรวจโน้ตใน vault (ส่ง path ของ bcaiaccount และ --strict เพื่อตรวจเข้มงวด)
 npm run check:drift      # ตรวจโน้ตแบบ --strict พร้อมรายงานโน้ตที่ไฟล์โค้ดใน D:/bcaiaccount แก้ใหม่กว่าโน้ต
-npm run verify:grounding # ตรวจความถูกต้องกันหลอน 6 มิติ (EOF + เมนู 735 หน้าจอ 1:1 + ตาราง SQL + Chi routes + shrink guard)
+npm run wiki:lint        # ตรวจคุณภาพ cross-note wikilinks และโครงสร้างคลังโน้ต (--strict)
+npm run verify:grounding # ตรวจความถูกต้องกันหลอน 6 มิติ (EOF + เมนู 735 หน้าจอ 1:1 + ตาราง SQL/คอลัมน์ + Chi routes + shrink guard)
+npm run grounding:index  # สร้าง public/grounding-index.json จากซอร์สโค้ดจริง (อ่านอย่างเดียว)
 npm run sync:check       # ตรวจว่า D:/bcaiaccount มีไฟล์เปลี่ยนหรือโน้ตได้รับผลกระทบอะไรบ้าง (อ่านอย่างเดียว)
 npm run sync:plan        # วางแผนสกัดความรู้ (เพิ่ม --json --diff เพื่อดู line-level diff เทียบ baseline)
 npm run sync:finalize    # รันครบ 7 ด่าน + deploy ขึ้น Production + ยิง mcp-eval + อัปเดต sync-meta/state
-npm run sync:dry         # ทดลองวางแผนสกัดความรู้โดยไม่แก้ไฟล์และไม่ deploy
-npm run sync:now         # สกัดความรู้ส่วนที่เปลี่ยน + ตรวจ 7 ด่าน + deploy อัตโนมัติ
-npm run deploy:win       # Build + atomic deploy ขึ้น Production + live mcp-eval + auto-rollback จาก Windows
+npm run deploy:win       # Refresh grounding index + Build + Export Go pack + Cross-Compile Go Sidecar + Atomic Deploy + live mcp-eval + auto-rollback
 npm run task:install     # ติดตั้ง Windows Scheduled Task \bcbrain\hourly-sync
 npm run scan             # สแกนความลับใน vault และไฟล์ skill
-node scripts/mcp-eval.mjs http://localhost:3000/mcp         # ประเมิน MCP 52 เคส (143 calls, ครบ 9 tools) บนเครื่อง
-node scripts/mcp-eval.mjs https://brain.bcsmethai.com/mcp   # ประเมิน MCP 52 เคส (143 calls, ครบ 9 tools) บน Production จริง
+node scripts/mcp-eval.mjs http://127.0.0.1:3961/mcp         # ประเมิน Go Sidecar 15 tools + REST + 52 เคส (152 calls)
+node scripts/mcp-eval.mjs https://brain.bcsmethai.com/mcp   # ประเมิน Production จริง 15 tools + REST + 52 เคส (152 calls)
 ```
 
 เชื่อม AI ผ่าน MCP:
 ```bash
 claude mcp add --transport http bcbrain https://brain.bcsmethai.com/mcp
 ```
-Tools (**10 tools** — เรียงตามความเร็ว):
-- **`quick_answer(question, audience?, mode?, max_chars?, include_media?)`** — **ตอบเร็วสุดใน 1 รอบ** (`~2,000` อักษร `normal` หรือส่ง `mode: "ultra"` เหลือ `~600` อักษร TL;DR ลดขนาด ~96% เหมาะกับ Voice/LINE/Call Center) มีด่าน `🛑 Abstain` กันหลอน
+Tools (**15 tools · v3.0.0** — เรียงตามความเร็ว):
+- **`quick_answer(question, audience?, mode?, max_chars?, include_media?, include_facts?)`** — **ตอบเร็วสุดใน 1 รอบ** (`normal` ~2,000 อักษร, `fast` ~1,400 อักษร, หรือ `ultra` ~600 อักษร TL;DR สำหรับ Voice/LINE/Call Center) พร้อมข้อเท็จจริงสรุป (`facts`) และด่าน `🛑 Abstain` กันหลอน
 - **`batch_ask(questions, audience?, mode?, max_chars_per_answer?, include_media?)`** — ตอบ **1–5 คำถามพร้อมกันใน 1 รอบเดียว** (ค่าเริ่มต้น `mode: "ultra"`) ตัดรอบเรียก LLM ซ้ำ
 - **`lookup_menu(query, audience?, limit?)`** — **ค้นแบบ O(1) ใน `< 1 ms`** สำหรับรหัสเมนู 4 หลัก (`1001`–`9070`), รหัสจุดเดิม (`4.13`), ชื่อเมนูไทย หรือชื่อตาราง SQL (`ic_trans`, `gl_journal` เฉพาะโซน `dev`/`all`)
+- **`lookup_error(query, audience?, limit?)`** — **ค้นข้อความแจ้งเตือน/Error ภาษาไทยแบบ O(1)** คืนข้อความจริง สาเหตุ-วิธีแก้ และ slug โน้ตตรงจุดพร้อม `🛑 Abstain` กันหลอน
+- **`search_sections(query, audience?, limit?, max_chars?)`** — ค้นเจาะลึกระดับหัวข้อย่อย (`## Section` BM25) พร้อม Block-Aware Excerpt (ไม่ตัดกลางตาราง/รายการ/โค้ด) และ `Structured Facts`
+- **`get_facts(query?, slugs?, kinds?, audience?, limit?)`** — ดึงข้อเท็จจริงแบบมีประเภท (`[menu]`, `[rule]`, `[limit]`, `[error]`, `[formula]`) กรองตามคำค้นหรือ slug (ไร้ศัพท์โค้ดในโหมด `user`)
+- **`verify_reference(menus?, tables?, columns?, audience?)`** — ตัวตรวจอ้างอิง Ground Truth กันหลอน: ตรวจรหัสเมนู 4 หลักได้ทุกโหมด และตรวจตาราง SQL / `table.column` เฉพาะ `dev`/`all` (ปฏิเสธเด็ดขาดพร้อม `tablesRestricted: true` ในโหมด `user`)
+- **`whats_new(days?, audience?, limit?)`** — รายการโน้ตที่อัปเดตล่าสุดภายใน N วัน เรียงจากใหม่สุดพร้อมวันที่ ISO และ TL;DR
 - **`batch_read(slugs, audience?, query?, max_chars_per_note?, strip_links?)`** — อ่าน `1–5` โน้ตพร้อมกันใน **1 รอบเดียว** รองรับตัดเฉพาะหัวข้อตาม `query` และล็อกโซน `audience`
 - **`ask_brain(question, audience?, compact?, max_notes?)`** — สังเคราะห์หลายโน้ตพร้อม `Media & Reference Links` (รูปภาพหน้าจอ + คลิป YouTube) และ Connected Graph Context 1 ทอด (รองรับ `compact: true`)
-- **`search_brain(query, limit?, audience?)`** — อินเด็กซ์กลับด้าน + BM25 + รหัสเมนู 4 หลัก + คำพ้องไทย-SQL (default `limit=5` ลด Token) พร้อมอาร์เรย์ `images` และ `videos`
+- **`search_brain(query, limit?, audience?)`** — Hybrid Multi-Signal RRF + BM25 + Section BM25 + รหัสเมนู 4 หลัก + คำพ้องไทย-SQL (default `limit=5` ลด Token) พร้อมอาร์เรย์ `images` และ `videos`
 - **`find_media(query?, kind?, limit?, audience?)`** — ดึงลิงก์รูปภาพหน้าจอ (`https://bcaccount.com/...`), วิดีโอ YouTube (`PLO9P7tPZLXB0` พร้อม `thumbnailUrl`/`embedUrl`) และหน้าเว็บอ้างอิงในรูปแบบ JSON พร้อมแชร์
 - **`traverse_brain(slug, to_slug?, depth?, direction?, relation?, folder?, limit?, audience?)`** — เดินกราฟ 1–3 ทอดหรือหาเส้นทางสั้นสุดระหว่าง 2 โน้ต
 - **`read_note(slug, query?, max_chars?)`** — อ่านโน้ตตาม `slug` พร้อมสรุปลิงก์สื่อและลิงก์ไป-กลับ (ส่ง `query`/`max_chars` เพื่อตัดเฉพาะส่วนที่ต้องการได้)
 - **`list_notes(folder?, tag?, audience?)`** — แสดงรายชื่อโน้ตกรองตามโฟลเดอร์ แท็ก หรือ `audience`
 
-REST ความเร็วสูง & Local Stdio MCP (`< 1 ms`, ไร้ RTT ข้ามประเทศ):
+REST API ความเร็วสูง (OpenAPI 3.1) & Local Stdio MCP (`< 1 ms`, ไร้ RTT ข้ามประเทศ):
 ```bash
-# Edge-cacheable REST (s-maxage=300, ETag)
+# Edge-cacheable REST (s-maxage=300, ETag 304)
 curl "https://brain.bcsmethai.com/api/fast?q=%E0%B9%80%E0%B8%8A%E0%B9%87%E0%B8%84%E0%B9%80%E0%B8%94%E0%B9%89%E0%B8%87&audience=user&mode=ultra"
-curl "https://brain.bcsmethai.com/api/fast?menu=4013&audience=user"
+curl "https://brain.bcsmethai.com/api/error?q=%E0%B8%A5%E0%B9%87%E0%B8%AD%E0%B8%81%E0%B8%AB%E0%B8%99%E0%B9%88%E0%B8%A7%E0%B8%A2%E0%B8%95%E0%B9%89%E0%B8%99%E0%B8%97%E0%B8%B8%E0%B8%99%E0%B9%81%E0%B8%A5%E0%B9%89%E0%B8%A7&audience=user"
+curl "https://brain.bcsmethai.com/api/sections?q=%E0%B8%AA%E0%B9%88%E0%B8%A7%E0%B8%99%E0%B8%97%E0%B8%B5%E0%B9%88%204&audience=user"
+curl "https://brain.bcsmethai.com/api/facts?slugs=start-erp-options-9-tabs&kinds=menu&audience=user"
+curl "https://brain.bcsmethai.com/api/whats-new?days=7&audience=user"
+curl -X POST "https://brain.bcsmethai.com/api/verify" -H "Content-Type: application/json" -d '{"menus":["4013"],"tables":["ic_trans"],"columns":["ic_trans.doc_no"],"audience":"dev"}'
+curl "https://brain.bcsmethai.com/api/openapi.json"
 # Context-Caching Bootstrap Pack (ยัดลง System Prompt บอท -> ตอบเรื่องหลัก 0 ms)
 curl "https://brain.bcsmethai.com/api/bootstrap-pack?audience=user"
-# Local Stdio MCP (ซิงก์แพ็ก gzip ~670KB จาก /api/vault-pack ด้วย ETag ลง RAM เครื่องท้องถิ่น)
+# Local Stdio MCP (ซิงก์แพ็ก gzip ~675KB จาก /api/vault-pack ด้วย ETag ลง RAM เครื่องท้องถิ่น)
 node scripts/mcp-stdio.ts --sync
 ```
 
@@ -122,9 +136,9 @@ mkdir -p ~/.claude/skills/bcbrain && curl -fsSL https://brain.bcsmethai.com/skil
 - `/bcbrain setup` — แสดงวิธีผูก MCP `https://brain.bcsmethai.com/mcp` ตามเครื่องมือที่ใช้
 
 ## Limitation
-- ค้นหาแบบอินเด็กซ์กลับด้าน + BM25 length normalization + O(1) menu/table lookup + คำพ้องไทย-SQL + 1-hop graph boost (ไม่ใช่ vector embedding) — หากคลังเกิน ~1,500 โน้ตควรพิจารณา hybrid/embedding เพิ่มเติม
+- ใช้ Hybrid Multi-Signal RRF (BM25 + Section BM25 + 256-dim Hashed Semantic Vectors + O(1) Menu/Error/Table Index + 1-hop Graph Boost) แบบไร้ GPU/API ภายนอกเพื่อความเร็ว `< 1 ms` — หากคลังเติบโตเกิน ~2,000 โน้ตควรพิจารณา embedding โมเดลเพิ่มเติม
 - โน้ตเป็นภาพถ่ายโค้ด ณ วันที่สกัด (ซิงก์อัตโนมัติทุกชั่วโมง) หากโค้ดใน `d:\bcaiaccount` เพิ่งแก้ไขระหว่างรอบให้รัน `npm run sync:plan` หรือยึดโค้ดจริงเป็นหลักเสมอ
 - ขอบเขตจำกัดเฉพาะระบบใน `d:\bcaiaccount` และเว็บไซต์ทางการ `d:\bcaiwebsite-live` (`bcaccount.com`) เท่านั้น
-- MCP เปิดสาธารณะแบบอ่านอย่างเดียว จำกัดขนาดคำขอ 32 KB และจำกัดอัตราเรียก 240 ครั้ง/นาทีต่อ IP ในหน่วยความจำของโปรเซส พร้อมรองรับ CORS (ไม่เปิด SSE stream บน `GET /mcp` เพื่อลดการค้างการเชื่อมต่อ)
+- MCP และ REST API เปิดสาธารณะแบบอ่านอย่างเดียว จำกัดขนาดคำขอ 32 KB และจำกัดอัตราเรียก 300 ครั้ง/นาทีต่อ IP ในหน่วยความจำของโปรเซส พร้อมรองรับ CORS (ไม่เปิด SSE stream บน `GET /mcp` เพื่อลดการค้างการเชื่อมต่อ)
 - โซนผู้ใช้ทั่วไปอ้างอิงเฉพาะตารางราคามาตรฐาน 4 รุ่นจาก `sales-pricing-packages` และโครงการสำนักงานบัญชีจาก `sales-accounting-partner` เท่านั้น ห้าม AI แต่งส่วนลดพิเศษหรือเงื่อนไขสัญญานอกตารางเอง (ส่งต่อ `https://bcaccount.com/quotation` หรือ LINE `@bcaccount`)
 - ชื่อไฟล์ (`slug`) ต้องเป็น ascii kebab-case ตัวเล็กและไม่ซ้ำกันทั้ง `vault/`

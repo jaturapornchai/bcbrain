@@ -1,33 +1,50 @@
-# สมอง BC (BC Brain)
+# สมอง BC (BC Brain · v3.0.0)
 
-> Dual-audience knowledge base of the BC Ai Account product suite (Thai accounting/ERP for SMEs plus POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Market, Dashboard, MonitorMap, WorkMonitor, Company Brain), verified against the real source code.
+> Dual-audience knowledge base of the BC Ai Account product suite (Thai accounting/ERP for SMEs plus POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Market, Dashboard, MonitorMap, WorkMonitor, Company Brain), verified against real source code and powered by a compiled Go MCP & REST sidecar (`< 1 ms`) with Hybrid Multi-Signal RRF, Section BM25, 256-dim semantic fallback, structured facts, O(1) Thai error index, and runtime ground-truth verification.
 
 ## Audience Zones (`audience` filter)
-- `user`: Plain-Thai guides for end users, Call Center, and pre-sale assistants (`playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`). No SQL/code jargon.
+- `user`: Plain-Thai guides for end users, Call Center, and pre-sale assistants (`playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`). Zero SQL/code jargon; SQL table/column verification strictly refused.
 - `dev`: Technical specifications for developers and coding agents (`dev-playbook`, `schema`, `queries`, `api`, `doctypes`, `architecture`) — table schemas, PostgreSQL `SELECT`/`WITH` queries, `trans_flag` catalog, GL Dr/Cr rules, API/MCP contracts.
 - `both`: Shared core map (`root` / `index.md`), included in both `"user"` and `"dev"` filters.
 - `all`: Full knowledge base across every zone.
 
-## For AI agents (MCP)
-- MCP endpoint (Streamable HTTP): https://brain.bcsmethai.com/mcp
+## For AI agents (MCP v3.0.0 — 15 Tools)
+- MCP endpoint (Streamable HTTP, compiled Go sidecar `< 1 ms`): https://brain.bcsmethai.com/mcp
+- OpenAPI 3.1.0 specification: https://brain.bcsmethai.com/api/openapi.json
 - Public and read-only: no key or auth header needed.
-- Tools (10 tools — dedicated raw HTTP sidecar + LRU Buffer cache + pre-split sections):
-  - `quick_answer(question, audience?, mode?, max_chars?, include_media?)` — **FASTEST default**: 1 call (~2,000 chars `normal`, or ~600-char TL;DR with `mode: "ultra"` for voice/LINE bots), strict `🛑 Abstain` guardrail
+- Tools (**15 tools** — zero-CGO compiled Go sidecar + LRU JSON cache + pre-split sections + structured facts + grounding verifier):
+  - `quick_answer(question, audience?, mode?, max_chars?, include_media?, include_facts?)` — **FASTEST default**: 1 call (`normal` ~2,000 chars, `fast` ~1,400 chars, or `ultra` ~600-char TL;DR for voice/LINE bots) with top structured facts and strict `🛑 Abstain` guardrail
   - `batch_ask(questions, audience?, mode?, max_chars_per_answer?, include_media?)` — answer 1–5 questions in ONE single MCP call (defaults to `mode: "ultra"`)
   - `lookup_menu(query, audience?, limit?)` — **instant O(1)** lookup for 4-digit menu codes (`1001`–`9070`), legacy dotted codes (`4.13`), Thai menu names, or SQL table names (`ic_trans`, `gl_journal`, etc. in `dev`/`all` mode)
+  - `lookup_error(query, audience?, limit?)` — **instant O(1)** lookup for real BC Ai Account Thai error/validation alerts returning exact cause, fix snippet, and canonical note slug (with strict `🛑 Abstain`)
+  - `search_sections(query, audience?, limit?, max_chars?)` — surgical `## Section` BM25 search returning block-aware Markdown excerpts (never slicing mid-table, mid-list, or mid-code-fence) + structured facts
+  - `get_facts(query?, slugs?, kinds?, audience?, limit?)` — retrieve pre-computed typed facts (`[menu]`, `[rule]`, `[limit]`, `[error]`, `[formula]`) with zero SQL/code jargon in `user` mode
+  - `verify_reference(menus?, tables?, columns?, audience?)` — anti-hallucination ground-truth verifier for 4-digit menu codes (all modes) and SQL tables / `table.column` refs (`dev`/`all` only; strictly refused with `tablesRestricted: true` in `user` mode)
+  - `whats_new(days?, audience?, limit?)` — recently updated knowledge base notes sorted newest-first with ISO timestamps and TL;DR summaries
   - `batch_read(slugs, audience?, query?, max_chars_per_note?, strip_links?)` — read 1–5 notes in ONE single call with optional query-focused section excerpting and strict audience isolation
-- Fast Cacheable REST & Local Mirror Endpoints:
-  - `GET https://brain.bcsmethai.com/api/fast?q=...&audience=user&mode=ultra` (or `?menu=4013`) — Edge-cacheable REST (`s-maxage=300`, ETag)
-  - `GET https://brain.bcsmethai.com/api/bootstrap-pack?audience=user|dev` — compact Prompt-Caching bootstrap pack (`0 ms` basic answers for bots)
-  - `GET https://brain.bcsmethai.com/api/vault-pack` — ETag-cached gzipped full vault (`~670 KB`) for zero-RTT Local Stdio MCP (`node scripts/mcp-stdio.ts --sync`)
   - `ask_brain(question, audience?, compact?, max_notes?)` — multi-note synthesis (`audience`: `"all" | "user" | "dev"`), ready-to-share `Media & Reference Links` (YouTube tutorials + `bcaccount.com` screenshots + website pages), and 1-hop Connected Graph Context
-  - `search_brain(query, limit?, audience?)` — BM25 length-normalized Thai + 4-digit menu code + SQL identifier search (default `limit=5` for low latency) with `images` and `videos` media arrays
-  - `find_media(query?, kind?, limit?, audience?)` — returns structured JSON of official screenshot URLs (`https://bcaccount.com/...`), YouTube video/playlist URLs (`PLO9P7tPZLXB0` with `thumbnailUrl` and `embedUrl`), and website pages
+  - `search_brain(query, limit?, audience?)` — Hybrid Multi-Signal RRF search (Thai segmentation + BM25 + section BM25 + SQL/menu direct match + 1-hop graph; default `limit=5`) with `images` and `videos` media arrays
+  - `find_media(query?, kind?, limit?, audience?)` — structured JSON of official screenshot URLs (`https://bcaccount.com/...`), YouTube video/playlist URLs (`PLO9P7tPZLXB0` with `thumbnailUrl` and `embedUrl`), and website pages
   - `traverse_brain(slug, to_slug?, depth?, direction?, relation?, folder?, limit?, audience?)` — follow 18 typed synapse relations (`uses_table`, `writes_table`, `posts_rule`, `has_query`, `exposes_api`, `solves_issue`, `shares_menu`, `implements_code`, `bridges_zone`, etc.) 1–3 hops or find shortest paths
   - `read_note(slug, query?, max_chars?)` — full or focused markdown note with `audience`, `youtube_videos`/`images`/`web_pages`, typed outgoing links, and backlinks
   - `list_notes(folder?, tag?, audience?)` — index of notes filterable by `folder`, `tag`, and `audience`
-- **Call Center / Sales / Voice mode**: Call `quick_answer(..., audience: "user", include_media: true)` or `lookup_menu(..., audience: "user")` directly (no extra playbook round-trip needed; `playbook-call-center` / `playbook-sales` remain available when full scripts are needed). Cite both exact Thai menu breadcrumb paths AND 4-digit menu codes (`1001`–`9070` across 735 screens), include verified screenshot links (`https://bcaccount.com/...`) and YouTube tutorials (`PLO9P7tPZLXB0`), and answer in plain Thai without code/SQL jargon. Cite official pricing/support facts strictly from `sales-pricing-packages`, `sales-accounting-partner`, and `sales-support-implementation-contact` (prices exclude 7% VAT and external AI API costs; never invent custom discounts).
-- **Developer mode**: Call `quick_answer(..., audience: "dev")`, `lookup_menu("<table_name>", audience: "dev")`, or `batch_read(..., audience: "dev")` directly (full map in `playbook-dev`). Follow `dev-rules-accounting-sql` (`NUMERIC`, `COALESCE(last_status, 0) = 0`).
+
+## Fast Cacheable REST API & Local Mirror (OpenAPI 3.1.0)
+- `GET https://brain.bcsmethai.com/api/fast?q=...&audience=user&mode=ultra` (or `?menu=4013`) — Edge-cacheable REST (`s-maxage=300`, ETag `304`)
+- `GET https://brain.bcsmethai.com/api/error?q=...&audience=user` — O(1) Thai validation/error fix lookup (ETag `304`)
+- `GET https://brain.bcsmethai.com/api/sections?q=...&audience=user` — Surgical `## Section` BM25 search with block-aware excerpts & facts (ETag `304`)
+- `GET https://brain.bcsmethai.com/api/facts?q=...&kinds=menu,rule&audience=user` — Typed structured facts (ETag `304`)
+- `GET https://brain.bcsmethai.com/api/whats-new?days=7&audience=user` — Recently updated notes feed (ETag `304`)
+- `GET | POST https://brain.bcsmethai.com/api/verify` — Runtime ground-truth verifier for menus (all modes) and SQL tables/columns (`dev`/`all` only; strictly blocked in `user`)
+- `GET https://brain.bcsmethai.com/api/gaps` — Sanitized knowledge-gap telemetry ring buffer (`Cache-Control: no-store`)
+- `GET https://brain.bcsmethai.com/api/bootstrap-pack?audience=user|dev` — compact Prompt-Caching bootstrap pack (`0 ms` basic answers for bots)
+- `GET https://brain.bcsmethai.com/api/vault-pack` — ETag-cached gzipped full vault (`~675 KB`) for zero-RTT Local Stdio MCP (`node scripts/mcp-stdio.ts --sync`)
+- `GET https://brain.bcsmethai.com/api/openapi.json` — OpenAPI 3.1.0 specification (ETag `304`)
+- `GET https://brain.bcsmethai.com/healthz` — Sidecar liveness, version, note/tool counts & capability manifest
+
+## Guidance by Role
+- **Call Center / Sales / Voice mode**: Call `lookup_error(..., audience: "user")` for screen alerts, `quick_answer(..., audience: "user", include_media: true)` or `lookup_menu(..., audience: "user")` directly (no extra playbook round-trip needed; `playbook-call-center` / `playbook-sales` remain available for full scripts). Cite both exact Thai menu breadcrumb paths AND 4-digit menu codes (`1001`–`9070` across 735 screens), include verified screenshot links (`https://bcaccount.com/...`) and YouTube tutorials (`PLO9P7tPZLXB0`), and answer in plain Thai without code/SQL jargon. Cite official pricing/support facts strictly from `sales-pricing-packages`, `sales-accounting-partner`, and `sales-support-implementation-contact` (prices exclude 7% VAT and external AI API costs; never invent custom discounts).
+- **Developer mode**: Call `quick_answer(..., audience: "dev")`, `lookup_menu("<table_name>", audience: "dev")`, `verify_reference({ tables, columns, audience: "dev" })`, or `batch_read(..., audience: "dev")` directly (full map in `playbook-dev`). Follow `dev-rules-accounting-sql` (`NUMERIC`, `COALESCE(last_status, 0) = 0`).
 - **Slash Skill (`/bcbrain`)**: Installable skill instructions at https://brain.bcsmethai.com/skills/bcbrain/SKILL.md (handles `/bcbrain`, `/bcbrain dev`, `/bcbrain all`, `/bcbrain setup`, and stateless HTTP JSON-RPC fallback).
 
 ## Pages

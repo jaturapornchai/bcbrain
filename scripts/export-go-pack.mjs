@@ -74,8 +74,11 @@ if (!process.env.SYNC_COMMIT) {
 }
 
 const vaultMod = await import("../lib/vault.ts");
+const retrievalMod = await import("../lib/vault-retrieval.ts");
+const openApiMod = await import("../lib/openapi.ts");
 const {
   getBootstrapPack,
+  getNoteFacts,
   getNoteTldr,
   getVaultPackGzip,
   stripSeeAlso,
@@ -85,6 +88,8 @@ const {
   vaultFolders,
   warmVaultIndexes,
 } = vaultMod;
+const { buildErrorIndex } = retrievalMod;
+const { getOpenApiSpec } = openApiMod;
 
 const t0 = performance.now();
 warmVaultIndexes();
@@ -438,100 +443,60 @@ function extractMenusAndTables(notesMap) {
   return { menus, tables };
 }
 
-// ---------- Error-Message Index Extraction (troubleshoot/ & howto/ quoted Thai errors + aliases) ----------
-const QUOTED_ERROR_RE = /\*\*"([^"\n]{4,180})"\*\*|"([^"\n]{6,180})"/g;
-const ERROR_HINT_RE =
-  /(?:ห้าม|ไม่พบ|ไม่พอ|ไม่ถูกต้อง|ไม่ได้|ติดลบ|ปิดงวด|ล็อก|เกิน|ซ้ำ|หมดอายุ|กรุณา|ผิดพลาด|ไม่สมบูรณ์|ไม่รองรับ|เตือน|แจ้งเตือน|error|failed|invalid|denied|cannot|locked)/i;
-const FIX_HEADING_RE = /^##\s+(?:วิธีตรวจเช็กและแก้ไข|วิธีแก้ไข|วิธีแก้|แนวทางแก้ไข|วิธีตรวจเช็ก)/;
+// ---------- Load compiled runtime Ground-Truth Index (public/grounding-index.json, safe fallback) ----------
+const FORBIDDEN_GROUNDING_TABLE_RE =
+  /^(?:bc_user_list|bc_mcp_access_tokens|bc_mcp_token_databases|bc_mcp_token_audit|bc_google_account|pg_shadow|pg_authid|pg_stats)/i;
 
-function findDefaultFixSnippet(note) {
-  const clean = note.cleanBody ?? stripSeeAlso(note.body);
-  const secs = clean.split(/\n(?=## )/);
-  const fixSec = secs.find((s) => FIX_HEADING_RE.test(s.trimStart()));
-  if (fixSec) {
-    const lines = fixSec
-      .split("\n")
-      .slice(1)
-      .map((l) => l.replace(/\*\*/g, "").trim())
-      .filter((l) => l && !l.startsWith("#") && !l.startsWith("> [!"));
-    const joined = lines.slice(0, 3).join(" ").replace(/\s+/g, " ").trim();
-    if (joined) return joined.length > 280 ? `${joined.slice(0, 277)}…` : joined;
-  }
-  const tldr = getNoteTldr(note).replace(/\s+/g, " ").trim();
-  return tldr.length > 280 ? `${tldr.slice(0, 277)}…` : tldr;
-}
-
-function extractErrors(notesMap) {
-  const entries = [];
-  const seen = new Set();
-
-  const pushEntry = (errorText, note, fixSnippet) => {
-    const cleaned = errorText.replace(/\s+/g, " ").trim();
-    if (cleaned.length < 4 || cleaned.length > 180) return;
-    if (/^https?:\/\//i.test(cleaned)) return;
-    const norm = normalizeText(cleaned);
-    if (!norm || norm.length < 3) return;
-    const key = `${note.slug}\0${norm}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    entries.push({
-      errorText: cleaned,
-      norm,
-      slug: note.slug,
-      title: note.title,
-      folder: note.folder,
-      audience: note.audience,
-      fixSnippet: (fixSnippet || findDefaultFixSnippet(note)).slice(0, 300),
-    });
+function loadGroundingIndexForPack() {
+  const indexPath = process.env.BC_GROUNDING_INDEX_FILE?.trim()
+    ? path.resolve(process.env.BC_GROUNDING_INDEX_FILE.trim())
+    : path.join(process.cwd(), "public", "grounding-index.json");
+  const fallback = {
+    builtAt: "",
+    menuCount: 0,
+    tableCount: 0,
+    columnCount: 0,
+    errorCount: 0,
+    menus: {},
+    tables: {},
   };
-
-  for (const n of notesMap.values()) {
-    if (n.folder !== "troubleshoot" && n.folder !== "howto") continue;
-    const defaultFix = findDefaultFixSnippet(n);
-    const clean = n.cleanBody ?? stripSeeAlso(n.body);
-    let inCode = false;
-    for (const rawLine of clean.split("\n")) {
-      const line = rawLine.trim();
-      if (line.startsWith("```")) {
-        inCode = !inCode;
-        continue;
-      }
-      if (inCode || !line) continue;
-      for (const m of line.matchAll(QUOTED_ERROR_RE)) {
-        const quoted = (m[1] ?? m[2] ?? "").trim();
-        const isBoldQuoted = Boolean(m[1]);
-        if (!quoted) continue;
-        // In howto notes, require explicit error hint or bold quote with Thai error phrasing
-        if (n.folder === "howto" && !ERROR_HINT_RE.test(quoted)) continue;
-        if (n.folder === "troubleshoot" && !isBoldQuoted && !ERROR_HINT_RE.test(quoted)) continue;
-
-        let fix = defaultFix;
-        const after = line.slice((m.index ?? 0) + m[0].length);
-        const dashMatch = after.match(/^\s*(?:—|--|-|:)\s*(.+)$/);
-        if (dashMatch && dashMatch[1].trim().length >= 12) {
-          const inlineFix = dashMatch[1]
-            .replace(/\[\[(?:[a-z_]+::)?([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]/g, (_x, slug, lbl) => lbl ?? slug)
-            .replace(/\*\*/g, "")
-            .replace(/\s+/g, " ")
-            .trim();
-          fix = inlineFix.length > 280 ? `${inlineFix.slice(0, 277)}…` : inlineFix;
-        }
-        pushEntry(quoted, n, fix);
+  if (!fs.existsSync(indexPath)) return fallback;
+  try {
+    const raw = JSON.parse(fs.readFileSync(indexPath, "utf8"));
+    const menus = {};
+    if (raw.menus && typeof raw.menus === "object") {
+      for (const [code, entry] of Object.entries(raw.menus)) {
+        const cleanCode = String(code).trim();
+        if (!/^[1-9]\d{3}$/.test(cleanCode) || !entry || typeof entry !== "object") continue;
+        const label = String(entry.label ?? "").trim();
+        if (!label) continue;
+        const mod = typeof entry.module === "string" && entry.module.trim() ? entry.module.trim() : undefined;
+        menus[cleanCode] = mod ? { code: cleanCode, label, module: mod } : { code: cleanCode, label };
       }
     }
-
-    // Also index troubleshoot aliases (they carry canonical Thai screen error summaries)
-    if (n.folder === "troubleshoot") {
-      for (const alias of n.aliases) {
-        if (alias.trim().length >= 4) {
-          pushEntry(alias.trim(), n, defaultFix);
-        }
+    const tables = {};
+    let columnCount = 0;
+    if (raw.tables && typeof raw.tables === "object") {
+      for (const [rawTbl, rawCols] of Object.entries(raw.tables)) {
+        const tbl = String(rawTbl).toLowerCase().trim();
+        if (!/^[a-z][a-z0-9_]*$/.test(tbl) || FORBIDDEN_GROUNDING_TABLE_RE.test(tbl) || !Array.isArray(rawCols)) continue;
+        const cols = [...new Set(rawCols.map((c) => String(c).toLowerCase().trim()).filter((c) => /^[a-z_][a-z0-9_]*$/.test(c)))].sort();
+        tables[tbl] = cols;
+        columnCount += cols.length;
       }
     }
+    return {
+      builtAt: typeof raw.builtAt === "string" ? raw.builtAt : "",
+      menuCount: Object.keys(menus).length,
+      tableCount: Object.keys(tables).length,
+      columnCount,
+      errorCount: typeof raw.errorCount === "number" && Number.isFinite(raw.errorCount) ? raw.errorCount : 0,
+      menus,
+      tables,
+    };
+  } catch {
+    return fallback;
   }
-
-  entries.sort((a, b) => a.slug.localeCompare(b.slug) || a.norm.localeCompare(b.norm));
-  return entries;
 }
 
 // ---------- Build full export payload ----------
@@ -551,8 +516,26 @@ for (const n of sortedNotes) {
     if (prev < 16) bodyFreq[w] = prev + 1;
   }
 
+  const cleanBody = n.cleanBody ?? stripSeeAlso(n.body);
+  const rawSections =
+    Array.isArray(n.sections) && n.sections.length > 0
+      ? n.sections
+      : cleanBody.split(/\n(?=## )/).map((raw) => ({
+          heading: raw.split("\n")[0].replace(/^#+\s*/, "").trim(),
+          raw,
+          norm: normalizeText(raw),
+        }));
+  const exportedSections = rawSections.map((s) => {
+    const heading = s.heading || n.title;
+    tokenizeNormalized(normalizeText(heading), true);
+    return {
+      heading,
+      raw: s.raw,
+    };
+  });
+
   const tldr = getNoteTldr(n);
-  const facts = typeof vaultMod.getNoteFacts === "function" ? vaultMod.getNoteFacts(n) : extractFallbackFacts(n);
+  const facts = typeof getNoteFacts === "function" ? getNoteFacts(n) : extractFallbackFacts(n);
   const rec = gitRecency.get(n.slug);
 
   exportedNotes.push({
@@ -565,6 +548,7 @@ for (const n of sortedNotes) {
     sources: n.sources,
     body: n.body,
     tldr,
+    sections: exportedSections,
     facts,
     links: n.links,
     backlinks: n.backlinks,
@@ -582,7 +566,19 @@ for (const n of sortedNotes) {
 }
 
 const { menus, tables } = extractMenusAndTables(notesMap);
-const errors = extractErrors(notesMap);
+const builtErrIdx = buildErrorIndex(sortedNotes, (s) => tokenizeNormalized(s, true), normalizeText);
+const errors = builtErrIdx.entries.map((entry, idx) => ({
+  errorText: entry.errorText,
+  norm: builtErrIdx.normTexts[idx] ?? normalizeText(entry.errorText),
+  stripped: builtErrIdx.strippedTexts[idx] ?? "",
+  slug: entry.slug,
+  title: entry.title,
+  folder: entry.folder,
+  audience: entry.audience,
+  fixSnippet: entry.fixSnippet,
+}));
+const groundingIndex = loadGroundingIndexForPack();
+const openApiSpec = getOpenApiSpec();
 
 // Ensure STOP words and tokenized synonym pieces are present in Thai vocab dictionary
 for (const sw of STOP_WORDS) {
@@ -642,6 +638,8 @@ const pack = {
   menus,
   tables,
   errors,
+  groundingIndex,
+  openApiSpec,
   bootstrapPacks: {
     user: { text: bootUser.text, etag: bootUser.etag, chars: bootUser.chars },
     dev: { text: bootDev.text, etag: bootDev.etag, chars: bootDev.chars },
@@ -661,5 +659,5 @@ fs.writeFileSync(outPath, jsonStr, "utf8");
 
 const elapsedMs = (performance.now() - t0).toFixed(1);
 console.log(
-  `export-go-pack ok: ${outPath} (${(Buffer.byteLength(jsonStr, "utf8") / 1024 / 1024).toFixed(2)} MB, notes=${exportedNotes.length}, menus=${menus.length}, tables=${tables.length}, errors=${errors.length}, vocab=${vocabFreq.size}, ms=${elapsedMs})`,
+  `export-go-pack ok: ${outPath} (${(Buffer.byteLength(jsonStr, "utf8") / 1024 / 1024).toFixed(2)} MB, notes=${exportedNotes.length}, menus=${menus.length}, tables=${tables.length}, errors=${errors.length}, grounding=${groundingIndex.menuCount}m/${groundingIndex.tableCount}t/${groundingIndex.columnCount}c, vocab=${vocabFreq.size}, ms=${elapsedMs})`,
 );

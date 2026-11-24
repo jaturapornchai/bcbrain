@@ -144,10 +144,12 @@ type Engine struct {
 	tok          *Tokenizer
 	notesBySlug  map[string]*Note
 	indexes      map[string]*SearchIndex
+	secIndexes   map[string]*SectionSearchIndex
+	errIndex     *ErrorSearchIndex
+	grounding    *GroundingRuntime
 	menuByCode   map[string]*MenuLookupEntry
 	menuByLegacy map[string]*MenuLookupEntry
 	tableByName  map[string]*TableLookupEntry
-	errorByNorm  map[string][]*ErrorLookupEntry
 	rowsByAud    map[string][]*Note
 }
 
@@ -223,10 +225,11 @@ func NewEngine(pack *Pack) *Engine {
 		tok:          tok,
 		notesBySlug:  make(map[string]*Note, len(pack.Notes)),
 		indexes:      make(map[string]*SearchIndex, 3),
+		secIndexes:   make(map[string]*SectionSearchIndex, 3),
+		grounding:    NewGroundingRuntime(pack.GroundingIndex),
 		menuByCode:   make(map[string]*MenuLookupEntry, len(pack.Menus)),
 		menuByLegacy: make(map[string]*MenuLookupEntry, len(pack.Menus)),
 		tableByName:  make(map[string]*TableLookupEntry, len(pack.Tables)),
-		errorByNorm:  make(map[string][]*ErrorLookupEntry, len(pack.Errors)),
 		rowsByAud:    make(map[string][]*Note, 3),
 	}
 
@@ -263,6 +266,12 @@ func NewEngine(pack *Pack) *Engine {
 			n.Haystack.Body = NormalizeText(stripTypedWikiPrefix(n.Body))
 		}
 		n.BodyLenU16 = utf16Len(n.Haystack.Body)
+		secs := noteSections(n)
+		for si := range secs {
+			if secs[si].Norm == "" {
+				secs[si].Norm = NormalizeText(secs[si].Raw)
+			}
+		}
 		e.notesBySlug[n.Slug] = n
 	}
 
@@ -286,18 +295,10 @@ func NewEngine(pack *Pack) *Engine {
 		e.tableByName[t.Table] = t
 	}
 
-	for i := range pack.Errors {
-		er := &pack.Errors[i]
-		if er.Norm == "" {
-			er.Norm = NormalizeText(er.ErrorText)
-		}
-		er.Tokens = tok.Terms(er.ErrorText)
-		e.errorByNorm[er.Norm] = append(e.errorByNorm[er.Norm], er)
-	}
-
 	var wg sync.WaitGroup
 	auds := []string{"all", "user", "dev"}
 	builtIdx := make([]*SearchIndex, len(auds))
+	builtSecIdx := make([]*SectionSearchIndex, len(auds))
 	for ai, aud := range auds {
 		rows := make([]*Note, 0, len(pack.Notes))
 		for _, n := range pack.Notes {
@@ -306,21 +307,33 @@ func NewEngine(pack *Pack) *Engine {
 			}
 		}
 		e.rowsByAud[aud] = rows
-		wg.Add(1)
+		wg.Add(2)
 		go func(i int, a string) {
 			defer wg.Done()
 			builtIdx[i] = e.buildSearchIndex(a)
 		}(ai, aud)
+		go func(i int, a string) {
+			defer wg.Done()
+			builtSecIdx[i] = e.buildSectionIndex(a)
+		}(ai, aud)
 	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		e.errIndex = e.buildErrorIndex()
+	}()
 	wg.Wait()
 	for ai, aud := range auds {
 		e.indexes[aud] = builtIdx[ai]
+		e.secIndexes[aud] = builtSecIdx[ai]
 	}
-	// Free pre-tokenized maps after inverted indexes are built to keep RSS ~20-30 MB
+	// Free pre-tokenized maps & raw grounding map duplicates after indexes are built to keep RSS lean
 	for _, n := range pack.Notes {
 		n.Tokens = NoteTokens{}
 	}
 	pack.Vocab = nil
+	pack.GroundingIndex.Menus = nil
+	pack.GroundingIndex.Tables = nil
 	return e
 }
 
@@ -1329,40 +1342,6 @@ func splitMarkdownSections(body string) []NoteSection {
 	return out
 }
 
-// trimBlockAware trims text to at most budget runes without slicing mid-table row or leaving an unclosed code fence.
-func trimBlockAware(s string, budget int) string {
-	if budget <= 0 {
-		return ""
-	}
-	if utf8.RuneCountInString(s) <= budget {
-		return s
-	}
-	cut := sliceRunes(s, budget)
-	// Prefer trimming cleanly at a newline boundary within the last 25% of the budget so table rows & list steps stay intact
-	if nl := strings.LastIndexByte(cut, '\n'); nl > 0 && nl >= len(cut)*65/100 {
-		cut = strings.TrimRight(cut[:nl], " \t\r\n")
-	}
-	// If the last line is a broken/incomplete markdown table row (starts with '|' but doesn't end with '|'), drop that partial row
-	if nl := strings.LastIndexByte(cut, '\n'); nl >= 0 {
-		lastLine := strings.TrimSpace(cut[nl+1:])
-		if strings.HasPrefix(lastLine, "|") && !strings.HasSuffix(lastLine, "|") {
-			cut = strings.TrimRight(cut[:nl], " \t\r\n")
-		}
-	}
-	if len(reFenceLine.FindAllStringIndex(cut, -1))%2 == 1 {
-		cut += "\n```"
-	}
-	lastLine := cut
-	if nl := strings.LastIndexByte(cut, '\n'); nl >= 0 {
-		lastLine = cut[nl+1:]
-	}
-	lastTrim := strings.TrimSpace(lastLine)
-	if strings.HasPrefix(lastTrim, "|") || strings.HasSuffix(lastTrim, "|") || strings.HasSuffix(lastTrim, "```") {
-		return cut + "\n…"
-	}
-	return cut + " …"
-}
-
 func noteSections(n *Note) []NoteSection {
 	n.secOnce.Do(func() {
 		if len(n.Sections) == 0 {
@@ -1438,7 +1417,7 @@ func (e *Engine) ExcerptNote(n *Note, ts []string, budget int, stripFooter bool)
 	out := strings.Join(keptRaw, "\n")
 	cut := out
 	if utf8.RuneCountInString(out) > budget {
-		cut = trimBlockAware(out, budget)
+		cut, _ = TrimBlockAware(out, budget)
 	}
 	omitPart := ""
 	if len(omitted) > 0 {
@@ -1673,105 +1652,9 @@ func (e *Engine) LookupDirect(query, filter string, limit int) DirectLookupResul
 	return DirectLookupResult{Kind: kind, Menus: menusOut, Tables: tablesOut}
 }
 
-// ---------- O(1) + Fuzzy Error Message Lookup ----------
+// ---------- O(1) + Inverted Token Error Message Lookup ----------
 func (e *Engine) LookupError(query, filter string, limit int) []ErrorLookupEntry {
-	if filter == "" {
-		filter = "all"
-	}
-	if limit < 1 {
-		limit = 5
-	}
-	if limit > 15 {
-		limit = 15
-	}
-	raw := strings.TrimSpace(query)
-	norm := NormalizeText(raw)
-	if norm == "" {
-		return nil
-	}
-
-	type scoredErr struct {
-		entry *ErrorLookupEntry
-		score int
-	}
-	scored := make([]scoredErr, 0, 16)
-	seenKey := make(map[string]bool)
-
-	// 1. O(1) exact normalized lookup
-	if exact, ok := e.errorByNorm[norm]; ok {
-		for _, er := range exact {
-			if !matchesAudience(er.Audience, filter) {
-				continue
-			}
-			key := er.Slug + "\x00" + er.Norm
-			if !seenKey[key] {
-				seenKey[key] = true
-				scored = append(scored, scoredErr{entry: er, score: 200})
-			}
-		}
-	}
-
-	// 2. Substring + token overlap scoring across indexed error messages
-	qTerms := e.tok.Terms(raw)
-	for i := range e.pack.Errors {
-		er := &e.pack.Errors[i]
-		if !matchesAudience(er.Audience, filter) {
-			continue
-		}
-		key := er.Slug + "\x00" + er.Norm
-		if seenKey[key] {
-			continue
-		}
-		sc := 0
-		if utf8.RuneCountInString(norm) >= 4 && strings.Contains(er.Norm, norm) {
-			sc += 120
-		} else if utf8.RuneCountInString(er.Norm) >= 8 && strings.Contains(norm, er.Norm) {
-			sc += 95
-		}
-		if len(qTerms) > 0 {
-			matched := 0
-			for _, qt := range qTerms {
-				if strings.Contains(er.Norm, qt) {
-					matched++
-				}
-			}
-			if matched > 0 {
-				ratio := float64(matched) / float64(len(qTerms))
-				if sc > 0 || matched == len(qTerms) || (len(qTerms) >= 2 && matched >= 2 && ratio >= 0.6) {
-					sc += matched*20 + int(ratio*30)
-				}
-			}
-		}
-		if sc >= 35 {
-			seenKey[key] = true
-			scored = append(scored, scoredErr{entry: er, score: sc})
-		}
-	}
-
-	sort.Slice(scored, func(a, b int) bool {
-		if scored[a].score != scored[b].score {
-			return scored[a].score > scored[b].score
-		}
-		if scored[a].entry.Folder != scored[b].entry.Folder {
-			return scored[a].entry.Folder == "troubleshoot"
-		}
-		return scored[a].entry.Slug < scored[b].entry.Slug
-	})
-
-	// Deduplicate by (slug + exact text) while preferring top match per slug when limit is small
-	out := make([]ErrorLookupEntry, 0, limit)
-	slugCount := make(map[string]int)
-	for _, s := range scored {
-		if slugCount[s.entry.Slug] >= 2 {
-			continue
-		}
-		slugCount[s.entry.Slug]++
-		out = append(out, *s.entry)
-		if len(out) >= limit {
-			break
-		}
-	}
-	return out
+	return e.LookupErrorV3(query, filter, limit)
 }
 
 // ---------- Temporal / Recency Query (whats_new) ----------
@@ -1787,7 +1670,7 @@ type WhatsNewEntry struct {
 
 func (e *Engine) WhatsNew(days int, filter string, limit int) []WhatsNewEntry {
 	if days < 1 {
-		days = 30
+		days = 7
 	}
 	if days > 365 {
 		days = 365
@@ -1796,7 +1679,7 @@ func (e *Engine) WhatsNew(days int, filter string, limit int) []WhatsNewEntry {
 		filter = "all"
 	}
 	if limit < 1 {
-		limit = 15
+		limit = 20
 	}
 	if limit > 50 {
 		limit = 50

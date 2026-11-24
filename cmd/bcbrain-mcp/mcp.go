@@ -43,7 +43,17 @@ type cachedPayload struct {
 	audience   string
 	abstained  bool
 	confidence string
+	topScore   int
+	facts      []string
 	resultJSON []byte
+}
+
+var gapTrackedTools = map[string]bool{
+	"ask_brain":       true,
+	"quick_answer":    true,
+	"search_brain":    true,
+	"lookup_error":    true,
+	"search_sections": true,
 }
 
 type lruCache struct {
@@ -111,16 +121,18 @@ func NewMCPService(engine *Engine, events *EventBus, gaps *GapLog, logEnabled bo
 	if version == "" {
 		version = "3.0.0"
 	}
-	baseInstructions := `BC Brain = ultra-fast dual-audience knowledge base for BC Ai Account & BC suite (sales, purchasing, inventory, AR/AP, cash/bank, assets, GL, VAT/WHT, POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Market, Dashboard, MonitorMap, WorkMonitor, Company Brain), verified against real source code.
+	baseInstructions := `BC Brain v3 = ultra-fast dual-audience knowledge base for BC Ai Account & BC suite (sales, purchasing, inventory, AR/AP, cash/bank, assets, GL, VAT/WHT, POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Market, Dashboard, MonitorMap, WorkMonitor, Company Brain), verified against real source code (hybrid RRF, section BM25, 256-dim semantic, structured facts, O(1) error index, and ground-truth verifier).
 
-FASTEST TOOL SELECTION (minimize round-trips & token latency — do NOT pre-read playbooks unless needing full scripts):
-1. quick_answer — DEFAULT for real-time Q&A, Call Center, voice/LINE bots, and focused lookups: 1 call (~2k chars normal; pass mode: "ultra" for ~600-char TL;DR ultra-low-latency voice/chat). Set include_media: true for screenshots/YouTube links.
+FASTEST TOOL SELECTION (15 tools — minimize round-trips & token latency; do NOT pre-read playbooks unless needing full scripts):
+1. quick_answer — DEFAULT for real-time Q&A, Call Center, voice/LINE bots, and focused lookups: 1 call (~2k chars normal, ~1.4k fast, or ~600-char TL;DR ultra) with top structured facts. Set include_media: true for screenshots/YouTube links.
 2. batch_ask — Answer 1–5 questions in ONE single call (defaults to mode: "ultra") when user asks compound/multi-part questions.
 3. lookup_menu — INSTANT O(1) lookup for 4-digit menu codes (1001–9070), screen names, or SQL table names (ic_trans, gl_journal, etc.).
-4. lookup_error — INSTANT O(1) lookup for exact Thai/English BC error or warning messages (e.g. ห้ามติดลบ, ล็อกหน่วยต้นทุนแล้ว, ปิดงวดไปแล้ว).
-5. whats_new — List recently updated knowledge notes within the last N days.
-6. batch_read — Read 1–5 known slugs in ONE call (optional query & max_chars_per_note) instead of sequential read_note loops.
-7. ask_brain — Multi-note synthesis with 1-hop graph & aggregated media (use compact: true or max_notes: 2 for speed).
+4. lookup_error — INSTANT O(1) Thai validation/error alert lookup returning exact cause, fix snippet, and canonical note slug.
+5. search_sections — Surgical ## Section BM25 search returning block-aware excerpts + structured facts without whole-note bloat.
+6. get_facts — Typed structured facts ([menu], [rule], [limit], [error], [formula]) filtered by query, slugs, or kinds.
+7. verify_reference — Anti-hallucination ground-truth verifier for 4-digit menu codes (all modes) and SQL tables/table.column refs (dev/all only; strictly blocked in user mode).
+8. whats_new — Recently updated knowledge base notes feed (days/audience/limit).
+9. batch_read / ask_brain — Read 1–5 known slugs or synthesize multi-note answers with 1-hop graph & aggregated media.
 
 AUDIENCE ISOLATION (MANDATORY):
 - Dev (SQL, schema, trans_flag, GL Dr/Cr, API, architecture; optional full guide: playbook-dev): pass audience: "dev" (or "all" for UI+tech). Use exact table/column/trans_flag names, PostgreSQL NUMERIC (no float), and COALESCE(last_status, 0) = 0.
@@ -164,6 +176,11 @@ func buildToolDescriptors(foldersDesc string) []map[string]any {
 		"enum":        []string{"all", "user", "dev"},
 		"description": `Audience zone: "user" (plain Thai guides/sales), "dev" (schema/SQL/API/architecture), or "all" (default).`,
 	}
+	smartAudProp := map[string]any{
+		"type":        "string",
+		"enum":        []string{"user", "dev", "both", "all"},
+		"description": `Audience zone: "user" (plain Thai guides/sales, zero SQL/code), "dev" (schema/SQL/API/architecture), or "both"/"all" (default).`,
+	}
 	ann := map[string]any{"readOnlyHint": true, "openWorldHint": false}
 	schema := "http://json-schema.org/draft-07/schema#"
 
@@ -171,16 +188,17 @@ func buildToolDescriptors(foldersDesc string) []map[string]any {
 		{
 			"name":        "quick_answer",
 			"title":       "Ultra-fast single-shot answer",
-			"description": "FASTEST default tool for real-time Q&A, Call Center, voice/LINE bots, and focused lookups. Returns ~2,000 chars (mode: 'normal') or ~600-char TL;DR (mode: 'ultra') in 1 call with strict anti-hallucination abstention.",
+			"description": "FASTEST default tool for real-time Q&A, Call Center, voice/LINE bots, and focused lookups. Returns ~2,000 chars ('normal'), ~1,400 chars ('fast'), or ~600-char TL;DR ('ultra') with top structured facts in 1 call and strict anti-hallucination abstention.",
 			"inputSchema": map[string]any{
 				"$schema": schema,
 				"type":    "object",
 				"properties": map[string]any{
 					"question":      map[string]any{"type": "string", "minLength": 2, "maxLength": 500, "description": "Thai or English question."},
 					"audience":      audProp,
-					"mode":          map[string]any{"type": "string", "enum": []string{"normal", "ultra"}, "description": "'normal' (~2000 chars) or 'ultra' (~600-char TL;DR for voice/LINE bots)."},
-					"max_chars":     map[string]any{"type": "integer", "minimum": 300, "maximum": 4500, "description": "Char budget (default 2000 normal, 700 ultra)."},
+					"mode":          map[string]any{"type": "string", "enum": []string{"normal", "ultra", "fast"}, "description": "'normal' (~2000 chars), 'fast' (~1400 chars), or 'ultra' (~600-char TL;DR for voice/LINE bots)."},
+					"max_chars":     map[string]any{"type": "integer", "minimum": 300, "maximum": 4500, "description": "Char budget (default 2000 normal, 1400 fast, 700 ultra)."},
 					"include_media": map[string]any{"type": "boolean", "description": "Append 1 compact YouTube/screenshot line (default false for max speed)."},
+					"include_facts": map[string]any{"type": "boolean", "description": "Attach concise structured facts line when budget permits (default true)."},
 				},
 				"required":             []string{"question"},
 				"additionalProperties": false,
@@ -203,8 +221,8 @@ func buildToolDescriptors(foldersDesc string) []map[string]any {
 						"description": "1–5 questions to answer in one call.",
 					},
 					"audience":             audProp,
-					"mode":                 map[string]any{"type": "string", "enum": []string{"normal", "ultra"}, "description": "Default 'ultra' (TL;DR) or 'normal'."},
-					"max_chars_per_answer": map[string]any{"type": "integer", "minimum": 300, "maximum": 2500, "description": "Char cap per answer (default 700 ultra, 1400 normal)."},
+					"mode":                 map[string]any{"type": "string", "enum": []string{"normal", "ultra", "fast"}, "description": "Default 'ultra' (TL;DR), 'fast', or 'normal'."},
+					"max_chars_per_answer": map[string]any{"type": "integer", "minimum": 300, "maximum": 2500, "description": "Char cap per answer (default 700 ultra, 1400 normal/fast)."},
 					"include_media":        map[string]any{"type": "boolean", "description": "Append compact media line per answer (default false)."},
 				},
 				"required":             []string{"questions"},
@@ -225,39 +243,6 @@ func buildToolDescriptors(foldersDesc string) []map[string]any {
 					"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 15, "description": "Max rows to return (default 6)."},
 				},
 				"required":             []string{"query"},
-				"additionalProperties": false,
-			},
-			"annotations": ann,
-		},
-		{
-			"name":        "lookup_error",
-			"title":       "Instant O(1) error message lookup",
-			"description": "Instant lookup for exact or partial Thai/English BC error or warning messages (e.g. 'ห้ามติดลบ', 'ล็อกหน่วยต้นทุนแล้ว', 'ปิดงวดไปแล้ว', 'ยอดมัดจำมากกว่ามูลค่าสุทธิ'). Returns matching troubleshooting notes and fix steps with strict audience isolation.",
-			"inputSchema": map[string]any{
-				"$schema": schema,
-				"type":    "object",
-				"properties": map[string]any{
-					"query":    map[string]any{"type": "string", "minLength": 2, "maxLength": 200, "description": "Exact or partial error/warning message shown on screen."},
-					"audience": audProp,
-					"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 15, "description": "Max matches (default 5)."},
-				},
-				"required":             []string{"query"},
-				"additionalProperties": false,
-			},
-			"annotations": ann,
-		},
-		{
-			"name":        "whats_new",
-			"title":       "Recently updated knowledge notes",
-			"description": "List recently added or updated BC Brain notes within the last N days (default 30) with timestamps, commit hashes, and concise TL;DR summaries. Respects audience isolation.",
-			"inputSchema": map[string]any{
-				"$schema": schema,
-				"type":    "object",
-				"properties": map[string]any{
-					"days":     map[string]any{"type": "integer", "minimum": 1, "maximum": 365, "description": "Lookback window in days (default 30)."},
-					"audience": audProp,
-					"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 50, "description": "Max notes to return (default 15)."},
-				},
 				"additionalProperties": false,
 			},
 			"annotations": ann,
@@ -308,7 +293,7 @@ func buildToolDescriptors(foldersDesc string) []map[string]any {
 		{
 			"name":        "search_brain",
 			"title":       "Search notes",
-			"description": "Keyword search (Thai word segmentation + SQL table/identifier matching + BM25). Supports audience ('all' | 'user' | 'dev'). Default limit 5 for low latency.",
+			"description": "Hybrid multi-signal RRF search (Thai segmentation + BM25 + section BM25 + SQL/menu direct match + 1-hop graph). Supports audience ('all' | 'user' | 'dev'). Default limit 5 for low latency.",
 			"inputSchema": map[string]any{
 				"$schema": schema,
 				"type":    "object",
@@ -389,6 +374,117 @@ func buildToolDescriptors(foldersDesc string) []map[string]any {
 					"kind":     map[string]any{"type": "string", "enum": []string{"all", "image", "youtube", "webpage"}},
 					"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 40},
 					"audience": audProp,
+				},
+				"additionalProperties": false,
+			},
+			"annotations": ann,
+		},
+		{
+			"name":        "lookup_error",
+			"title":       "O(1) Thai validation & error message lookup",
+			"description": "Instant O(1) lookup for real BC Ai Account Thai error/validation alerts. Returns exact error message, cause + fix snippet, and canonical troubleshoot/howto note slug, with strict 🛑 Abstain on unmatched queries.",
+			"inputSchema": map[string]any{
+				"$schema": schema,
+				"type":    "object",
+				"properties": map[string]any{
+					"query":    map[string]any{"type": "string", "minLength": 1, "maxLength": 300, "description": "Thai error alert or validation message."},
+					"audience": smartAudProp,
+					"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 15, "description": "Max matched error entries (default 5)."},
+				},
+				"required":             []string{"query"},
+				"additionalProperties": false,
+			},
+			"annotations": ann,
+		},
+		{
+			"name":        "search_sections",
+			"title":       "Surgical ## Section BM25 search",
+			"description": "Search individual ## Section chunks across the vault and return exact block-aware Markdown excerpts (never slicing mid-table, mid-list, or mid-code-fence) plus structured facts for matched slugs.",
+			"inputSchema": map[string]any{
+				"$schema": schema,
+				"type":    "object",
+				"properties": map[string]any{
+					"query":     map[string]any{"type": "string", "minLength": 1, "maxLength": 300, "description": "Focused Thai or technical query."},
+					"audience":  smartAudProp,
+					"limit":     map[string]any{"type": "integer", "minimum": 1, "maximum": 15, "description": "Max sections to return (default 5)."},
+					"max_chars": map[string]any{"type": "integer", "minimum": 200, "maximum": 6000, "description": "Max chars per section excerpt (default 1200)."},
+				},
+				"required":             []string{"query"},
+				"additionalProperties": false,
+			},
+			"annotations": ann,
+		},
+		{
+			"name":        "get_facts",
+			"title":       "Get structured typed facts ([menu], [rule], [limit], [error], [formula])",
+			"description": "Extract pre-computed typed facts ([menu], [rule], [limit], [error], [formula]) for explicit slugs or top search matches, with strict audience isolation (zero SQL/code jargon in user mode).",
+			"inputSchema": map[string]any{
+				"$schema": schema,
+				"type":    "object",
+				"properties": map[string]any{
+					"query": map[string]any{"type": "string", "maxLength": 300, "description": "Optional search query to select top relevant notes."},
+					"slugs": map[string]any{
+						"type":        "array",
+						"items":       map[string]any{"type": "string", "minLength": 1, "maxLength": 120},
+						"maxItems":    10,
+						"description": "Optional explicit note slugs.",
+					},
+					"kinds": map[string]any{
+						"type":        "array",
+						"items":       map[string]any{"type": "string", "enum": []string{"menu", "rule", "limit", "error", "formula"}},
+						"maxItems":    5,
+						"description": "Optional fact kinds filter.",
+					},
+					"audience": smartAudProp,
+					"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 50, "description": "Max total facts returned (default 20)."},
+				},
+				"additionalProperties": false,
+			},
+			"annotations": ann,
+		},
+		{
+			"name":        "whats_new",
+			"title":       "Recently updated knowledge base notes",
+			"description": "Return recently updated BC Brain notes within the last N days, sorted newest-first with ISO dates, titles, folders, and TL;DR summaries.",
+			"inputSchema": map[string]any{
+				"$schema": schema,
+				"type":    "object",
+				"properties": map[string]any{
+					"days":     map[string]any{"type": "integer", "minimum": 1, "maximum": 365, "description": "Lookback window in days (default 7)."},
+					"audience": smartAudProp,
+					"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 50, "description": "Max notes to return (default 20)."},
+				},
+				"additionalProperties": false,
+			},
+			"annotations": ann,
+		},
+		{
+			"name":        "verify_reference",
+			"title":       "Anti-hallucination ground-truth verifier",
+			"description": "Verify 4-digit BC menu codes (all modes) and SQL table / table.column references (dev/both/all modes only) against compiled real source ground truth. Strictly refuses and omits SQL tables/columns in audience='user' mode.",
+			"inputSchema": map[string]any{
+				"$schema": schema,
+				"type":    "object",
+				"properties": map[string]any{
+					"menus": map[string]any{
+						"type":        "array",
+						"items":       map[string]any{"type": "string", "minLength": 1, "maxLength": 20},
+						"maxItems":    50,
+						"description": "4-digit BC menu codes to verify (e.g. ['4013', '1005']).",
+					},
+					"tables": map[string]any{
+						"type":        "array",
+						"items":       map[string]any{"type": "string", "minLength": 1, "maxLength": 100},
+						"maxItems":    50,
+						"description": "SQL table names to verify (dev/both/all only; strictly blocked in user mode).",
+					},
+					"columns": map[string]any{
+						"type":        "array",
+						"items":       map[string]any{"type": "string", "minLength": 1, "maxLength": 160},
+						"maxItems":    100,
+						"description": "SQL 'table.column' references to verify (dev/both/all only; strictly blocked in user mode).",
+					},
+					"audience": smartAudProp,
 				},
 				"additionalProperties": false,
 			},
@@ -575,6 +671,22 @@ func marshalToolText(text string, isError bool) []byte {
 	return b
 }
 
+func (m *MCPService) maybeRecordToolGap(tool, rawArg string, p *cachedPayload) {
+	if !gapTrackedTools[tool] || p == nil {
+		return
+	}
+	if !p.abstained && p.totalHits > 0 && p.confidence != "low" {
+		return
+	}
+	reason := "low_conf"
+	if p.totalHits == 0 {
+		reason = "zero_hit"
+	} else if p.abstained {
+		reason = "abstain"
+	}
+	m.gaps.Record(tool, rawArg, p.audience, reason, p.topScore)
+}
+
 func (m *MCPService) runCachedTool(
 	tool, cacheKey, rawArg string,
 	compute func() cachedPayload,
@@ -586,6 +698,7 @@ func (m *MCPService) runCachedTool(
 		if m.logEnabled {
 			fmt.Fprintf(os.Stdout, "[mcp-go] tool=%s audience=%s hits=%d ms=%.2f cached=1\n", tool, hit.audience, hit.totalHits, ms)
 		}
+		m.maybeRecordToolGap(tool, rawArg, hit)
 		m.events.Emit(tool, hit.audience, rawArg, hit.hits, hit.totalHits, ms)
 		return hit, ms, true
 	}
@@ -598,29 +711,34 @@ func (m *MCPService) runCachedTool(
 	if m.logEnabled {
 		fmt.Fprintf(os.Stdout, "[mcp-go] tool=%s audience=%s hits=%d ms=%.2f\n", tool, val.audience, val.totalHits, ms)
 	}
+	m.maybeRecordToolGap(tool, rawArg, &val)
 	m.events.Emit(tool, val.audience, rawArg, val.hits, val.totalHits, ms)
 	return &val, ms, false
 }
 
-func (m *MCPService) buildQuickAnswer(question, filter, mode string, maxChars int, withMedia bool, toolName string) cachedPayload {
+func (m *MCPService) buildQuickAnswer(question, filter, mode string, maxChars int, withMedia, withFacts bool) cachedPayload {
 	budget := maxChars
 	if budget <= 0 {
-		if mode == "ultra" {
+		switch mode {
+		case "ultra":
 			budget = 700
-		} else {
+		case "fast":
+			budget = 1400
+		default:
 			budget = 2000
 		}
 	}
 	meta := m.engine.SearchWithMeta(question, 3, filter)
 	if len(meta.Hits) == 0 {
-		m.gaps.Record(toolName, question, filter, "zero_hit", 0)
 		return cachedPayload{
-			text:       fmt.Sprintf("🛑 Abstain — No matching notes (audience=%s). Do not guess—try lookup_menu or search_brain.", filter),
+			text:       fmt.Sprintf("🛑 Abstain — No matching notes (audience=%s). Do not guess—try lookup_menu, lookup_error, or search_brain.", filter),
 			hits:       []EventHit{},
 			totalHits:  0,
 			audience:   filter,
 			abstained:  true,
 			confidence: "low",
+			topScore:   0,
+			facts:      []string{},
 		}
 	}
 	denom := meta.TotalTerms
@@ -629,7 +747,6 @@ func (m *MCPService) buildQuickAnswer(question, filter, mode string, maxChars in
 	}
 	coverage := float64(meta.BestMatchedTerms) / float64(denom)
 	if meta.Confidence == "low" && (coverage < 0.5 || meta.TopScore < 18) {
-		m.gaps.Record(toolName, question, filter, "abstain", meta.TopScore)
 		capC := len(meta.Hits)
 		if capC > 3 {
 			capC = 3
@@ -657,6 +774,8 @@ func (m *MCPService) buildQuickAnswer(question, filter, mode string, maxChars in
 			audience:   filter,
 			abstained:  true,
 			confidence: "low",
+			topScore:   meta.TopScore,
+			facts:      []string{},
 		}
 	}
 
@@ -679,8 +798,27 @@ func (m *MCPService) buildQuickAnswer(question, filter, mode string, maxChars in
 		if withMedia && filter != "dev" {
 			mediaLine = formatInlineMediaLine(m.engine.CollectRelatedMedia([]string{top.Slug}, filter, 1, 1, 1))
 		}
-		outText := fmt.Sprintf("[quick_answer:ultra | audience=%s | confidence=%s | slug: %s]\n# %s\n%s%s%s",
+		parsedFacts := SafeNoteFacts(top, filter, nil, 3)
+		topFacts := make([]string, len(parsedFacts))
+		for i, pf := range parsedFacts {
+			topFacts[i] = pf.Formatted
+		}
+		baseText := fmt.Sprintf("[quick_answer:ultra | audience=%s | confidence=%s | slug: %s]\n# %s\n%s%s%s",
 			filter, meta.Confidence, top.Slug, top.Title, strings.TrimSpace(body), src, mediaLine)
+		outText := baseText
+		if withFacts && len(topFacts) > 0 {
+			twoCap := len(topFacts)
+			if twoCap > 2 {
+				twoCap = 2
+			}
+			twoFacts := "\nfacts: " + strings.Join(topFacts[:twoCap], " | ")
+			oneFact := "\nfacts: " + topFacts[0]
+			if utf8.RuneCountInString(baseText)+utf8.RuneCountInString(twoFacts) <= 980 {
+				outText = baseText + twoFacts
+			} else if utf8.RuneCountInString(baseText)+utf8.RuneCountInString(oneFact) <= 980 {
+				outText = baseText + oneFact
+			}
+		}
 		return cachedPayload{
 			text:       outText,
 			hits:       []EventHit{{Slug: top.Slug, Title: top.Title, Folder: top.Folder}},
@@ -688,6 +826,8 @@ func (m *MCPService) buildQuickAnswer(question, filter, mode string, maxChars in
 			audience:   filter,
 			abstained:  false,
 			confidence: meta.Confidence,
+			topScore:   meta.TopScore,
+			facts:      topFacts,
 		}
 	}
 
@@ -709,10 +849,18 @@ func (m *MCPService) buildQuickAnswer(question, filter, mode string, maxChars in
 	blocks := make([]string, len(picked))
 	pickedSlugs := make([]string, len(picked))
 	evHits := make([]EventHit, len(picked))
+	collectedFacts := make([]string, 0, 3)
+	seenFact := make(map[string]bool, 4)
 	for i, h := range picked {
 		n := m.engine.GetNote(h.Slug)
 		pickedSlugs[i] = n.Slug
 		evHits[i] = EventHit{Slug: n.Slug, Title: n.Title, Folder: n.Folder}
+		for _, pf := range SafeNoteFacts(n, filter, nil, 2) {
+			if !seenFact[pf.Formatted] && len(collectedFacts) < 3 {
+				seenFact[pf.Formatted] = true
+				collectedFacts = append(collectedFacts, pf.Formatted)
+			}
+		}
 		body := m.engine.ExcerptNote(n, ts, caps[i], true)
 		src := ""
 		if filter == "dev" && n.Audience == "dev" && len(n.Sources) > 0 {
@@ -738,8 +886,21 @@ func (m *MCPService) buildQuickAnswer(question, filter, mode string, maxChars in
 		}
 		relLine = "\nrelated: " + strings.Join(rSlugs, ", ")
 	}
-	outText := fmt.Sprintf("[quick_answer | audience=%s | confidence=%s | coverage=%d/%d]\n\n%s%s%s",
-		filter, meta.Confidence, meta.BestMatchedTerms, meta.TotalTerms, strings.Join(blocks, "\n\n---\n\n"), mediaLine, relLine)
+	headerTag := "quick_answer"
+	if mode == "fast" {
+		headerTag = "quick_answer:fast"
+	}
+	baseText := fmt.Sprintf("[%s | audience=%s | confidence=%s | coverage=%d/%d]\n\n%s%s%s",
+		headerTag, filter, meta.Confidence, meta.BestMatchedTerms, meta.TotalTerms, strings.Join(blocks, "\n\n---\n\n"), mediaLine, relLine)
+	outText := baseText
+	if withFacts && len(collectedFacts) > 0 {
+		factsLine := "\nfacts: " + strings.Join(collectedFacts, " | ")
+		if utf8.RuneCountInString(baseText)+utf8.RuneCountInString(factsLine) <= 2950 {
+			outText = baseText + factsLine
+		} else if utf8.RuneCountInString(baseText)+utf8.RuneCountInString(collectedFacts[0])+8 <= 2950 {
+			outText = baseText + "\nfacts: " + collectedFacts[0]
+		}
+	}
 	return cachedPayload{
 		text:       outText,
 		hits:       evHits,
@@ -747,6 +908,8 @@ func (m *MCPService) buildQuickAnswer(question, filter, mode string, maxChars in
 		audience:   filter,
 		abstained:  false,
 		confidence: meta.Confidence,
+		topScore:   meta.TopScore,
+		facts:      collectedFacts,
 	}
 }
 
@@ -813,9 +976,31 @@ func getAudienceArg(args map[string]any, def string) (string, string) {
 	return s, ""
 }
 
+func getSmartAudienceArg(args map[string]any, def string) (string, string) {
+	raw, exists := args["audience"]
+	if !exists || raw == nil {
+		return def, ""
+	}
+	s, ok := raw.(string)
+	if !ok {
+		return def, `audience: Must be one of "user", "dev", "both", "all"`
+	}
+	switch s {
+	case "user", "dev", "all":
+		return s, ""
+	case "both":
+		return "all", ""
+	default:
+		return def, `audience: Must be one of "user", "dev", "both", "all"`
+	}
+}
+
 func getStringArrayArg(args map[string]any, key string, minItems, maxItems, minLen, maxLen int) ([]string, string) {
 	raw, exists := args[key]
 	if !exists || raw == nil {
+		if minItems == 0 {
+			return nil, ""
+		}
 		return nil, fmt.Sprintf("%s: Required", key)
 	}
 	arr, ok := raw.([]any)
@@ -840,7 +1025,89 @@ func getStringArrayArg(args map[string]any, key string, minItems, maxItems, minL
 	return out, ""
 }
 
-// ---------- Tool Dispatcher (All 12 Tools) ----------
+type sectionsCoreResult struct {
+	sections   []SectionExcerptItem
+	abstained  bool
+	confidence string
+	topScore   int
+}
+
+func (m *MCPService) searchSectionsCore(query, filter string, limit, maxChars int) sectionsCoreResult {
+	if limit < 1 {
+		limit = 5
+	}
+	if limit > 15 {
+		limit = 15
+	}
+	if maxChars < 200 {
+		maxChars = 200
+	}
+	if maxChars > 6000 {
+		maxChars = 6000
+	}
+	rawHits := m.engine.SearchSections(query, limit, filter)
+	if len(rawHits) == 0 {
+		return sectionsCoreResult{sections: []SectionExcerptItem{}, abstained: true, confidence: "low", topScore: 0}
+	}
+
+	ts := m.engine.tok.Terms(query)
+	topScore := rawHits[0].Score
+	bestMatched := rawHits[0].MatchedTerms
+	denom := len(ts)
+	if denom < 1 {
+		denom = 1
+	}
+	coverage := float64(bestMatched) / float64(denom)
+	conf := "low"
+	if (coverage >= 0.6 && topScore >= 24) || (len(ts) <= 1 && topScore >= 18) {
+		conf = "high"
+	} else if coverage >= 0.45 && topScore >= 14 {
+		conf = "medium"
+	}
+
+	factsBySlug := make(map[string][]string, len(rawHits))
+	sections := make([]SectionExcerptItem, 0, len(rawHits))
+	for _, hit := range rawHits {
+		if !matchesAudience(hit.Audience, filter) {
+			continue
+		}
+		excerpt, truncated := TrimBlockAware(hit.Raw, maxChars)
+		noteFacts, ok := factsBySlug[hit.Slug]
+		if !ok {
+			note := m.engine.GetNote(hit.Slug)
+			parsed := SafeNoteFacts(note, filter, nil, 4)
+			noteFacts = make([]string, len(parsed))
+			for i, pf := range parsed {
+				noteFacts[i] = pf.Formatted
+			}
+			factsBySlug[hit.Slug] = noteFacts
+		}
+		sections = append(sections, SectionExcerptItem{
+			Slug:         hit.Slug,
+			Title:        hit.Title,
+			Folder:       hit.Folder,
+			Audience:     hit.Audience,
+			Heading:      hit.Heading,
+			Score:        hit.Score,
+			MatchedTerms: hit.MatchedTerms,
+			Excerpt:      excerpt,
+			Truncated:    truncated,
+			Facts:        noteFacts,
+		})
+	}
+
+	if len(sections) == 0 {
+		return sectionsCoreResult{sections: []SectionExcerptItem{}, abstained: true, confidence: "low", topScore: 0}
+	}
+	return sectionsCoreResult{
+		sections:   sections,
+		abstained:  false,
+		confidence: conf,
+		topScore:   sections[0].Score,
+	}
+}
+
+// ---------- Tool Dispatcher (All 15 Tools) ----------
 func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, error) {
 	if args == nil {
 		args = map[string]any{}
@@ -856,8 +1123,8 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 			return marshalToolText("Invalid arguments for quick_answer: "+errMsg, true), true, nil
 		}
 		mode, errMsg := getStringArg(args, "mode", false, 0, 10)
-		if errMsg != "" || (mode != "" && mode != "normal" && mode != "ultra") {
-			return marshalToolText("Invalid arguments for quick_answer: mode must be normal or ultra", true), true, nil
+		if errMsg != "" || (mode != "" && mode != "normal" && mode != "ultra" && mode != "fast") {
+			return marshalToolText("Invalid arguments for quick_answer: mode must be normal, fast, or ultra", true), true, nil
 		}
 		if mode == "" {
 			mode = "normal"
@@ -865,6 +1132,8 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 		defBudget := 2000
 		if mode == "ultra" {
 			defBudget = 700
+		} else if mode == "fast" {
+			defBudget = 1400
 		}
 		budget, _, errMsg := getIntArg(args, "max_chars", defBudget, 300, 4500)
 		if errMsg != "" {
@@ -874,13 +1143,21 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 		if errMsg != "" {
 			return marshalToolText("Invalid arguments for quick_answer: "+errMsg, true), true, nil
 		}
+		withFacts, errMsg := getBoolArg(args, "include_facts", true)
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for quick_answer: "+errMsg, true), true, nil
+		}
 		mediaFlag := 0
 		if withMedia {
 			mediaFlag = 1
 		}
-		key := fmt.Sprintf("%s|%s|%d|%d|%s", aud, mode, budget, mediaFlag, strings.TrimSpace(q))
+		factsFlag := 0
+		if withFacts {
+			factsFlag = 1
+		}
+		key := fmt.Sprintf("%s|%s|%d|%d|%d|%s", aud, mode, budget, mediaFlag, factsFlag, strings.TrimSpace(q))
 		p, _, _ := m.runCachedTool("quick_answer", key, q, func() cachedPayload {
-			return m.buildQuickAnswer(q, aud, mode, budget, withMedia, "quick_answer")
+			return m.buildQuickAnswer(q, aud, mode, budget, withMedia, withFacts)
 		})
 		return p.resultJSON, true, nil
 
@@ -894,14 +1171,14 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 			return marshalToolText("Invalid arguments for batch_ask: "+errMsg, true), true, nil
 		}
 		mode, errMsg := getStringArg(args, "mode", false, 0, 10)
-		if errMsg != "" || (mode != "" && mode != "normal" && mode != "ultra") {
-			return marshalToolText("Invalid arguments for batch_ask: mode must be normal or ultra", true), true, nil
+		if errMsg != "" || (mode != "" && mode != "normal" && mode != "ultra" && mode != "fast") {
+			return marshalToolText("Invalid arguments for batch_ask: mode must be normal, fast, or ultra", true), true, nil
 		}
 		if mode == "" {
 			mode = "ultra"
 		}
 		defBudget := 700
-		if mode == "normal" {
+		if mode == "normal" || mode == "fast" {
 			defBudget = 1400
 		}
 		budget, _, errMsg := getIntArg(args, "max_chars_per_answer", defBudget, 300, 2500)
@@ -928,7 +1205,7 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 			seen := make(map[string]bool)
 			blocks := make([]string, len(normQs))
 			for idx, q := range normQs {
-				sub := m.buildQuickAnswer(q, aud, mode, budget, withMedia, "batch_ask")
+				sub := m.buildQuickAnswer(q, aud, mode, budget, withMedia, true)
 				for _, h := range sub.hits {
 					if !seen[h.Slug] && len(allHits) < 6 {
 						seen[h.Slug] = true
@@ -963,7 +1240,6 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 		p, _, _ := m.runCachedTool("lookup_menu", key, q, func() cachedPayload {
 			res := m.engine.LookupDirect(q, aud, lim)
 			if res.Kind == "none" {
-				m.gaps.Record("lookup_menu", q, aud, "zero_hit", 0)
 				return cachedPayload{
 					text:      fmt.Sprintf(`No direct menu code or SQL table match for "%s" (audience=%s). Try quick_answer or search_brain.`, q, aud),
 					hits:      []EventHit{},
@@ -1025,11 +1301,11 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 		return p.resultJSON, true, nil
 
 	case "lookup_error":
-		q, errMsg := getStringArg(args, "query", true, 2, 200)
+		q, errMsg := getStringArg(args, "query", true, 1, 300)
 		if errMsg != "" {
 			return marshalToolText("Invalid arguments for lookup_error: "+errMsg, true), true, nil
 		}
-		aud, errMsg := getAudienceArg(args, "all")
+		aud, errMsg := getSmartAudienceArg(args, "all")
 		if errMsg != "" {
 			return marshalToolText("Invalid arguments for lookup_error: "+errMsg, true), true, nil
 		}
@@ -1037,48 +1313,205 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 		if errMsg != "" {
 			return marshalToolText("Invalid arguments for lookup_error: "+errMsg, true), true, nil
 		}
-		key := fmt.Sprintf("%s|%d|%s", aud, lim, strings.TrimSpace(q))
-		p, _, _ := m.runCachedTool("lookup_error", key, q, func() cachedPayload {
-			matches := m.engine.LookupError(q, aud, lim)
+		qTrim := strings.TrimSpace(q)
+		key := fmt.Sprintf("%s|%d|%s", aud, lim, qTrim)
+		p, _, _ := m.runCachedTool("lookup_error", key, qTrim, func() cachedPayload {
+			matches := m.engine.LookupError(qTrim, aud, lim)
 			if len(matches) == 0 {
-				m.gaps.Record("lookup_error", q, aud, "zero_hit", 0)
 				return cachedPayload{
-					text:      fmt.Sprintf(`No matching error message found for "%s" (audience=%s). Try quick_answer or search_brain.`, q, aud),
-					hits:      []EventHit{},
-					totalHits: 0,
-					audience:  aud,
-					abstained: true,
+					text:       fmt.Sprintf(`🛑 Abstain — No verified BC error message found for "%s" (audience=%s). Do not guess—try search_sections or quick_answer.`, qTrim, aud),
+					hits:       []EventHit{},
+					totalHits:  0,
+					audience:   aud,
+					abstained:  true,
+					confidence: "low",
+					topScore:   0,
 				}
 			}
-			lines := []string{fmt.Sprintf("## Error Matches (%d | audience=%s)", len(matches), aud)}
+			lines := []string{fmt.Sprintf("[lookup_error | audience=%s | hits=%d]", aud, len(matches)), ""}
 			evHits := make([]EventHit, 0, len(matches))
 			seenSlug := make(map[string]bool)
-			for _, er := range matches {
-				lines = append(lines, fmt.Sprintf("- **\"%s\"** → `%s` (%s) — **%s**\n  วิธีแก้: %s", er.ErrorText, er.Slug, er.Folder, er.Title, er.FixSnippet))
+			for i, er := range matches {
+				lines = append(lines, fmt.Sprintf("%d. **\"%s\"**\n   - cause/fix: %s\n   - slug: `%s` | folder: %s | audience: %s — %s",
+					i+1, er.ErrorText, er.FixSnippet, er.Slug, er.Folder, er.Audience, er.Title))
 				if !seenSlug[er.Slug] && len(evHits) < 6 {
 					seenSlug[er.Slug] = true
 					evHits = append(evHits, EventHit{Slug: er.Slug, Title: er.Title, Folder: er.Folder})
 				}
 			}
 			return cachedPayload{
+				text:       strings.Join(lines, "\n"),
+				hits:       evHits,
+				totalHits:  len(matches),
+				audience:   aud,
+				abstained:  false,
+				confidence: "high",
+				topScore:   100,
+			}
+		})
+		return p.resultJSON, true, nil
+
+	case "search_sections":
+		q, errMsg := getStringArg(args, "query", true, 1, 300)
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for search_sections: "+errMsg, true), true, nil
+		}
+		aud, errMsg := getSmartAudienceArg(args, "all")
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for search_sections: "+errMsg, true), true, nil
+		}
+		lim, _, errMsg := getIntArg(args, "limit", 5, 1, 15)
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for search_sections: "+errMsg, true), true, nil
+		}
+		capChars, _, errMsg := getIntArg(args, "max_chars", 1200, 200, 6000)
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for search_sections: "+errMsg, true), true, nil
+		}
+		qTrim := strings.TrimSpace(q)
+		key := fmt.Sprintf("%s|%d|%d|%s", aud, lim, capChars, qTrim)
+		p, _, _ := m.runCachedTool("search_sections", key, qTrim, func() cachedPayload {
+			res := m.searchSectionsCore(qTrim, aud, lim, capChars)
+			if res.abstained {
+				return cachedPayload{
+					text:       fmt.Sprintf(`🛑 Abstain — No matching sections found for "%s" (audience=%s). Do not guess—try search_brain or quick_answer.`, qTrim, aud),
+					hits:       []EventHit{},
+					totalHits:  0,
+					audience:   aud,
+					abstained:  true,
+					confidence: "low",
+					topScore:   0,
+				}
+			}
+			blocks := make([]string, 0, len(res.sections))
+			evHits := make([]EventHit, 0, 6)
+			seenSlug := make(map[string]bool)
+			allFacts := make([]string, 0, 8)
+			seenFact := make(map[string]bool)
+			for _, sec := range res.sections {
+				srcLine := ""
+				if aud == "dev" {
+					if srcNote := m.engine.GetNote(sec.Slug); srcNote != nil && srcNote.Audience == "dev" && len(srcNote.Sources) > 0 {
+						capS := len(srcNote.Sources)
+						if capS > 4 {
+							capS = 4
+						}
+						srcLine = "\nverified_sources: " + strings.Join(srcNote.Sources[:capS], ", ")
+					}
+				}
+				blocks = append(blocks, fmt.Sprintf("### %s\nslug: %s | folder: %s | audience: %s | score: %d\n\n%s%s",
+					sec.Heading, sec.Slug, sec.Folder, sec.Audience, sec.Score, sec.Excerpt, srcLine))
+				if !seenSlug[sec.Slug] && len(evHits) < 6 {
+					seenSlug[sec.Slug] = true
+					evHits = append(evHits, EventHit{Slug: sec.Slug, Title: sec.Title, Folder: sec.Folder})
+				}
+				for _, f := range sec.Facts {
+					if !seenFact[f] && len(allFacts) < 8 {
+						seenFact[f] = true
+						allFacts = append(allFacts, fmt.Sprintf("%s (%s)", f, sec.Slug))
+					}
+				}
+			}
+			factsBlock := ""
+			if len(allFacts) > 0 {
+				var fb strings.Builder
+				fb.WriteString("\n\n---\n\n## Structured Facts")
+				for _, f := range allFacts {
+					fb.WriteString("\n- ")
+					fb.WriteString(f)
+				}
+				factsBlock = fb.String()
+			}
+			return cachedPayload{
+				text:       fmt.Sprintf("[search_sections | audience=%s | confidence=%s | sections=%d]\n\n%s%s", aud, res.confidence, len(res.sections), strings.Join(blocks, "\n\n---\n\n"), factsBlock),
+				hits:       evHits,
+				totalHits:  len(res.sections),
+				audience:   aud,
+				abstained:  false,
+				confidence: res.confidence,
+				topScore:   res.topScore,
+			}
+		})
+		return p.resultJSON, true, nil
+
+	case "get_facts":
+		q, errMsg := getStringArg(args, "query", false, 0, 300)
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for get_facts: "+errMsg, true), true, nil
+		}
+		slugs, errMsg := getStringArrayArg(args, "slugs", 0, 10, 1, 120)
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for get_facts: "+errMsg, true), true, nil
+		}
+		kinds, errMsg := getStringArrayArg(args, "kinds", 0, 5, 1, 20)
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for get_facts: "+errMsg, true), true, nil
+		}
+		for _, k := range kinds {
+			if !validFactKinds[k] {
+				return marshalToolText("Invalid arguments for get_facts: kinds must be in menu, rule, limit, error, formula", true), true, nil
+			}
+		}
+		aud, errMsg := getSmartAudienceArg(args, "all")
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for get_facts: "+errMsg, true), true, nil
+		}
+		lim, _, errMsg := getIntArg(args, "limit", 20, 1, 50)
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for get_facts: "+errMsg, true), true, nil
+		}
+		normSlugs := make([]string, 0, len(slugs))
+		for _, s := range slugs {
+			if ts := strings.TrimSpace(s); ts != "" {
+				normSlugs = append(normSlugs, ts)
+			}
+		}
+		qTrim := strings.TrimSpace(q)
+		rawArg := qTrim
+		if rawArg == "" {
+			if len(normSlugs) > 0 {
+				rawArg = strings.Join(normSlugs, ",")
+			} else if len(kinds) > 0 {
+				rawArg = "kinds=" + strings.Join(kinds, ",")
+			} else {
+				rawArg = "*"
+			}
+		}
+		key := fmt.Sprintf("%s|%d|%s|%s|%s", aud, lim, qTrim, strings.Join(normSlugs, ","), strings.Join(kinds, ","))
+		p, _, _ := m.runCachedTool("get_facts", key, rawArg, func() cachedPayload {
+			facts, matchedNotes := m.engine.CollectFacts(qTrim, normSlugs, kinds, aud, lim)
+			if len(facts) == 0 {
+				return cachedPayload{
+					text:      fmt.Sprintf("No matching structured facts found (audience=%s). Try broader query, different kinds, or read_note.", aud),
+					hits:      []EventHit{},
+					totalHits: 0,
+					audience:  aud,
+				}
+			}
+			lines := make([]string, 0, len(facts)+1)
+			lines = append(lines, fmt.Sprintf("[get_facts | audience=%s | count=%d]", aud, len(facts)))
+			for _, f := range facts {
+				lines = append(lines, fmt.Sprintf("- %s (slug: %s)", f.Formatted, f.Slug))
+			}
+			return cachedPayload{
 				text:      strings.Join(lines, "\n"),
-				hits:      evHits,
-				totalHits: len(matches),
+				hits:      matchedNotes,
+				totalHits: len(facts),
 				audience:  aud,
 			}
 		})
 		return p.resultJSON, true, nil
 
 	case "whats_new":
-		days, _, errMsg := getIntArg(args, "days", 30, 1, 365)
+		days, _, errMsg := getIntArg(args, "days", 7, 1, 365)
 		if errMsg != "" {
 			return marshalToolText("Invalid arguments for whats_new: "+errMsg, true), true, nil
 		}
-		aud, errMsg := getAudienceArg(args, "all")
+		aud, errMsg := getSmartAudienceArg(args, "all")
 		if errMsg != "" {
 			return marshalToolText("Invalid arguments for whats_new: "+errMsg, true), true, nil
 		}
-		lim, _, errMsg := getIntArg(args, "limit", 15, 1, 50)
+		lim, _, errMsg := getIntArg(args, "limit", 20, 1, 50)
 		if errMsg != "" {
 			return marshalToolText("Invalid arguments for whats_new: "+errMsg, true), true, nil
 		}
@@ -1087,13 +1520,14 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 			items := m.engine.WhatsNew(days, aud, lim)
 			if len(items) == 0 {
 				return cachedPayload{
-					text:      fmt.Sprintf("No notes updated in the last %d days (audience=%s).", days, aud),
+					text:      fmt.Sprintf("No notes updated within the last %d day(s) (audience=%s). Try increasing days (e.g. days: 30).", days, aud),
 					hits:      []EventHit{},
 					totalHits: 0,
 					audience:  aud,
 				}
 			}
-			lines := []string{fmt.Sprintf("## Recently Updated Notes (last %d days | audience=%s | count=%d)", days, aud, len(items))}
+			lines := make([]string, 0, len(items)+1)
+			lines = append(lines, fmt.Sprintf("[whats_new | days=%d | audience=%s | count=%d]", days, aud, len(items)))
 			evHits := make([]EventHit, 0, 6)
 			for _, it := range items {
 				dateShort := it.UpdatedAt
@@ -1101,8 +1535,8 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 					dateShort = dateShort[:10]
 				}
 				tldrFlat := strings.TrimSpace(reWhitespace.ReplaceAllString(it.Tldr, " "))
-				tldrShort := sliceRunes(tldrFlat, 130)
-				lines = append(lines, fmt.Sprintf("- **%s** (%s | %s | %s | `%s`) — %s\n  %s", it.Slug, it.Folder, it.Audience, dateShort, it.LastCommit, it.Title, tldrShort))
+				tldrShort := sliceRunes(tldrFlat, 140)
+				lines = append(lines, fmt.Sprintf("- **%s** `%s` (%s | %s) — **%s**: %s", dateShort, it.Slug, it.Folder, it.Audience, it.Title, tldrShort))
 				if len(evHits) < 6 {
 					evHits = append(evHits, EventHit{Slug: it.Slug, Title: it.Title, Folder: it.Folder})
 				}
@@ -1111,6 +1545,56 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 				text:      strings.Join(lines, "\n"),
 				hits:      evHits,
 				totalHits: len(items),
+				audience:  aud,
+			}
+		})
+		return p.resultJSON, true, nil
+
+	case "verify_reference":
+		menus, errMsg := getStringArrayArg(args, "menus", 0, 50, 1, 20)
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for verify_reference: "+errMsg, true), true, nil
+		}
+		tables, errMsg := getStringArrayArg(args, "tables", 0, 50, 1, 100)
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for verify_reference: "+errMsg, true), true, nil
+		}
+		columns, errMsg := getStringArrayArg(args, "columns", 0, 100, 1, 160)
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for verify_reference: "+errMsg, true), true, nil
+		}
+		aud, errMsg := getSmartAudienceArg(args, "all")
+		if errMsg != "" {
+			return marshalToolText("Invalid arguments for verify_reference: "+errMsg, true), true, nil
+		}
+		var argBits []string
+		if len(menus) > 0 {
+			argBits = append(argBits, fmt.Sprintf("menus=%d", len(menus)))
+		}
+		if len(tables) > 0 {
+			argBits = append(argBits, fmt.Sprintf("tables=%d", len(tables)))
+		}
+		if len(columns) > 0 {
+			argBits = append(argBits, fmt.Sprintf("cols=%d", len(columns)))
+		}
+		rawArg := "empty"
+		if len(argBits) > 0 {
+			rawArg = strings.Join(argBits, " ")
+		}
+		key := fmt.Sprintf("%s|m:%s|t:%s|c:%s", aud, strings.Join(menus, ","), strings.Join(tables, ","), strings.Join(columns, ","))
+		p, _, _ := m.runCachedTool("verify_reference", key, rawArg, func() cachedPayload {
+			res := m.engine.grounding.VerifyReferences(VerifyReferenceInput{
+				Menus:    menus,
+				Tables:   tables,
+				Columns:  columns,
+				Audience: aud,
+			})
+			rawJSON, _ := json.Marshal(res)
+			totalChecked := res.Summary.CheckedMenus + res.Summary.CheckedTables + res.Summary.CheckedColumns
+			return cachedPayload{
+				text:      string(rawJSON),
+				hits:      []EventHit{},
+				totalHits: totalChecked,
 				audience:  aud,
 			}
 		})
@@ -1228,13 +1712,14 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 		p, _, _ := m.runCachedTool("ask_brain", key, q, func() cachedPayload {
 			meta := m.engine.SearchWithMeta(q, maxNotes, aud)
 			if len(meta.Hits) == 0 {
-				m.gaps.Record("ask_brain", q, aud, "zero_hit", 0)
 				return cachedPayload{
-					text:      fmt.Sprintf("🛑 Abstain — No matching notes (audience=%s). Do not guess—try other keywords (Thai or SQL/API identifiers) or list_notes.", aud),
-					hits:      []EventHit{},
-					totalHits: 0,
-					audience:  aud,
-					abstained: true,
+					text:       fmt.Sprintf("🛑 Abstain — No matching notes (audience=%s). Do not guess—try other keywords (Thai or SQL/API identifiers) or list_notes.", aud),
+					hits:       []EventHit{},
+					totalHits:  0,
+					audience:   aud,
+					abstained:  true,
+					confidence: "low",
+					topScore:   0,
 				}
 			}
 			denom := meta.TotalTerms
@@ -1243,7 +1728,6 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 			}
 			coverage := float64(meta.BestMatchedTerms) / float64(denom)
 			if meta.Confidence == "low" && (coverage < 0.5 || meta.TopScore < 18) {
-				m.gaps.Record("ask_brain", q, aud, "abstain", meta.TopScore)
 				capC := len(meta.Hits)
 				if capC > 3 {
 					capC = 3
@@ -1266,10 +1750,12 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 						"🛑 Abstain — Insufficient Grounded Evidence in BC Brain (audience=%s, confidence=low, coverage=%d/%d, topScore=%d) for: %s\n\nDo NOT extrapolate or guess. State clearly that BC Brain has no verified record for this question.\nClosest topic candidates (inspect with read_note only if relevant):\n%s",
 						aud, meta.BestMatchedTerms, meta.TotalTerms, meta.TopScore, q, strings.Join(cands, "\n"),
 					),
-					hits:      evHits,
-					totalHits: len(meta.Hits),
-					audience:  aud,
-					abstained: true,
+					hits:       evHits,
+					totalHits:  len(meta.Hits),
+					audience:   aud,
+					abstained:  true,
+					confidence: "low",
+					topScore:   meta.TopScore,
 				}
 			}
 
@@ -1380,8 +1866,15 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 		key := fmt.Sprintf("%s|%d|%s", aud, lim, strings.TrimSpace(q))
 		p, _, _ := m.runCachedTool("search_brain", key, q, func() cachedPayload {
 			hits := m.engine.Search(q, lim, aud)
-			if len(hits) == 0 {
-				m.gaps.Record("search_brain", q, aud, "zero_hit", 0)
+			topScore := 0
+			if len(hits) > 0 {
+				topScore = hits[0].Score
+			}
+			conf := "medium"
+			if len(hits) == 0 || topScore < 18 {
+				conf = "low"
+			} else if topScore >= 35 {
+				conf = "high"
 			}
 			type compactImg struct {
 				Alt string `json:"alt"`
@@ -1450,10 +1943,13 @@ func (m *MCPService) callTool(name string, args map[string]any) ([]byte, bool, e
 			}
 			rawJSON, _ := json.Marshal(compact)
 			return cachedPayload{
-				text:      string(rawJSON),
-				hits:      evHits,
-				totalHits: len(hits),
-				audience:  aud,
+				text:       string(rawJSON),
+				hits:       evHits,
+				totalHits:  len(hits),
+				audience:   aud,
+				abstained:  len(hits) == 0,
+				confidence: conf,
+				topScore:   topScore,
 			}
 		})
 		return p.resultJSON, true, nil
@@ -1922,7 +2418,7 @@ func (m *MCPService) HandleJSONRPCPayload(raw []byte) (int, []byte) {
 	return 200, single
 }
 
-// ---------- Fast REST API Helper (/api/fast) ----------
+// ---------- Fast REST API Helpers (/api/*) ----------
 type FastRestResult struct {
 	OK         bool       `json:"ok"`
 	Kind       string     `json:"kind"`
@@ -1931,23 +2427,33 @@ type FastRestResult struct {
 	Answer     string     `json:"answer"`
 	Abstained  bool       `json:"abstained"`
 	Confidence string     `json:"confidence"`
+	Facts      []string   `json:"facts"`
 	Hits       []EventHit `json:"hits"`
 	Ms         float64    `json:"ms"`
 	Cached     bool       `json:"cached"`
 }
 
-func (m *MCPService) RunFastRestQuery(q, menu, audience, mode string, includeMedia bool, maxChars int) FastRestResult {
-	filter := "user"
-	if audience == "dev" || audience == "all" {
-		filter = audience
+func normalizeRestAudience(raw, def string) string {
+	switch raw {
+	case "user":
+		return "user"
+	case "dev":
+		return "dev"
+	case "all", "both":
+		return "all"
+	default:
+		return def
 	}
+}
+
+func (m *MCPService) RunFastRestQuery(q, menu, audience, mode string, includeMedia bool, maxChars int) FastRestResult {
+	filter := normalizeRestAudience(audience, "user")
 	if strings.TrimSpace(menu) != "" {
 		mq := strings.TrimSpace(menu)
 		key := fmt.Sprintf("%s|6|%s", filter, mq)
 		p, ms, cached := m.runCachedTool("lookup_menu", key, mq, func() cachedPayload {
 			res := m.engine.LookupDirect(mq, filter, 6)
 			if res.Kind == "none" {
-				m.gaps.Record("lookup_menu", mq, filter, "zero_hit", 0)
 				return cachedPayload{
 					text:      fmt.Sprintf(`No direct menu code or SQL table match for "%s" (audience=%s). Try quick_answer or search_brain.`, mq, filter),
 					hits:      []EventHit{},
@@ -2010,6 +2516,10 @@ func (m *MCPService) RunFastRestQuery(q, menu, audience, mode string, includeMed
 		if p.totalHits > 0 {
 			conf = "high"
 		}
+		hits := p.hits
+		if hits == nil {
+			hits = []EventHit{}
+		}
 		return FastRestResult{
 			OK:         true,
 			Kind:       "menu",
@@ -2018,14 +2528,15 @@ func (m *MCPService) RunFastRestQuery(q, menu, audience, mode string, includeMed
 			Answer:     p.text,
 			Abstained:  p.totalHits == 0,
 			Confidence: conf,
-			Hits:       p.hits,
+			Facts:      []string{},
+			Hits:       hits,
 			Ms:         math.Round(ms*100) / 100,
 			Cached:     cached,
 		}
 	}
 
 	qTrim := strings.TrimSpace(q)
-	if mode != "normal" {
+	if mode != "normal" && mode != "fast" {
 		mode = "ultra"
 	}
 	if utf8.RuneCountInString(qTrim) < 2 {
@@ -2037,14 +2548,18 @@ func (m *MCPService) RunFastRestQuery(q, menu, audience, mode string, includeMed
 			Answer:     "Missing query parameter ?q=... (min 2 chars) or ?menu=4013",
 			Abstained:  true,
 			Confidence: "low",
+			Facts:      []string{},
 			Hits:       []EventHit{},
 		}
 	}
 	budget := maxChars
 	if budget <= 0 {
-		if mode == "ultra" {
+		switch mode {
+		case "ultra":
 			budget = 700
-		} else {
+		case "fast":
+			budget = 1400
+		default:
 			budget = 2000
 		}
 	}
@@ -2052,13 +2567,21 @@ func (m *MCPService) RunFastRestQuery(q, menu, audience, mode string, includeMed
 	if includeMedia {
 		mediaFlag = 1
 	}
-	key := fmt.Sprintf("%s|%s|%d|%d|%s", filter, mode, budget, mediaFlag, qTrim)
+	key := fmt.Sprintf("%s|%s|%d|%d|1|%s", filter, mode, budget, mediaFlag, qTrim)
 	p, ms, cached := m.runCachedTool("quick_answer", key, qTrim, func() cachedPayload {
-		return m.buildQuickAnswer(qTrim, filter, mode, budget, includeMedia, "quick_answer")
+		return m.buildQuickAnswer(qTrim, filter, mode, budget, includeMedia, true)
 	})
 	conf := p.confidence
 	if conf == "" {
 		conf = "medium"
+	}
+	facts := p.facts
+	if facts == nil {
+		facts = []string{}
+	}
+	hits := p.hits
+	if hits == nil {
+		hits = []EventHit{}
 	}
 	return FastRestResult{
 		OK:         true,
@@ -2068,8 +2591,211 @@ func (m *MCPService) RunFastRestQuery(q, menu, audience, mode string, includeMed
 		Answer:     p.text,
 		Abstained:  p.abstained,
 		Confidence: conf,
-		Hits:       p.hits,
+		Facts:      facts,
+		Hits:       hits,
 		Ms:         math.Round(ms*100) / 100,
 		Cached:     cached,
 	}
+}
+
+type ErrorRestHit struct {
+	ErrorText  string `json:"errorText"`
+	FixSnippet string `json:"fixSnippet"`
+	Slug       string `json:"slug"`
+	Title      string `json:"title"`
+	Folder     string `json:"folder"`
+	Audience   string `json:"audience"`
+}
+
+type ErrorRestResult struct {
+	OK        bool           `json:"ok"`
+	Error     string         `json:"error,omitempty"`
+	Query     string         `json:"query"`
+	Audience  string         `json:"audience"`
+	Count     int            `json:"count"`
+	Abstained bool           `json:"abstained"`
+	Hits      []ErrorRestHit `json:"hits"`
+	Ms        float64        `json:"ms"`
+}
+
+func (m *MCPService) RunErrorRestQuery(q, audience string, limit int) ErrorRestResult {
+	t0 := time.Now()
+	filter := normalizeRestAudience(audience, "user")
+	qTrim := strings.TrimSpace(q)
+	if qTrim == "" {
+		return ErrorRestResult{
+			OK:        false,
+			Error:     "Missing query parameter ?q=...",
+			Query:     "",
+			Audience:  filter,
+			Count:     0,
+			Abstained: true,
+			Hits:      []ErrorRestHit{},
+			Ms:        0,
+		}
+	}
+	if limit < 1 {
+		limit = 5
+	}
+	if limit > 15 {
+		limit = 15
+	}
+	entries := m.engine.LookupError(qTrim, filter, limit)
+	abstained := len(entries) == 0
+	if abstained {
+		m.gaps.Record("lookup_error", qTrim, filter, "zero_hit", 0)
+	}
+	hits := make([]ErrorRestHit, len(entries))
+	for i, e := range entries {
+		hits[i] = ErrorRestHit{
+			ErrorText:  e.ErrorText,
+			FixSnippet: e.FixSnippet,
+			Slug:       e.Slug,
+			Title:      e.Title,
+			Folder:     e.Folder,
+			Audience:   e.Audience,
+		}
+	}
+	ms := float64(time.Since(t0).Microseconds()) / 1000.0
+	return ErrorRestResult{
+		OK:        true,
+		Query:     qTrim,
+		Audience:  filter,
+		Count:     len(hits),
+		Abstained: abstained,
+		Hits:      hits,
+		Ms:        math.Round(ms*100) / 100,
+	}
+}
+
+type SectionsRestResult struct {
+	OK        bool                 `json:"ok"`
+	Error     string               `json:"error,omitempty"`
+	Query     string               `json:"query"`
+	Audience  string               `json:"audience"`
+	Count     int                  `json:"count"`
+	Abstained bool                 `json:"abstained"`
+	Sections  []SectionExcerptItem `json:"sections"`
+	Ms        float64              `json:"ms"`
+}
+
+func (m *MCPService) RunSectionsRestQuery(q, audience string, limit, maxChars int) SectionsRestResult {
+	t0 := time.Now()
+	filter := normalizeRestAudience(audience, "user")
+	qTrim := strings.TrimSpace(q)
+	if qTrim == "" {
+		return SectionsRestResult{
+			OK:        false,
+			Error:     "Missing query parameter ?q=...",
+			Query:     "",
+			Audience:  filter,
+			Count:     0,
+			Abstained: true,
+			Sections:  []SectionExcerptItem{},
+			Ms:        0,
+		}
+	}
+	res := m.searchSectionsCore(qTrim, filter, limit, maxChars)
+	if res.abstained || res.confidence == "low" {
+		reason := "low_conf"
+		if res.abstained {
+			reason = "zero_hit"
+		}
+		m.gaps.Record("search_sections", qTrim, filter, reason, res.topScore)
+	}
+	ms := float64(time.Since(t0).Microseconds()) / 1000.0
+	return SectionsRestResult{
+		OK:        true,
+		Query:     qTrim,
+		Audience:  filter,
+		Count:     len(res.sections),
+		Abstained: res.abstained,
+		Sections:  res.sections,
+		Ms:        math.Round(ms*100) / 100,
+	}
+}
+
+type FactsRestResult struct {
+	OK       bool             `json:"ok"`
+	Audience string           `json:"audience"`
+	Count    int              `json:"count"`
+	Facts    []FactResultItem `json:"facts"`
+	Ms       float64          `json:"ms"`
+}
+
+func (m *MCPService) RunFactsRestQuery(q string, slugs, kinds []string, audience string, limit int) FactsRestResult {
+	t0 := time.Now()
+	filter := normalizeRestAudience(audience, "user")
+	facts, _ := m.engine.CollectFacts(q, slugs, kinds, filter, limit)
+	if facts == nil {
+		facts = []FactResultItem{}
+	}
+	ms := float64(time.Since(t0).Microseconds()) / 1000.0
+	return FactsRestResult{
+		OK:       true,
+		Audience: filter,
+		Count:    len(facts),
+		Facts:    facts,
+		Ms:       math.Round(ms*100) / 100,
+	}
+}
+
+type WhatsNewRestItem struct {
+	Slug      string `json:"slug"`
+	Title     string `json:"title"`
+	Folder    string `json:"folder"`
+	Audience  string `json:"audience"`
+	UpdatedAt string `json:"updatedAt"`
+	Tldr      string `json:"tldr"`
+}
+
+type WhatsNewRestResult struct {
+	OK       bool               `json:"ok"`
+	Days     int                `json:"days"`
+	Audience string             `json:"audience"`
+	Count    int                `json:"count"`
+	Items    []WhatsNewRestItem `json:"items"`
+	Ms       float64            `json:"ms"`
+}
+
+func (m *MCPService) RunWhatsNewRestQuery(days int, audience string, limit int) WhatsNewRestResult {
+	t0 := time.Now()
+	filter := normalizeRestAudience(audience, "user")
+	if days < 1 {
+		days = 7
+	}
+	if days > 365 {
+		days = 365
+	}
+	if limit < 1 {
+		limit = 20
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	rows := m.engine.WhatsNew(days, filter, limit)
+	items := make([]WhatsNewRestItem, len(rows))
+	for i, r := range rows {
+		items[i] = WhatsNewRestItem{
+			Slug:      r.Slug,
+			Title:     r.Title,
+			Folder:    r.Folder,
+			Audience:  r.Audience,
+			UpdatedAt: r.UpdatedAt,
+			Tldr:      r.Tldr,
+		}
+	}
+	ms := float64(time.Since(t0).Microseconds()) / 1000.0
+	return WhatsNewRestResult{
+		OK:       true,
+		Days:     days,
+		Audience: filter,
+		Count:    len(items),
+		Items:    items,
+		Ms:       math.Round(ms*100) / 100,
+	}
+}
+
+func (m *MCPService) RunVerifyRestQuery(input VerifyReferenceInput) VerifyReferenceResult {
+	return m.engine.grounding.VerifyReferences(input)
 }

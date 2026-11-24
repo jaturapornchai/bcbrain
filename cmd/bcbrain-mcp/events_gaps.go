@@ -159,30 +159,38 @@ func (b *EventBus) Subscribe() (<-chan McpCallEvent, func()) {
 	return ch, unsub
 }
 
-// ---------- Sanitized Zero-Hit / Abstain Gap Feedback Log ----------
-type GapRecord struct {
-	Tool      string `json:"tool"`
-	Audience  string `json:"audience"`
-	Reason    string `json:"reason"` // "abstain" | "zero_hit" | "low_conf"
-	Query     string `json:"query"`
-	Count     int    `json:"count"`
-	TopScore  int    `json:"topScore"`
-	FirstSeen string `json:"firstSeen"`
-	LastSeen  string `json:"lastSeen"`
+// ---------- Sanitized Zero-Hit / Abstain Gap Feedback Log (parity with lib/gap-log.ts) ----------
+type GapEntry struct {
+	Query     string         `json:"query"`
+	Audience  string         `json:"audience"`
+	Tool      string         `json:"tool"`
+	Tools     []string       `json:"tools"`
+	Reason    string         `json:"reason"` // "abstain" | "zero_hit" | "low_conf"
+	Reasons   map[string]int `json:"reasons"`
+	Count     int            `json:"count"`
+	TopScore  *float64       `json:"topScore"`
+	FirstSeen string         `json:"firstSeen"`
+	LastSeen  string         `json:"lastSeen"`
 }
 
 type GapLog struct {
-	mu          sync.Mutex
-	entries     map[string]*GapRecord
-	order       []string
-	totalEvents int
-	filePath    string
+	mu            sync.Mutex
+	entries       map[string]*GapEntry
+	order         []string
+	totalRecorded int
+	byReason      map[string]int
+	filePath      string
+}
+
+func emptyReasonCounts() map[string]int {
+	return map[string]int{"abstain": 0, "zero_hit": 0, "low_conf": 0}
 }
 
 func NewGapLog(filePath string) *GapLog {
 	return &GapLog{
-		entries:  make(map[string]*GapRecord, 64),
+		entries:  make(map[string]*GapEntry, 64),
 		order:    make([]string, 0, 64),
+		byReason: emptyReasonCounts(),
 		filePath: strings.TrimSpace(filePath),
 	}
 }
@@ -192,52 +200,85 @@ func (g *GapLog) Record(tool, query, audience, reason string, topScore int) {
 	if cleanQ == "" {
 		return
 	}
-	if audience == "" {
+	cleanTool := SanitizeArg(tool)
+	if cleanTool == "" {
+		cleanTool = "unknown"
+	}
+	if audience != "user" && audience != "dev" {
 		audience = "all"
 	}
-	if reason == "" {
-		reason = "zero_hit"
+	if reason != "abstain" && reason != "zero_hit" && reason != "low_conf" {
+		reason = "low_conf"
 	}
-	nowStr := time.Now().UTC().Format(time.RFC3339)
-	key := tool + "\x00" + audience + "\x00" + reason + "\x00" + strings.ToLower(cleanQ)
+	tsVal := float64(topScore)
+	nowStr := time.Now().UTC().Format(time.RFC3339Nano)
+	key := audience + "::" + strings.ToLower(cleanQ)
 
 	g.mu.Lock()
-	g.totalEvents++
-	var snap GapRecord
+	g.totalRecorded++
+	g.byReason[reason]++
 	if existing, ok := g.entries[key]; ok {
 		existing.Count++
-		existing.LastSeen = nowStr
-		if topScore > existing.TopScore {
-			existing.TopScore = topScore
+		existing.Tool = cleanTool
+		hasTool := false
+		for _, t := range existing.Tools {
+			if t == cleanTool {
+				hasTool = true
+				break
+			}
 		}
-		snap = *existing
+		if !hasTool && len(existing.Tools) < 12 {
+			existing.Tools = append(existing.Tools, cleanTool)
+		}
+		existing.Reason = reason
+		existing.Reasons[reason]++
+		existing.TopScore = &tsVal
+		existing.LastSeen = nowStr
+		// Move key to tail of order slice for LRU eviction
+		for i, k := range g.order {
+			if k == key {
+				g.order = append(g.order[:i], g.order[i+1:]...)
+				break
+			}
+		}
+		g.order = append(g.order, key)
 	} else {
 		if len(g.entries) >= maxGapEntries && len(g.order) > 0 {
 			oldest := g.order[0]
 			g.order = g.order[1:]
 			delete(g.entries, oldest)
 		}
-		rec := &GapRecord{
-			Tool:      tool,
-			Audience:  audience,
-			Reason:    reason,
+		reasons := emptyReasonCounts()
+		reasons[reason] = 1
+		rec := &GapEntry{
 			Query:     cleanQ,
+			Audience:  audience,
+			Tool:      cleanTool,
+			Tools:     []string{cleanTool},
+			Reason:    reason,
+			Reasons:   reasons,
 			Count:     1,
-			TopScore:  topScore,
+			TopScore:  &tsVal,
 			FirstSeen: nowStr,
 			LastSeen:  nowStr,
 		}
 		g.entries[key] = rec
 		g.order = append(g.order, key)
-		snap = *rec
 	}
 	fp := g.filePath
 	g.mu.Unlock()
 
 	if fp != "" {
 		// Non-blocking best-effort JSONL append (safe no-op under ProtectSystem=strict)
-		go func(path string, r GapRecord) {
-			line, err := json.Marshal(r)
+		go func(path string, ts, tl, aud, rsn, q string, sc float64) {
+			line, err := json.Marshal(map[string]any{
+				"ts":       ts,
+				"tool":     tl,
+				"audience": aud,
+				"reason":   rsn,
+				"query":    q,
+				"topScore": sc,
+			})
 			if err != nil {
 				return
 			}
@@ -247,16 +288,18 @@ func (g *GapLog) Record(tool, query, audience, reason string, topScore int) {
 			}
 			defer f.Close()
 			_, _ = f.Write(append(line, '\n'))
-		}(fp, snap)
+		}(fp, nowStr, cleanTool, audience, reason, cleanQ, tsVal)
 	}
 }
 
 type GapReport struct {
-	OK          bool        `json:"ok"`
-	Service     string      `json:"service"`
-	Count       int         `json:"count"`
-	TotalEvents int         `json:"totalEvents"`
-	Gaps        []GapRecord `json:"gaps"`
+	OK                 bool           `json:"ok"`
+	TotalRecorded      int            `json:"totalRecorded"`
+	UniqueQueries      int            `json:"uniqueQueries"`
+	MaxEntries         int            `json:"maxEntries"`
+	FileLoggingEnabled bool           `json:"fileLoggingEnabled"`
+	ByReason           map[string]int `json:"byReason"`
+	Entries            []GapEntry     `json:"entries"`
 }
 
 func (g *GapLog) Report(limit int) GapReport {
@@ -267,11 +310,23 @@ func (g *GapLog) Report(limit int) GapReport {
 		limit = maxGapEntries
 	}
 	g.mu.Lock()
-	list := make([]GapRecord, 0, len(g.entries))
+	list := make([]GapEntry, 0, len(g.entries))
 	for _, r := range g.entries {
-		list = append(list, *r)
+		cp := *r
+		cp.Tools = append([]string(nil), r.Tools...)
+		cp.Reasons = make(map[string]int, len(r.Reasons))
+		for k, v := range r.Reasons {
+			cp.Reasons[k] = v
+		}
+		list = append(list, cp)
 	}
-	total := g.totalEvents
+	total := g.totalRecorded
+	uniq := len(g.entries)
+	byReason := make(map[string]int, len(g.byReason))
+	for k, v := range g.byReason {
+		byReason[k] = v
+	}
+	fileLog := g.filePath != ""
 	g.mu.Unlock()
 
 	sort.Slice(list, func(a, b int) bool {
@@ -284,10 +339,12 @@ func (g *GapLog) Report(limit int) GapReport {
 		list = list[:limit]
 	}
 	return GapReport{
-		OK:          true,
-		Service:     "bcbrain-mcp-go",
-		Count:       len(list),
-		TotalEvents: total,
-		Gaps:        list,
+		OK:                 true,
+		TotalRecorded:      total,
+		UniqueQueries:      uniq,
+		MaxEntries:         maxGapEntries,
+		FileLoggingEnabled: fileLog,
+		ByReason:           byReason,
+		Entries:            list,
 	}
 }

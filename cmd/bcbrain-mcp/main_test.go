@@ -167,7 +167,8 @@ func buildTestPack() *Pack {
 		Errors: []ErrorLookupEntry{
 			{
 				ErrorText:  "สินค้า [<รหัส>] ห้ามติดลบ",
-				Norm:       "สินค้า [<รหัส>] ห้ามติดลบ",
+				Norm:       "สินค้า ห้ามติดลบ",
+				Stripped:   "สินค้า ห้ามติดลบ",
 				Slug:       "ts-stock-negative-control",
 				Title:      "แก้ปัญหาเตือนสินค้าติดลบ ห้ามขายติดลบ",
 				Folder:     "troubleshoot",
@@ -175,6 +176,23 @@ func buildTestPack() *Pack {
 				FixSnippet: "ตรวจสอบเอกสารรับเข้า คลัง และวันเวลาเอกสารก่อนบันทึกขาย",
 			},
 		},
+		GroundingIndex: GroundingIndexFile{
+			BuiltAt:     nowISO,
+			MenuCount:   2,
+			TableCount:  2,
+			ColumnCount: 5,
+			ErrorCount:  1,
+			Menus: map[string]GroundingMenuEntry{
+				"4013": {Code: "4013", Label: "ขายสินค้า/บริการ", Module: "ระบบขาย"},
+				"1005": {Code: "1005", Label: "ปรับปรุงภาษา", Module: "เริ่มต้น"},
+			},
+			Tables: map[string][]string{
+				"ic_trans":        {"doc_no", "doc_date", "trans_flag", "last_status"},
+				"ic_trans_detail": {"doc_no", "item_code"},
+				"bc_user_list":    {"user_code", "password_hash"}, // must be stripped by GroundingRuntime!
+			},
+		},
+		OpenApiSpec: json.RawMessage(`{"openapi":"3.1.0","info":{"title":"BC Brain API & MCP Server","version":"3.0.0"},"paths":{"/mcp":{},"\/api\/verify":{}}}`),
 		BootstrapPacks: map[string]BootstrapPack{
 			"user": {Text: "# User Pack\n- **4013** ขายสินค้า/บริการ", Etag: `"bcpack-user-abc-1234"`, Chars: 40},
 			"dev":  {Text: "# Dev Pack\n- `ic_trans` NUMERIC", Etag: `"bcpack-dev-abc-1234"`, Chars: 32},
@@ -252,11 +270,11 @@ func TestSanitizeAndGaps(t *testing.T) {
 	gl.Record("quick_answer", raw, "user", "abstain", 0)
 	gl.Record("quick_answer", raw, "user", "abstain", 0)
 	rep := gl.Report(10)
-	if !rep.OK || rep.Count != 1 || rep.TotalEvents != 2 || rep.Gaps[0].Count != 2 {
+	if !rep.OK || rep.UniqueQueries != 1 || rep.TotalRecorded != 2 || len(rep.Entries) != 1 || rep.Entries[0].Count != 2 {
 		t.Fatalf("unexpected gap report: %+v", rep)
 	}
-	if strings.Contains(rep.Gaps[0].Query, mockMail) {
-		t.Fatalf("gap log leaked email: %q", rep.Gaps[0].Query)
+	if strings.Contains(rep.Entries[0].Query, mockMail) {
+		t.Fatalf("gap log leaked email: %q", rep.Entries[0].Query)
 	}
 }
 
@@ -273,7 +291,7 @@ func TestHTTPEndpointsAndMCPTools(t *testing.T) {
 	var hz map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&hz)
 	resp.Body.Close()
-	if hz["service"] != "bcbrain-mcp-go" || hz["version"] != "3.0.0" {
+	if hz["service"] != "bcbrain-mcp-go" || hz["version"] != "3.0.0" || hz["tools"] != float64(15) {
 		t.Fatalf("unexpected /healthz: %v", hz)
 	}
 
@@ -284,7 +302,7 @@ func TestHTTPEndpointsAndMCPTools(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// 3. POST /mcp tools/list -> all 12 tools
+	// 3. POST /mcp tools/list -> all 15 tools
 	rpcCall := func(payload string) (int, []byte) {
 		r, err := http.Post(ts.URL+"/mcp", "application/json", strings.NewReader(payload))
 		if err != nil {
@@ -308,8 +326,8 @@ func TestHTTPEndpointsAndMCPTools(t *testing.T) {
 		} `json:"result"`
 	}
 	_ = json.Unmarshal(body, &tl)
-	if len(tl.Result.Tools) != 12 {
-		t.Fatalf("expected 12 tools, got %d", len(tl.Result.Tools))
+	if len(tl.Result.Tools) != 15 {
+		t.Fatalf("expected 15 tools, got %d", len(tl.Result.Tools))
 	}
 
 	// 4. Notification -> 202
@@ -325,19 +343,58 @@ func TestHTTPEndpointsAndMCPTools(t *testing.T) {
 		t.Fatalf("oversized body expected 413, got %d", code)
 	}
 
-	// 6. Audience isolation + trap abstain + lookup_error + whats_new
-	_, body = rpcCall(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"lookup_error","arguments":{"query":"ห้ามติดลบ","audience":"user"}}}`)
-	if !strings.Contains(string(body), "ts-stock-negative-control") {
+	// 6. Audience isolation + trap abstain + lookup_error + search_sections + get_facts + whats_new + verify_reference
+	_, body = rpcCall(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"lookup_error","arguments":{"query":"สินค้า ห้ามติดลบ","audience":"user"}}}`)
+	if !strings.Contains(string(body), "ts-stock-negative-control") || !strings.Contains(string(body), "[lookup_error") {
 		t.Fatalf("lookup_error failed: %s", string(body))
 	}
-	_, body = rpcCall(`{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"lookup_error","arguments":{"query":"ห้ามติดลบ","audience":"dev"}}}`)
-	if strings.Contains(string(body), "ts-stock-negative-control") {
-		t.Fatalf("lookup_error(dev) leaked user note: %s", string(body))
+	_, body = rpcCall(`{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"lookup_error","arguments":{"query":"สินค้า ห้ามติดลบ","audience":"dev"}}}`)
+	if strings.Contains(string(body), "ts-stock-negative-control") || !strings.Contains(string(body), "🛑 Abstain") {
+		t.Fatalf("lookup_error(dev) leaked user note or missed abstain: %s", string(body))
+	}
+
+	_, body = rpcCall(`{"jsonrpc":"2.0","id":41,"method":"tools/call","params":{"name":"search_sections","arguments":{"query":"เปิดบิลขาย 4013","audience":"user","limit":3,"max_chars":500}}}`)
+	if !strings.Contains(string(body), "howto-sale-invoice") || !strings.Contains(string(body), "## Structured Facts") || strings.Contains(string(body), "tbl-ic-trans") {
+		t.Fatalf("search_sections(user) unexpected: %s", string(body))
+	}
+
+	_, body = rpcCall(`{"jsonrpc":"2.0","id":42,"method":"tools/call","params":{"name":"get_facts","arguments":{"slugs":["howto-sale-invoice","tbl-ic-trans"],"kinds":["menu"],"audience":"user","limit":10}}}`)
+	if !strings.Contains(string(body), "[menu]") || !strings.Contains(string(body), "4013") || strings.Contains(string(body), "tbl-ic-trans") {
+		t.Fatalf("get_facts(user) unexpected: %s", string(body))
 	}
 
 	_, body = rpcCall(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"whats_new","arguments":{"days":30,"audience":"user"}}}`)
-	if !strings.Contains(string(body), "howto-sale-invoice") || strings.Contains(string(body), "tbl-ic-trans") {
+	if !strings.Contains(string(body), "[whats_new") || !strings.Contains(string(body), "howto-sale-invoice") || strings.Contains(string(body), "tbl-ic-trans") {
 		t.Fatalf("whats_new(user) unexpected: %s", string(body))
+	}
+
+	// verify_reference(user) strictly refuses SQL tables/columns without leaking existence
+	_, body = rpcCall(`{"jsonrpc":"2.0","id":51,"method":"tools/call","params":{"name":"verify_reference","arguments":{"menus":["4013","4999"],"tables":["ic_trans"],"columns":["ic_trans.doc_no"],"audience":"user"}}}`)
+	var rpcWrap struct {
+		Result ToolResult `json:"result"`
+	}
+	_ = json.Unmarshal(body, &rpcWrap)
+	var vrUser VerifyReferenceResult
+	_ = json.Unmarshal([]byte(rpcWrap.Result.Content[0].Text), &vrUser)
+	if !vrUser.TablesRestricted || vrUser.OK || len(vrUser.Menus.Valid) != 1 || len(vrUser.Menus.UnknownMenus) != 1 || len(vrUser.Tables.Valid) != 0 || len(vrUser.Tables.Invalid) != 0 || len(vrUser.Columns.Valid) != 0 {
+		t.Fatalf("verify_reference(user) failed isolation: %+v", vrUser)
+	}
+
+	// verify_reference(dev) validates tables, columns with fuzzy suggestions, and rejects forbidden tables
+	_, body = rpcCall(`{"jsonrpc":"2.0","id":52,"method":"tools/call","params":{"name":"verify_reference","arguments":{"menus":["4013"],"tables":["ic_trans","ic_trans_typo","bc_user_list"],"columns":["ic_trans.doc_no","ic_trans.doc_noo"],"audience":"dev"}}}`)
+	rpcWrap = struct {
+		Result ToolResult `json:"result"`
+	}{}
+	_ = json.Unmarshal(body, &rpcWrap)
+	var vrDev VerifyReferenceResult
+	_ = json.Unmarshal([]byte(rpcWrap.Result.Content[0].Text), &vrDev)
+	if vrDev.TablesRestricted || len(vrDev.Tables.Valid) != 1 || len(vrDev.Tables.Invalid) != 2 || len(vrDev.Columns.Valid) != 1 || len(vrDev.Columns.Invalid) != 1 {
+		t.Fatalf("verify_reference(dev) unexpected: %+v", vrDev)
+	}
+	for _, inv := range vrDev.Tables.Invalid {
+		if inv.Table == "bc_user_list" && len(inv.Suggestions) != 0 {
+			t.Fatalf("forbidden table must return zero suggestions: %+v", inv)
+		}
 	}
 
 	_, body = rpcCall(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"quick_answer","arguments":{"question":"สูตรทำแกงเขียวหวานไก่ใส่กะทิสด","audience":"user"}}}`)
@@ -345,13 +402,83 @@ func TestHTTPEndpointsAndMCPTools(t *testing.T) {
 		t.Fatalf("quick_answer did not abstain on trap: %s", string(body))
 	}
 
-	// 7. /api/gaps must now contain the abstained trap query
+	// 7. /api/gaps must now contain the abstained trap query and Cache-Control: no-store
 	resp, _ = http.Get(ts.URL + "/api/gaps")
+	gapCC := resp.Header.Get("Cache-Control")
 	var gapRep GapReport
 	_ = json.NewDecoder(resp.Body).Decode(&gapRep)
 	resp.Body.Close()
-	if !gapRep.OK || gapRep.Count < 1 {
-		t.Fatalf("/api/gaps expected >=1 gap, got %+v", gapRep)
+	if !gapRep.OK || gapRep.UniqueQueries < 1 || !strings.Contains(gapCC, "no-store") {
+		t.Fatalf("/api/gaps expected >=1 gap and no-store, got cc=%q rep=%+v", gapCC, gapRep)
+	}
+
+	// 7b. v3 REST endpoints + deterministic ETag 304 checks
+	checkGetWith304 := func(path string) []byte {
+		r1, err := http.Get(ts.URL + path)
+		if err != nil || r1.StatusCode != 200 {
+			t.Fatalf("GET %s failed: err=%v status=%d", path, err, r1.StatusCode)
+		}
+		et := r1.Header.Get("ETag")
+		var b bytes.Buffer
+		_, _ = b.ReadFrom(r1.Body)
+		r1.Body.Close()
+		if et == "" {
+			t.Fatalf("GET %s missing ETag", path)
+		}
+		req, _ := http.NewRequest("GET", ts.URL+path, nil)
+		req.Header.Set("If-None-Match", et)
+		r2, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("GET %s (304) error: %v", path, err)
+		}
+		r2.Body.Close()
+		if r2.StatusCode != 304 {
+			t.Fatalf("GET %s expected 304 on ETag %s, got %d", path, et, r2.StatusCode)
+		}
+		return b.Bytes()
+	}
+
+	errRaw := checkGetWith304("/api/error?q=%E0%B8%AA%E0%B8%B4%E0%B8%99%E0%B8%84%E0%B9%89%E0%B8%B2%20%E0%B8%AB%E0%B9%89%E0%B8%B2%E0%B8%A1%E0%B8%95%E0%B8%B4%E0%B8%94%E0%B8%A5%E0%B8%9A&audience=user&limit=3")
+	if !strings.Contains(string(errRaw), "ts-stock-negative-control") {
+		t.Fatalf("/api/error unexpected: %s", string(errRaw))
+	}
+
+	secRaw := checkGetWith304("/api/sections?q=%E0%B9%80%E0%B8%9B%E0%B8%B4%E0%B8%94%E0%B8%9A%E0%B8%B4%E0%B8%A5%E0%B8%82%E0%B8%B2%E0%B8%A2%204013&audience=user&limit=3")
+	if !strings.Contains(string(secRaw), "howto-sale-invoice") {
+		t.Fatalf("/api/sections unexpected: %s", string(secRaw))
+	}
+
+	factsRaw := checkGetWith304("/api/facts?slugs=howto-sale-invoice&kinds=menu&audience=user&limit=10")
+	if !strings.Contains(string(factsRaw), "4013") {
+		t.Fatalf("/api/facts unexpected: %s", string(factsRaw))
+	}
+
+	wnRaw := checkGetWith304("/api/whats-new?days=30&audience=user&limit=5")
+	if !strings.Contains(string(wnRaw), "howto-sale-invoice") || strings.Contains(string(wnRaw), "tbl-ic-trans") {
+		t.Fatalf("/api/whats-new unexpected: %s", string(wnRaw))
+	}
+
+	verGetRaw := checkGetWith304("/api/verify?menus=4013&tables=ic_trans&audience=user")
+	var verGetObj VerifyReferenceResult
+	_ = json.Unmarshal(verGetRaw, &verGetObj)
+	if !verGetObj.TablesRestricted || len(verGetObj.Tables.Valid) != 0 {
+		t.Fatalf("GET /api/verify(user) failed SQL refusal: %+v", verGetObj)
+	}
+
+	verPostResp, err := http.Post(ts.URL+"/api/verify", "application/json", strings.NewReader(`{"menus":["4013"],"tables":["ic_trans"],"columns":["ic_trans.doc_no"],"audience":"dev"}`))
+	if err != nil || verPostResp.StatusCode != 200 {
+		t.Fatalf("POST /api/verify failed: err=%v status=%d", err, verPostResp.StatusCode)
+	}
+	var verPostObj VerifyReferenceResult
+	_ = json.NewDecoder(verPostResp.Body).Decode(&verPostObj)
+	verPostResp.Body.Close()
+	if !verPostObj.OK || verPostObj.TablesRestricted || len(verPostObj.Columns.Valid) != 1 {
+		t.Fatalf("POST /api/verify(dev) unexpected: %+v", verPostObj)
+	}
+
+	oaRaw := checkGetWith304("/api/openapi.json")
+	if !strings.Contains(string(oaRaw), `"3.1.0"`) {
+		t.Fatalf("/api/openapi.json unexpected: %s", string(oaRaw))
 	}
 
 	// 8. /api/vault-pack & 304 ETag

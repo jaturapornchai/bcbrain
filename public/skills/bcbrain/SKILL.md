@@ -3,9 +3,9 @@ name: bcbrain
 description: เชื่อมและค้นสมอง BC (https://brain.bcsmethai.com/mcp) ทั้งโหมดนักพัฒนา (Schema, SQL, trans_flag, Dr/Cr, API/MCP) และโหมดผู้ใช้ทั่วไป/Call Center/ฝ่ายขาย เรียกผ่านคำสั่ง /bcbrain หรืออัตโนมัติเมื่อพัฒนาต่อยอด เขียนคิวรี หรือตอบคำถามระบบ BC Ai Account และชุดโปรแกรม BC
 ---
 
-# สมอง BC (`/bcbrain`)
+# สมอง BC (`/bcbrain` · v3.0.0)
 
-Skill สำหรับให้ AI เชื่อมต่อและดึงความรู้จาก **สมอง BC** (`https://brain.bcsmethai.com/mcp`) ซึ่งสกัดจากซอร์สโค้ดจริงของ **BC Ai Account** และระบบในชุด BC รองรับทั้งโซนผู้ใช้ทั่วไป (`user`) และโซนนักพัฒนา (`dev`)
+Skill สำหรับให้ AI เชื่อมต่อและดึงความรู้จาก **สมอง BC v3.0.0** (`https://brain.bcsmethai.com/mcp`) ซึ่งขับเคลื่อนด้วย **Compiled Go Sidecar (`< 1 ms`) + Hybrid Multi-Signal RRF + Section BM25 + Grounding Verifier** สกัดจากซอร์สโค้ดจริงของ **BC Ai Account** และระบบในชุด BC รองรับทั้งโซนผู้ใช้ทั่วไป (`user`) และโซนนักพัฒนา (`dev`)
 
 ## 1. รูปแบบคำสั่ง `/bcbrain` (Slash Modes)
 
@@ -24,20 +24,30 @@ Skill สำหรับให้ AI เชื่อมต่อและดึ�
 
 ## 2. ลำดับการเชื่อมต่อ MCP (`https://brain.bcsmethai.com/mcp`)
 
-1. **ทางหลัก — เรียก MCP Tools ของ server `bcbrain` โดยตรง**
-   - Tools ที่มี (10 ตัว — เน้นความเร็ว & ประหยัด Token):
-     - **กลุ่มตอบเร็วสุด (แนะนำใช้เป็นค่าเริ่มต้น)**: `quick_answer` (จบใน 1 รอบ ~2,000 อักษร หรือส่ง `mode: "ultra"` เหลือ ~600 อักษร TL;DR), `batch_ask` (ถาม 1–5 คำถามพร้อมกันใน 1 รอบ), `lookup_menu` (ค้นรหัสเมนู 4 หลัก / ชื่อเมนู / ตาราง SQL แบบ O(1) ใน `< 1 ms`), `batch_read` (อ่าน 1–5 โน้ตพร้อมกันใน 1 รอบ)
-     - **กลุ่มค้นเชิงลึก / สื่อ / กราฟ**: `ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `read_note`, `list_notes` (ในบางเครื่องมืออาจขึ้นชื่อเป็น `mcp_bcbrain_<tool>`, `mcp__bcbrain__<tool>` หรือเรียกผ่าน `call_mcp_tool` ด้วย server `"bcbrain"`)
-   - **REST & Local Mirror ความเร็วสูงสุด**:
-     - `GET https://brain.bcsmethai.com/api/fast?q=<คำถาม>&audience=user&mode=ultra` (รองรับ CDN Edge cache `s-maxage=300`)
-     - `GET https://brain.bcsmethai.com/api/bootstrap-pack?audience=user` (แพ็กสรุปสำหรับ Prompt Caching ฝั่งบอท → 0 ms คำถามพื้นฐาน)
-     - Local Stdio MCP (`node scripts/mcp-stdio.ts --sync` ดึงแพ็ก gzip ~670 KB จาก `/api/vault-pack` มาแคชใน RAM บนเครื่อง → `< 1 ms` ไร้ RTT)
+1. **ทางหลัก — เรียก MCP Tools ของ server `bcbrain` โดยตรง (15 Tools · Go Sidecar `< 1 ms`)**
+   - **กลุ่มตอบเร็วสุด (แนะนำใช้เป็นค่าเริ่มต้น)**:
+     - `quick_answer` — จบใน 1 รอบ (`normal` ~2,000 อักษร, `fast` ~1,400 อักษร, หรือ `ultra` ~600 อักษร TL;DR) พร้อมข้อเท็จจริงสรุป (`facts`) และด่าน `🛑 Abstain` กันหลอน
+     - `batch_ask` — ถาม 1–5 คำถามพร้อมกันใน 1 รอบ (ค่าเริ่มต้น `mode: "ultra"`)
+     - `lookup_menu` — ค้นรหัสเมนู 4 หลัก (`1001`–`9070`), รหัสจุดเดิม (`4.13`), ชื่อเมนู หรือชื่อตาราง SQL แบบ O(1) ใน `< 1 ms`
+     - `lookup_error` — ค้นข้อความแจ้งเตือนภาษาไทยบนหน้าจอจริงแบบ O(1) ได้สาเหตุ วิธีแก้ และโน้ตตรงจุดพร้อม `🛑 Abstain`
+     - `search_sections` — ค้นเจาะลึกระดับหัวข้อย่อย (`## Section` BM25) คืนข้อความตัดขอบตาราง/รายการ/โค้ดสมบูรณ์ + `Structured Facts`
+     - `get_facts` — ดึงข้อเท็จจริงแบบมีประเภท (`[menu]`, `[rule]`, `[limit]`, `[error]`, `[formula]`) กรองตามคำค้น/slug/ประเภท (ไร้ศัพท์โค้ดในโหมด `user`)
+     - `verify_reference` — ตรวจยืนยันรหัสเมนู 4 หลัก (ทุกโหมด) และชื่อตาราง SQL / `table.column` (เฉพาะ `dev`/`all` — บล็อกเด็ดขาดในโหมด `user`) เทียบ Ground Truth จากโค้ดจริงเพื่อกันหลอน
+     - `whats_new` — ดูโน้ตที่อัปเดตล่าสุดภายใน N วัน
+     - `batch_read` — อ่าน 1–5 โน้ตพร้อมกันใน 1 รอบ (รองรับตัดเฉพาะหัวข้อตาม `query`)
+   - **กลุ่มค้นเชิงลึก / สื่อ / กราฟ**: `ask_brain`, `search_brain` (Hybrid Multi-Signal RRF + Section BM25), `find_media`, `traverse_brain`, `read_note`, `list_notes` (ในบางเครื่องมืออาจขึ้นชื่อเป็น `mcp_bcbrain_<tool>`, `mcp__bcbrain__<tool>` หรือเรียกผ่าน `call_mcp_tool` ด้วย server `"bcbrain"`)
+   - **REST API (OpenAPI 3.1) & Local Mirror ความเร็วสูงสุด**:
+     - `GET https://brain.bcsmethai.com/api/fast?q=<คำถาม>&audience=user&mode=ultra` (รองรับ CDN Edge cache `s-maxage=300`, ETag `304`)
+     - `GET /api/error`, `/api/sections`, `/api/facts`, `/api/whats-new`, `GET|POST /api/verify`, `/api/gaps`, `/api/bootstrap-pack`, `/api/vault-pack`
+     - OpenAPI 3.1 Spec: `GET https://brain.bcsmethai.com/api/openapi.json`
+     - Local Stdio MCP (`node scripts/mcp-stdio.ts --sync` ดึงแพ็ก gzip ~675 KB จาก `/api/vault-pack` มาแคชใน RAM บนเครื่อง → `< 1 ms` ไร้ RTT)
+
 2. **ทางสำรองทันที — Stateless HTTP JSON-RPC (เมื่อ session ปัจจุบันยังไม่ได้ผูก MCP `bcbrain`)**
    - Endpoint `https://brain.bcsmethai.com/mcp` เป็น Public Read-Only Stateless Streamable HTTP (ไม่ต้องใช้ API key) สามารถเรียกผ่าน Node.js one-liner ได้ทันที:
 
 ```bash
 # macOS / Linux / Git Bash
-node -e 'const [,,name,args]=process.argv; fetch("https://brain.bcsmethai.com/mcp",{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json, text/event-stream"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"tools/call",params:{name,arguments:JSON.parse(args)}})}).then(r=>r.json()).then(j=>console.log(j.result?.content?.[0]?.text??JSON.stringify(j)))' ask_brain '{"question":"โครงสร้าง ic_trans","audience":"dev"}'
+node -e 'const [,,name,args]=process.argv; fetch("https://brain.bcsmethai.com/mcp",{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json, text/event-stream"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"tools/call",params:{name,arguments:JSON.parse(args)}})}).then(r=>r.json()).then(j=>console.log(j.result?.content?.[0]?.text??JSON.stringify(j)))' quick_answer '{"question":"โครงสร้าง ic_trans","audience":"dev"}'
 ```
 
 ```powershell
@@ -46,7 +56,7 @@ node -e 'const [,,name,args]=process.argv; fetch("https://brain.bcsmethai.com/mc
 const r = await fetch("https://brain.bcsmethai.com/mcp", {
   method: "POST",
   headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
-  body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "ask_brain", arguments: { question: "โครงสร้าง ic_trans", audience: "dev" } } }),
+  body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "quick_answer", arguments: { question: "โครงสร้าง ic_trans", audience: "dev" } } }),
 });
 const j = await r.json();
 console.log(j.result?.content?.[0]?.text ?? JSON.stringify(j));
@@ -103,21 +113,25 @@ console.log(j.result?.content?.[0]?.text ?? JSON.stringify(j));
 1. **ตอบไวใน 1 รอบ (ไม่ต้องเสียรอบอ่าน playbook ก่อนทุกครั้ง)**:
    - ถามโจทย์เทคนิคทั่วไป → เรียก `quick_answer({ question, audience: "dev" })`
    - หาตาราง SQL / รหัสเมนูตรงตัว → เรียก `lookup_menu({ query: "ic_trans", audience: "dev" })`
+   - ตรวจยืนยันชื่อตาราง/คอลัมน์ก่อนเขียน SQL กันหลอน → เรียก `verify_reference({ tables: ["ic_trans"], columns: ["ic_trans.doc_no"], audience: "dev" })`
+   - เจาะหัวข้อย่อยหรือดึงสูตร/กฎแบบกระชับ → `search_sections({ query, audience: "dev" })` หรือ `get_facts({ query, kinds: ["formula", "rule"], audience: "dev" })`
    - รู้ชื่อ slug 2–5 ใบที่ต้องใช้ → เรียก `batch_read({ slugs: [...], audience: "dev", query })` ในรอบเดียว (ห้ามวนเรียก `read_note` ทีละใบ)
 2. ต้องการบริบทหลายโน้ต + กราฟ 1 ทอด → เรียก `ask_brain({ question, audience: "dev", compact: true })` (หรือดูแผนที่ Hub เต็มที่ `playbook-dev` เมื่อจำเป็น)
-3. ค้นเฉพาะคำหรือดูสารบัญ → `search_brain({ query, limit: 5, audience: "dev" })` / `list_notes({ folder, audience: "dev" })` (โฟลเดอร์ฝั่ง dev: `dev-playbook`, `schema`, `queries`, `doctypes`, `api`, `architecture`)
-4. ไล่สายสัมพันธ์หลายทอด / หาผลกระทบข้ามหน้าจอ-โค้ด-ตาราง → เรียก `traverse_brain({ slug, depth: 2, audience: "dev" })` (หรือ `audience: "all"` เพื่อไล่ไซแนปส์ `bridges_zone` ข้ามจากหน้าจอผู้ใช้ไปยังไฟล์ Go/TS, ผังบัญชี Dr/Cr และตาราง SQL!) หรือหาเส้นทางสั้นสุดด้วย `traverse_brain({ slug, to_slug, audience })` (รองรับ 18 ชนิดความสัมพันธ์ เช่น `uses_table`, `writes_table`, `posts_rule`, `has_query`, `implements_code`, `bridges_zone`, `shares_menu`, `solves_issue`)
+3. ค้นเฉพาะคำหรือดูสารบัญ → `search_brain({ query, limit: 5, audience: "dev" })` / `list_notes({ folder, audience: "dev" })` / `whats_new({ days: 7, audience: "dev" })` (โฟลเดอร์ฝั่ง dev: `dev-playbook`, `schema`, `queries`, `doctypes`, `api`, `architecture`)
+4. ไล่สายสัมพันธ์หลายทอด / หาผลกระทบข้ามหน้าจอ-โค้ด-ตาราง → เรียก `traverse_brain({ slug, depth: 2, audience: "dev" })` (หรือ `audience: "all"` เพื่อไล่ไซแนปส์ `bridges_zone` ข้ามจากหน้าจอผู้ใช้ไปยังไฟล์ Go/TS, ผังบัญชี Dr/Cr และตาราง SQL!) หรือหาเส้นทางสั้นสุดด้วย `traverse_brain({ slug, to_slug, audience })` (รองรับ 18 ชนิดความสัมพันธ์)
 
 ### โหมดผู้ใช้ทั่วไป / Call Center / ฝ่ายขาย (`audience: "user"`)
 1. **ตอบไวสุดใน 1 รอบ (เหมาะกับ Call Center / LINE OA / Voice Bot — ไม่ต้องเสียรอบอ่าน playbook ก่อนทุกครั้ง)**:
-   - คำถามวิธีใช้/แก้ปัญหาทั่วไป → เรียก `quick_answer({ question, audience: "user", include_media: true })` จบใน 1 call (~2,000 อักษร + ลิงก์ภาพ/YouTube กระชับ)
-   - หารหัสเมนู 4 หลัก (`1001`–`9070` ครบ 735 หน้าจอ) หรือรหัสจุดเดิม (`4.13`) → เรียก `lookup_menu({ query: "4013", audience: "user" })` ตอบทันทีใน `< 1 ms`
+   - ลูกค้าอ่านข้อความแจ้งเตือน/Error บนหน้าจอให้ฟัง → เรียก `lookup_error({ query: "ล็อกหน่วยต้นทุนแล้ว", audience: "user" })` ตอบสาเหตุ + วิธีแก้ตรงเป๊ะทันที
+   - คำถามวิธีใช้/แก้ปัญหาทั่วไป → เรียก `quick_answer({ question, audience: "user", include_media: true })` จบใน 1 call (~2,000 อักษร + ข้อเท็จจริงสำคัญ + ลิงก์ภาพ/YouTube กระชับ) หรือส่ง `mode: "ultra"` สำหรับ Voice/LINE Bot
+   - หารหัสเมนู 4 หลัก (`1001`–`9070` ครบ 735 หน้าจอ) หรือรหัสจุดเดิม (`4.13`) → เรียก `lookup_menu({ query: "4013", audience: "user" })` หรือตรวจรหัสเมนูด้วย `verify_reference({ menus: ["4013"], audience: "user" })`
+   - ค้นเจาะแท็บ/หัวข้อย่อย (เช่น ข้อเลือกพิเศษ 9 ส่วน) → `search_sections({ query, audience: "user" })` หรือดึงกฎ/ลิมิตด้วย `get_facts({ query, kinds: ["menu", "limit", "rule"], audience: "user" })`
    - ต้องอ่านหลายโน้ตพร้อมกัน → เรียก `batch_read({ slugs: [...], audience: "user" })` ในรอบเดียว (ใช้ `playbook-call-center` / `playbook-sales` เมื่อต้องดูสคริปต์คัดกรองหรือรายละเอียดขายฉบับเต็ม)
 2. ต้องการคำตอบละเอียดหลายโน้ต + รวมสื่อครบ → เรียก `ask_brain({ question, audience: "user", compact: true })` (รวม `## Media & Reference Links` อัตโนมัติ)
 3. การดึงลิงก์รูปภาพหน้าจอจริง (`https://bcaccount.com/...`) และคลิปวิดีโอสอน YouTube (`PLO9P7tPZLXB0` พร้อม `thumbnailUrl` / `embedUrl`):
    - `quick_answer({ ..., include_media: true })` แนบลิงก์คลิป/รูปหลัก 1 บรรทัดกระชับ และ `ask_brain({ question, audience: "user" })` รวมส่วน `## Media & Reference Links` ไว้ท้ายคำตอบอัตโนมัติ
    - หากต้องการค้นหาเฉพาะสื่อเพื่อนำไปแสดงการ์ดรูปหรือส่งลิงก์คลิปให้ลูกค้าโดยตรง เรียก `find_media({ query, kind: "all" | "image" | "youtube" | "webpage", limit: 12, audience: "user" })`
-4. ทุกครั้งที่เรียก `quick_answer`, `lookup_menu`, `batch_read`, `ask_brain`, `search_brain`, `find_media`, `traverse_brain`, `list_notes` **ต้องส่ง `audience: "user"` เสมอ**
+4. ทุกครั้งที่เรียกเครื่องมือทั้งหมด (ยกเว้น `read_note`) **ต้องส่ง `audience: "user"` เสมอ**
    - โฟลเดอร์ฝั่ง user: `playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`
 
 ---
@@ -128,7 +142,7 @@ console.log(j.result?.content?.[0]?.text ?? JSON.stringify(j));
 - **ห้ามใช้ Binary Float กับเงินและจำนวนสินค้า**: ห้ามใช้ `float`, `double`, `parseFloat`, `Number()` กับยอดเงิน ส่วนลด ภาษี อัตราแลกเปลี่ยน และจำนวนสินค้า — ให้ใช้ PostgreSQL `NUMERIC(p, s)`, Go `*math/big.Rat` และ decimal helper ฝั่ง TypeScript ตาม `dev-rules-accounting-sql`
 - **ทุกคิวรีเอกสารต้องกรองสถานะและประเภทเอกสาร**: กรองเอกสารยกเลิกด้วย `COALESCE(last_status, 0) = 0` เสมอ และระบุ `trans_flag` ตาม `doc-trans-flag-catalog` (รวมถึงกลับเครื่องหมายใบลดหนี้/รับคืนเมื่อหายอดสุทธิ)
 - **ห้ามแก้ตารางบัญชี-สต็อก-การเงินตรงผ่าน `/query/exec`**: ระบบป้องกันด้วย `WritePolicy` — งานอ่านวิเคราะห์ใช้ `/api/v1/mcp` (`bc_query_readonly`) หรือ `/query/list`; งานสร้าง/แก้ไข/ยกเลิกเอกสารต้องผ่าน Process Engine (`/process/*`) เท่านั้น
-- **ยึดซอร์สโค้ดจริงเมื่ออยู่หน้าโค้ด**: หากเปิด workspace ซอร์สโค้ด `BC Ai Account` ควบคู่กันอยู่ ให้ตรวจเทียบกับไฟล์จริงใน workspace และห้ามเดาชื่อคอลัมน์หรือ endpoint นอกเหนือจากที่ตรวจสอบพบ
+- **ตรวจชื่อตาราง/คอลัมน์ก่อนตอบ**: ใช้ `verify_reference` หรือเทียบซอร์สโค้ดจริงใน workspace เสมอ ห้ามเดาชื่อคอลัมน์หรือ endpoint นอกเหนือจากที่ตรวจสอบพบ
 
 ### ฝั่ง User / Call Center / Sales (`audience: "user"`)
 - **ภาษาไทยเข้าใจง่าย ครบทั้งเส้นทางเมนู รหัสเมนู 4 หลัก รูปหน้าจอ และคลิป YouTube**: ตอบเรียงเป็นขั้นตอน ระบุทั้งเส้นทางเมนูเต็มและรหัสเมนู 4 หลักเสมอ (เช่น `"เริ่มต้น > ตั้งค่าองค์กร พนักงาน และเอกสาร > กำหนดรายละเอียดบริษัท" (รหัสเมนู 1003)`), ชื่อปุ่มจริง คีย์ลัด ข้อความแจ้งเตือน และแนบลิงก์ภาพหน้าจอพร้อมเปิดดู (`https://bcaccount.com/...`) คู่กับคลิปสอน YouTube (`PLO9P7tPZLXB0`) จาก `Media & Reference Links` หรือ `find_media` เสมอเมื่อมีสื่อเกี่ยวข้อง ห้ามปนชื่อตาราง SQL ชื่อไฟล์ หรือศัพท์เทคนิค

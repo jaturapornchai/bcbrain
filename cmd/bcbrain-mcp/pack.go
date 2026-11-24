@@ -118,12 +118,29 @@ type TableLookupEntry struct {
 type ErrorLookupEntry struct {
 	ErrorText  string   `json:"errorText"`
 	Norm       string   `json:"norm"`
+	Stripped   string   `json:"stripped,omitempty"`
 	Slug       string   `json:"slug"`
 	Title      string   `json:"title"`
 	Folder     string   `json:"folder"`
 	Audience   string   `json:"audience"`
 	FixSnippet string   `json:"fixSnippet"`
 	Tokens     []string `json:"-"`
+}
+
+type GroundingMenuEntry struct {
+	Code   string `json:"code"`
+	Label  string `json:"label"`
+	Module string `json:"module,omitempty"`
+}
+
+type GroundingIndexFile struct {
+	BuiltAt     string                        `json:"builtAt"`
+	MenuCount   int                           `json:"menuCount"`
+	TableCount  int                           `json:"tableCount"`
+	ColumnCount int                           `json:"columnCount"`
+	ErrorCount  int                           `json:"errorCount"`
+	Menus       map[string]GroundingMenuEntry `json:"menus"`
+	Tables      map[string][]string           `json:"tables"`
 }
 
 type BootstrapPack struct {
@@ -139,6 +156,8 @@ type Pack struct {
 	Menus               []MenuLookupEntry        `json:"menus"`
 	Tables              []TableLookupEntry       `json:"tables"`
 	Errors              []ErrorLookupEntry       `json:"errors"`
+	GroundingIndex      GroundingIndexFile       `json:"groundingIndex"`
+	OpenApiSpec         json.RawMessage          `json:"openApiSpec,omitempty"`
 	BootstrapPacks      map[string]BootstrapPack `json:"bootstrapPacks"`
 	VaultPackGzipBase64 string                   `json:"vaultPackGzipBase64"`
 	VaultPackEtag       string                   `json:"vaultPackEtag"`
@@ -268,12 +287,13 @@ func toSlug(raw string) string {
 }
 
 func LoadPack(packPath string) (*Pack, error) {
-	data, err := os.ReadFile(packPath)
+	f, err := os.Open(packPath)
 	if err != nil {
 		return nil, fmt.Errorf("read pack %s: %w", packPath, err)
 	}
+	defer f.Close()
 	var p Pack
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := json.NewDecoder(f).Decode(&p); err != nil {
 		return nil, fmt.Errorf("unmarshal pack %s: %w", packPath, err)
 	}
 	if p.VaultPackGzipBase64 != "" {

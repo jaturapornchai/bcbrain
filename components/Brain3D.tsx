@@ -1005,9 +1005,27 @@ export default function Brain3D({ nodes, links, rels, children }: Props) {
                           ? ev.totalHits > 0
                             ? `พบ ${ev.totalHits} รายการ`
                             : "ไม่พบเมนู/ตารางที่ตรง"
-                          : ev.totalHits > 0
-                            ? `พบ ${ev.totalHits} โน้ต`
-                            : "ไม่พบโน้ตที่ตรง"}
+                          : ev.tool === "lookup_error"
+                            ? ev.totalHits > 0
+                              ? `พบ ${ev.totalHits} แจ้งเตือน`
+                              : "ไม่พบแจ้งเตือนที่ตรง"
+                            : ev.tool === "search_sections"
+                              ? ev.totalHits > 0
+                                ? `พบ ${ev.totalHits} หัวข้อย่อย`
+                                : "ไม่พบหัวข้อย่อยที่ตรง"
+                              : ev.tool === "get_facts"
+                                ? ev.totalHits > 0
+                                  ? `พบ ${ev.totalHits} ข้อเท็จจริง`
+                                  : "ไม่พบข้อเท็จจริง"
+                                : ev.tool === "verify_reference"
+                                  ? `ตรวจอ้างอิง ${ev.totalHits} รายการ`
+                                  : ev.tool === "whats_new"
+                                    ? ev.totalHits > 0
+                                      ? `อัปเดตล่าสุด ${ev.totalHits} โน้ต`
+                                      : "ไม่มีโน้ตอัปเดตในช่วงนี้"
+                                    : ev.totalHits > 0
+                                      ? `พบ ${ev.totalHits} โน้ต`
+                                      : "ไม่พบโน้ตที่ตรง"}
                     </span>
                     {ev.hits.map((h) => {
                       const idx = slugIndex.get(h.slug);

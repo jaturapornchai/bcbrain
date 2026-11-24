@@ -76,20 +76,38 @@ func (rl *RateLimiter) Check(ip string) (bool, int) {
 }
 
 type Server struct {
-	mcp     *MCPService
-	limiter *RateLimiter
-	pack    *Pack
+	mcp          *MCPService
+	limiter      *RateLimiter
+	pack         *Pack
+	openApiBytes []byte
+	openApiEtag  string
 }
+
+var fallbackOpenApiSpec = []byte(`{"openapi":"3.1.0","info":{"title":"BC Brain API & MCP Server","version":"3.0.0"},"paths":{"/mcp":{"post":{"summary":"MCP JSON-RPC 2.0"}},"/api/verify":{"get":{"summary":"Verify references"},"post":{"summary":"Verify references"}}}}`)
 
 func NewServer(pack *Pack, gapLogFile string, logEnabled bool) *Server {
 	engine := NewEngine(pack)
 	events := NewEventBus()
 	gaps := NewGapLog(gapLogFile)
 	mcp := NewMCPService(engine, events, gaps, logEnabled)
+
+	openApiBytes := fallbackOpenApiSpec
+	if len(pack.OpenApiSpec) > 2 {
+		openApiBytes = []byte(pack.OpenApiSpec)
+	}
+	commit := pack.Meta.SyncCommit
+	if commit == "" {
+		commit = "local"
+	}
+	sum := sha256.Sum256(openApiBytes)
+	openApiEtag := fmt.Sprintf(`"bcopenapi-%s-%s"`, commit, hex.EncodeToString(sum[:])[:12])
+
 	return &Server{
-		mcp:     mcp,
-		limiter: NewRateLimiter(),
-		pack:    pack,
+		mcp:          mcp,
+		limiter:      NewRateLimiter(),
+		pack:         pack,
+		openApiBytes: openApiBytes,
+		openApiEtag:  openApiEtag,
 	}
 }
 
@@ -162,9 +180,45 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, []byte(`{"error":"Method not allowed"}`))
+	case "/api/error":
+		if r.Method == http.MethodGet {
+			s.handleError(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, []byte(`{"error":"Method not allowed"}`))
+	case "/api/sections":
+		if r.Method == http.MethodGet {
+			s.handleSections(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, []byte(`{"error":"Method not allowed"}`))
+	case "/api/facts":
+		if r.Method == http.MethodGet {
+			s.handleFacts(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, []byte(`{"error":"Method not allowed"}`))
+	case "/api/whats-new":
+		if r.Method == http.MethodGet {
+			s.handleWhatsNew(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, []byte(`{"error":"Method not allowed"}`))
+	case "/api/verify":
+		if r.Method == http.MethodGet || r.Method == http.MethodPost {
+			s.handleVerify(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, []byte(`{"error":"Method not allowed"}`))
 	case "/api/gaps":
 		if r.Method == http.MethodGet {
 			s.handleGaps(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, []byte(`{"error":"Method not allowed"}`))
+	case "/api/openapi.json":
+		if r.Method == http.MethodGet {
+			s.handleOpenApi(w, r)
 			return
 		}
 		writeJSON(w, http.StatusMethodNotAllowed, []byte(`{"error":"Method not allowed"}`))
@@ -177,19 +231,59 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) commitTag() string {
+	if s.pack.Meta.SyncCommit != "" {
+		return s.pack.Meta.SyncCommit
+	}
+	return "local"
+}
+
+func (s *Server) makeEtag(prefix string, stablePayload any) string {
+	b, _ := json.Marshal(stablePayload)
+	sum := sha256.Sum256(b)
+	return fmt.Sprintf(`"%s-%s-%s"`, prefix, s.commitTag(), hex.EncodeToString(sum[:])[:12])
+}
+
+func splitCSV(raw string, maxItems int) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		t := strings.TrimSpace(p)
+		if t == "" {
+			continue
+		}
+		out = append(out, t)
+		if maxItems > 0 && len(out) >= maxItems {
+			break
+		}
+	}
+	return out
+}
+
 func (s *Server) handleHealthz(w http.ResponseWriter) {
-	resp := struct {
-		OK      bool   `json:"ok"`
-		Service string `json:"service"`
-		Version string `json:"version"`
-		Notes   int    `json:"notes"`
-		Commit  string `json:"commit,omitempty"`
-	}{
-		OK:      true,
-		Service: "bcbrain-mcp-go",
-		Version: s.mcp.serverInfo.Version,
-		Notes:   len(s.pack.Notes),
-		Commit:  s.pack.Meta.SyncCommit,
+	resp := map[string]any{
+		"ok":      true,
+		"service": "bcbrain-mcp-go",
+		"version": s.mcp.serverInfo.Version,
+		"notes":   len(s.pack.Notes),
+		"tools":   len(s.mcp.toolDescriptors),
+		"capabilities": map[string]any{
+			"hybridRrf":         true,
+			"sectionBm25":       true,
+			"structuredFacts":   true,
+			"errorIndex":        true,
+			"groundingVerifier": true,
+			"gapTelemetry":      true,
+			"recencyFeed":       true,
+			"openApiVersion":    "3.1.0",
+		},
+		"grounding": s.mcp.engine.grounding.Stats(),
+	}
+	if s.pack.Meta.SyncCommit != "" {
+		resp["commit"] = s.pack.Meta.SyncCommit
 	}
 	b, _ := json.Marshal(resp)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -199,10 +293,32 @@ func (s *Server) handleHealthz(w http.ResponseWriter) {
 	_, _ = w.Write(b)
 }
 
+func (s *Server) handleOpenApi(w http.ResponseWriter, r *http.Request) {
+	const cacheCtrl = "public, max-age=300, s-maxage=600, stale-while-revalidate=3600"
+	if r.Header.Get("If-None-Match") == s.openApiEtag {
+		w.Header().Set("ETag", s.openApiEtag)
+		w.Header().Set("Cache-Control", cacheCtrl)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", cacheCtrl)
+	w.Header().Set("ETag", s.openApiEtag)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(s.openApiBytes)
+}
+
 func (s *Server) handleGaps(w http.ResponseWriter, r *http.Request) {
+	if ok, retry := s.limiter.Check(clientIP(r)); !ok {
+		w.Header().Set("Retry-After", strconv.Itoa(retry))
+		writeJSON(w, http.StatusTooManyRequests, []byte(`{"ok":false,"error":"Rate limit exceeded"}`))
+		return
+	}
 	lim := 50
 	if raw := r.URL.Query().Get("limit"); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 1 && n <= maxGapEntries {
 			lim = n
 		}
 	}
@@ -213,6 +329,284 @@ func (s *Server) handleGaps(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(b)
+}
+
+func (s *Server) handleError(w http.ResponseWriter, r *http.Request) {
+	if ok, retry := s.limiter.Check(clientIP(r)); !ok {
+		w.Header().Set("Retry-After", strconv.Itoa(retry))
+		writeJSON(w, http.StatusTooManyRequests, []byte(`{"ok":false,"error":"Rate limit exceeded"}`))
+		return
+	}
+	q := r.URL.Query()
+	aud := normalizeRestAudience(q.Get("audience"), "user")
+	lim := 5
+	if raw := q.Get("limit"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 1 && n <= 15 {
+			lim = n
+		}
+	}
+	res := s.mcp.RunErrorRestQuery(q.Get("q"), aud, lim)
+	stable := res
+	stable.Ms = 0
+	etag := s.makeEtag("bcerr", stable)
+	cacheCtrl := "no-store"
+	if res.OK {
+		cacheCtrl = "public, max-age=120, s-maxage=300, stale-while-revalidate=600"
+	}
+	if res.OK && r.Header.Get("If-None-Match") == etag {
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Cache-Control", cacheCtrl)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	body, _ := json.Marshal(res)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", cacheCtrl)
+	if res.OK {
+		w.Header().Set("ETag", etag)
+	}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	status := http.StatusBadRequest
+	if res.OK {
+		status = http.StatusOK
+	}
+	w.WriteHeader(status)
+	_, _ = w.Write(body)
+}
+
+func (s *Server) handleSections(w http.ResponseWriter, r *http.Request) {
+	if ok, retry := s.limiter.Check(clientIP(r)); !ok {
+		w.Header().Set("Retry-After", strconv.Itoa(retry))
+		writeJSON(w, http.StatusTooManyRequests, []byte(`{"ok":false,"error":"Rate limit exceeded"}`))
+		return
+	}
+	q := r.URL.Query()
+	aud := normalizeRestAudience(q.Get("audience"), "user")
+	lim := 5
+	if raw := q.Get("limit"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 1 && n <= 15 {
+			lim = n
+		}
+	}
+	maxChars := 1200
+	if raw := q.Get("max_chars"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 200 && n <= 6000 {
+			maxChars = n
+		}
+	}
+	res := s.mcp.RunSectionsRestQuery(q.Get("q"), aud, lim, maxChars)
+	stable := res
+	stable.Ms = 0
+	etag := s.makeEtag("bcsec", stable)
+	cacheCtrl := "no-store"
+	if res.OK {
+		cacheCtrl = "public, max-age=120, s-maxage=300, stale-while-revalidate=600"
+	}
+	if res.OK && r.Header.Get("If-None-Match") == etag {
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Cache-Control", cacheCtrl)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	body, _ := json.Marshal(res)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", cacheCtrl)
+	if res.OK {
+		w.Header().Set("ETag", etag)
+	}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	status := http.StatusBadRequest
+	if res.OK {
+		status = http.StatusOK
+	}
+	w.WriteHeader(status)
+	_, _ = w.Write(body)
+}
+
+func (s *Server) handleFacts(w http.ResponseWriter, r *http.Request) {
+	if ok, retry := s.limiter.Check(clientIP(r)); !ok {
+		w.Header().Set("Retry-After", strconv.Itoa(retry))
+		writeJSON(w, http.StatusTooManyRequests, []byte(`{"ok":false,"error":"Rate limit exceeded"}`))
+		return
+	}
+	q := r.URL.Query()
+	aud := normalizeRestAudience(q.Get("audience"), "user")
+	slugs := splitCSV(q.Get("slugs"), 10)
+	rawKinds := splitCSV(q.Get("kinds"), 5)
+	var kinds []string
+	for _, k := range rawKinds {
+		kl := strings.ToLower(k)
+		if validFactKinds[kl] {
+			kinds = append(kinds, kl)
+		}
+	}
+	lim := 20
+	if raw := q.Get("limit"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 1 && n <= 50 {
+			lim = n
+		}
+	}
+	res := s.mcp.RunFactsRestQuery(q.Get("q"), slugs, kinds, aud, lim)
+	stable := res
+	stable.Ms = 0
+	etag := s.makeEtag("bcfacts", stable)
+	const cacheCtrl = "public, max-age=120, s-maxage=300, stale-while-revalidate=600"
+	if r.Header.Get("If-None-Match") == etag {
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Cache-Control", cacheCtrl)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	body, _ := json.Marshal(res)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", cacheCtrl)
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(body)
+}
+
+func (s *Server) handleWhatsNew(w http.ResponseWriter, r *http.Request) {
+	if ok, retry := s.limiter.Check(clientIP(r)); !ok {
+		w.Header().Set("Retry-After", strconv.Itoa(retry))
+		writeJSON(w, http.StatusTooManyRequests, []byte(`{"ok":false,"error":"Rate limit exceeded"}`))
+		return
+	}
+	q := r.URL.Query()
+	aud := normalizeRestAudience(q.Get("audience"), "user")
+	days := 7
+	if raw := q.Get("days"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 1 && n <= 365 {
+			days = n
+		}
+	}
+	lim := 20
+	if raw := q.Get("limit"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 1 && n <= 50 {
+			lim = n
+		}
+	}
+	res := s.mcp.RunWhatsNewRestQuery(days, aud, lim)
+	stable := res
+	stable.Ms = 0
+	etag := s.makeEtag("bcnew", stable)
+	const cacheCtrl = "public, max-age=120, s-maxage=300, stale-while-revalidate=600"
+	if r.Header.Get("If-None-Match") == etag {
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Cache-Control", cacheCtrl)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	body, _ := json.Marshal(res)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", cacheCtrl)
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(body)
+}
+
+func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
+	if ok, retry := s.limiter.Check(clientIP(r)); !ok {
+		w.Header().Set("Retry-After", strconv.Itoa(retry))
+		writeJSON(w, http.StatusTooManyRequests, []byte(`{"ok":false,"error":"Rate limit exceeded"}`))
+		return
+	}
+
+	if r.Method == http.MethodGet {
+		q := r.URL.Query()
+		aud := normalizeRestAudience(q.Get("audience"), "user")
+		menus := splitCSV(q.Get("menus"), 50)
+		tables := splitCSV(q.Get("tables"), 50)
+		columns := splitCSV(q.Get("columns"), 100)
+		if len(menus) == 0 && len(tables) == 0 && len(columns) == 0 {
+			writeJSON(w, http.StatusBadRequest, []byte(`{"ok":false,"error":"Provide at least one of ?menus=, ?tables=, or ?columns="}`))
+			return
+		}
+		res := s.mcp.RunVerifyRestQuery(VerifyReferenceInput{
+			Menus:    menus,
+			Tables:   tables,
+			Columns:  columns,
+			Audience: aud,
+		})
+		body, _ := json.Marshal(res)
+		sum := sha256.Sum256(body)
+		etag := fmt.Sprintf(`"bcverify-%s-%s"`, s.commitTag(), hex.EncodeToString(sum[:])[:12])
+		const cacheCtrl = "public, max-age=120, s-maxage=300, stale-while-revalidate=600"
+		if r.Header.Get("If-None-Match") == etag {
+			w.Header().Set("ETag", etag)
+			w.Header().Set("Cache-Control", cacheCtrl)
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Cache-Control", cacheCtrl)
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(body)
+		return
+	}
+
+	// POST /api/verify
+	if r.ContentLength > maxBodyBytes {
+		writeJSON(w, http.StatusRequestEntityTooLarge, []byte(`{"ok":false,"error":"Request body too large (max 32 KB)."}`))
+		return
+	}
+	raw, err := io.ReadAll(io.LimitReader(r.Body, maxBodyBytes+1))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, []byte(`{"ok":false,"error":"Failed to read request body."}`))
+		return
+	}
+	if len(raw) > maxBodyBytes {
+		writeJSON(w, http.StatusRequestEntityTooLarge, []byte(`{"ok":false,"error":"Request body too large (max 32 KB)."}`))
+		return
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(raw, &parsed); err != nil || parsed == nil {
+		writeJSON(w, http.StatusBadRequest, []byte(`{"ok":false,"error":"Invalid JSON body: expected an object with menus, tables, columns, and optional audience."}`))
+		return
+	}
+	rawAud, _ := parsed["audience"].(string)
+	aud := normalizeRestAudience(rawAud, "user")
+	toArr := func(key string, maxItems int) []string {
+		arr, ok := parsed[key].([]any)
+		if !ok {
+			return nil
+		}
+		out := make([]string, 0, len(arr))
+		for _, item := range arr {
+			if str, ok := item.(string); ok {
+				if tr := strings.TrimSpace(str); tr != "" {
+					out = append(out, tr)
+					if len(out) >= maxItems {
+						break
+					}
+				}
+			}
+		}
+		return out
+	}
+	menus := toArr("menus", 50)
+	tables := toArr("tables", 50)
+	columns := toArr("columns", 100)
+	if len(menus) == 0 && len(tables) == 0 && len(columns) == 0 {
+		writeJSON(w, http.StatusBadRequest, []byte(`{"ok":false,"error":"Provide at least one non-empty array: menus, tables, or columns."}`))
+		return
+	}
+	res := s.mcp.RunVerifyRestQuery(VerifyReferenceInput{
+		Menus:    menus,
+		Tables:   tables,
+		Columns:  columns,
+		Audience: aud,
+	})
+	body, _ := json.Marshal(res)
+	writeJSON(w, http.StatusOK, body)
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
@@ -351,14 +745,10 @@ func (s *Server) handleFast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	rawAud := q.Get("audience")
-	aud := "user"
-	if rawAud == "dev" || rawAud == "all" {
-		aud = rawAud
-	}
+	aud := normalizeRestAudience(q.Get("audience"), "user")
 	mode := "ultra"
-	if q.Get("mode") == "normal" {
-		mode = "normal"
+	if rawMode := q.Get("mode"); rawMode == "normal" || rawMode == "fast" {
+		mode = rawMode
 	}
 	media := q.Get("media") == "1" || q.Get("media") == "true"
 	maxChars := 0
@@ -380,12 +770,8 @@ func (s *Server) handleFast(w http.ResponseWriter, r *http.Request) {
 		body, _ = json.Marshal(res)
 	}
 
-	commit := s.pack.Meta.SyncCommit
-	if commit == "" {
-		commit = "local"
-	}
 	// Hash deterministic content only (exclude volatile telemetry fields ms & cached so ETag + 304 works on JSON)
-	etagPayload, _ := json.Marshal(struct {
+	etag := s.makeEtag("bcfast", struct {
 		Format     string     `json:"f"`
 		Kind       string     `json:"k"`
 		Audience   string     `json:"a"`
@@ -393,6 +779,7 @@ func (s *Server) handleFast(w http.ResponseWriter, r *http.Request) {
 		Confidence string     `json:"c"`
 		Abstained  bool       `json:"ab"`
 		Answer     string     `json:"ans"`
+		Facts      []string   `json:"fa"`
 		Hits       []EventHit `json:"h"`
 	}{
 		Format:     fmtMode,
@@ -402,10 +789,9 @@ func (s *Server) handleFast(w http.ResponseWriter, r *http.Request) {
 		Confidence: res.Confidence,
 		Abstained:  res.Abstained,
 		Answer:     res.Answer,
+		Facts:      res.Facts,
 		Hits:       res.Hits,
 	})
-	sum := sha256.Sum256(etagPayload)
-	etag := fmt.Sprintf(`"bcfast-%s-%s"`, commit, hex.EncodeToString(sum[:])[:12])
 	cacheHeader := "no-store"
 	if res.OK {
 		cacheHeader = "public, max-age=120, s-maxage=300, stale-while-revalidate=600"
