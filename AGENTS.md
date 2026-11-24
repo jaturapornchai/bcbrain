@@ -10,10 +10,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # กฎประจำโปรเจกต์ `d:\bcbrain` (BC Brain Auto-Sync & Anti-Hallucination Rules)
 
-## 1. กฎเหล็กห้ามแตะ `D:\bcaiaccount` (Read-Only 100%)
-- **โปรเจกต์ `d:\bcbrain` ห้ามสร้าง แก้ไข ลบ หรือล็อกไฟล์ใดๆ ใน `D:\bcaiaccount` เด็ดขาด**
-- ทุกคำสั่ง `git` ที่อ่าน `D:\bcaiaccount` ต้องใส่ `--no-optional-locks` และอ่านอย่างเดียวเท่านั้น
+## 1. กฎเหล็กห้ามแก้นอกโปรเจกต์ `d:\bcbrain` (Workspace Isolation & Read-Only 100%)
+- **ห้ามสร้าง แก้ไข ลบ หรือล็อกไฟล์ใดๆ นอกโฟลเดอร์ `d:\bcbrain` เด็ดขาด** (รวมถึง `D:\bcaiaccount`, `D:\bcaiwebsite-live`, `D:\yalecom`, `D:\jarvisbcaiaccount` และโปรเจกต์อื่นทุกแห่งบนเครื่อง)
+- ทุกคำสั่ง `git` ที่อ่านโปรเจกต์ภายนอกต้องใส่ `--no-optional-locks` และอ่านอย่างเดียวเท่านั้น
 - ตัวสกัดความรู้ AI อัตโนมัติใน `scripts/hourly-sync.mjs` บังคับจำกัดสิทธิ์ที่ `--tools "Read,Glob,Grep"` เท่านั้น (ไม่มี `Write`/`Edit`/`Bash`) และ controller ยอมเขียนเฉพาะไฟล์ `.md` ภายใน `d:\bcbrain\vault\` เท่านั้น
+- หากต้องการให้โปรเจกต์ภายนอก (`D:\yalecom`, `D:\jarvisbcaiaccount` ฯลฯ) ปรับโค้ดหรือเพิ่มความสามารถเพื่อใช้ BC Brain ให้ **เขียนเป็น Prompt สำเร็จรูปส่งให้ลุงจืด** (และอัปเดตไว้ใน `docs/client-prompts.md`) เพื่อให้ AI ประจำโปรเจกต์นั้นเป็นผู้แก้เองเสมอ
 
 ## 2. กฎอัปเดตสมองอัตโนมัติทุก 1 ชั่วโมง + Auto-Deploy
 - **Antigravity Automation (`Hourly BC Brain Sync & Deploy`)**: รันทุก 1 ชั่วโมง (`CRON_TZ=Asia/Bangkok 0 * * * *`) ด้วย Agent ของ Antigravity เอง (ไม่เรียก Claude/DeepSeek ใน Antigravity):
@@ -51,3 +52,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
    - อธิบายชัดว่าฟีเจอร์/ระบบนั้น **เหมาะกับธุรกิจประเภทไหน · ช่วยแก้ปัญหา/ลดงานอะไรให้เจ้าของกิจการ · ทำอะไรได้บ้าง · และข้อจำกัดปัจจุบันคืออะไรตามความจริง** (ห้ามขายเกินจริง)
    - เพิ่มคำถามแนวลูกค้าก่อนตัดสินใจซื้อ เช่น *"รองรับ ... ไหม"*, *"ทำ ... อัตโนมัติได้ไหม"*, *"ใช้ได้กี่คน/กี่สาขา"*, *"แยกสิทธิ์พนักงานได้ไหม"* (เรื่องราคา/โปรโมชัน/สัญญาเฉพาะราย ให้ยึดข้อมูลจริงที่มีในระบบหรือระบุให้สอบถามฝ่ายขาย)
 4. **เพิ่มส่วนข้อความถาม-ตอบภาษาคน**: เมื่อเนื้อหามีประเด็นที่ลูกค้าถามซ้ำหรือใช้หลายสำนวน ให้เพิ่มหัวข้อ `## คำถามที่ลูกค้ามักถาม` หรือประโยคตัวอย่างภาษาพูดจริงในโน้ต โดยยังคง **ปลอดศัพท์โค้ด 100%** (ห้าม `snake_case`, นามสกุลไฟล์, SQL, `/api/`, ชื่อ framework ในโซน `user`) และระบุรายละเอียดเต็มไว้ใน `docs/extract-brief.md`
+
+## 7. โปรเจกต์หลักที่ระบบสมองนี้รองรับ (`D:\yalecom` & `D:\jarvisbcaiaccount`) + Prompt อัปเกรดต่อเนื่อง
+- ระบบสมอง `d:\bcbrain` (`https://brain.bcsmethai.com`) มีเป้าหมายหลักในการสนับสนุน **2 โปรเจกต์ปลายทาง** ให้ตอบลูกค้า ขายโปรแกรม และช่วยงานบัญชี/เทคนิคได้ฉลาด เร็ว และแม่นยำขึ้นเรื่อยๆ:
+  1. **`D:\yalecom`** — ระบบ BC Call Center + J.A.R.V.I.S Voice Agent + CRM (`https://callcenter.bcsmethai.com/`)
+  2. **`D:\jarvisbcaiaccount`** — ระบบ J.A.R.V.I.S BC Ai Account ผู้ช่วยเสียง/แชท Owner + Public (`https://jarvis.bcaiaccount.com/`)
+- **ห้ามแก้ไฟล์ในทั้ง 2 โปรเจกต์นี้จากฝั่ง `d:\bcbrain` เด็ดขาด** — ให้ดูแลผ่าน **Prompt สำเร็จรูปเฉพาะโปรเจกต์** ที่เก็บและอัปเดตต่อเนื่องใน `docs/client-prompts.md`
+- ทุกครั้งที่ `d:\bcbrain` เพิ่ม MCP Tool ใหม่, REST API ใหม่, โหมดความเร็วใหม่, ขยายโน้ต Call Center/ฝ่ายขาย, หรือเพิ่มกลไกกันหลอน (เช่น `lookup_error`, `search_sections`, `get_facts`, `whats_new`, `verify_reference`, `/api/openapi.json`, `/api/gaps`) ต้อง:
+  1. อัปเดต Prompt ของทั้ง `D:\yalecom` และ `D:\jarvisbcaiaccount` ใน `docs/client-prompts.md` ให้ใช้ความสามารถใหม่ได้เต็มที่ (ระบุ endpoint/tool จริง, ตัวอย่าง routing คำถาม, และวิธีป้อน gap/feedback กลับเพื่อให้ทั้ง 2 โปรเจกต์เก่งขึ้นเรื่อยๆ)
+  2. แนบ Prompt สำเร็จรูปให้ลุงจืดนำไปวางสั่ง AI ประจำ `D:\yalecom` และ `D:\jarvisbcaiaccount` อัปเกรดระบบของตัวเองทันที
