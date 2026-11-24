@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { checkRateLimit, runFastRestQuery } from "@/lib/mcp-engine";
+import { checkRateLimit, normalizeRestAudience, runFastRestQuery } from "@/lib/mcp-engine";
 import { syncCommit } from "@/lib/vault";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,17 @@ function clientIp(req: Request): string {
   return req.headers.get("x-real-ip")?.trim() || "local";
 }
 
+export async function OPTIONS(): Promise<Response> {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Accept",
+    },
+  });
+}
+
 export async function GET(req: Request): Promise<Response> {
   const rl = checkRateLimit(clientIp(req));
   if (!rl.ok) {
@@ -23,9 +34,9 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   const url = new URL(req.url);
-  const rawAud = url.searchParams.get("audience");
-  const audience = rawAud === "dev" || rawAud === "all" ? rawAud : "user";
-  const mode = url.searchParams.get("mode") === "normal" ? "normal" : "ultra";
+  const audience = normalizeRestAudience(url.searchParams.get("audience"), "user");
+  const rawMode = url.searchParams.get("mode");
+  const mode = rawMode === "normal" || rawMode === "fast" ? rawMode : "ultra";
   const media = url.searchParams.get("media") === "1" || url.searchParams.get("media") === "true";
   const maxCharsParam = Number(url.searchParams.get("max_chars") ?? "");
   const maxChars = Number.isFinite(maxCharsParam) && maxCharsParam >= 300 && maxCharsParam <= 4500 ? Math.floor(maxCharsParam) : undefined;
@@ -41,7 +52,9 @@ export async function GET(req: Request): Promise<Response> {
   });
 
   const body = format === "text" ? result.answer : JSON.stringify(result);
-  const etag = `"bcfast-${syncCommit || "local"}-${crypto.createHash("sha256").update(body).digest("hex").slice(0, 12)}"`;
+  const { ms: _ms, cached: _cached, ...stable } = result;
+  const etagSeed = format === "text" ? result.answer : JSON.stringify(stable);
+  const etag = `"bcfast-${syncCommit || "local"}-${crypto.createHash("sha256").update(etagSeed).digest("hex").slice(0, 12)}"`;
   const cacheControl = result.ok
     ? "public, max-age=120, s-maxage=300, stale-while-revalidate=600"
     : "no-store";

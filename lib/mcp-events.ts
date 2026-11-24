@@ -8,7 +8,12 @@ export type McpToolName =
   | "traverse_brain"
   | "read_note"
   | "list_notes"
-  | "find_media";
+  | "find_media"
+  | "lookup_error"
+  | "search_sections"
+  | "get_facts"
+  | "whats_new"
+  | "verify_reference";
 
 export type McpEventHit = {
   slug: string;

@@ -29,14 +29,33 @@ check(getRes.status === 405, `GET /mcp stateless endpoint returns 405 immediatel
 
 const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "eval", version: "1" } });
 check(init.result?.serverInfo?.name === "bcbrain", "initialize serverInfo");
+check(String(init.result?.serverInfo?.version ?? "").startsWith("3."), `initialize serverInfo version 3.x (got ${init.result?.serverInfo?.version})`);
 const instr = init.result?.instructions ?? "";
 check(
-  instr.includes("quick_answer") && instr.includes("playbook-dev") && instr.includes("playbook-call-center") && instr.includes("audience"),
-  "initialize instructions cover speed tools and both modes",
+  instr.includes("quick_answer") && instr.includes("playbook-dev") && instr.includes("playbook-call-center") && instr.includes("audience") && instr.includes("verify_reference"),
+  "initialize instructions cover speed tools, v3 tools, and both modes",
 );
 
 const listedTools = (await rpc("tools/list")).result?.tools ?? [];
-for (const t of ["quick_answer", "batch_ask", "lookup_menu", "batch_read", "ask_brain", "search_brain", "find_media", "traverse_brain", "read_note", "list_notes"]) {
+const EXPECTED_TOOLS = [
+  "quick_answer",
+  "batch_ask",
+  "lookup_menu",
+  "batch_read",
+  "ask_brain",
+  "search_brain",
+  "find_media",
+  "traverse_brain",
+  "read_note",
+  "list_notes",
+  "lookup_error",
+  "search_sections",
+  "get_facts",
+  "whats_new",
+  "verify_reference",
+];
+check(listedTools.length === 15, `tools/list returns 15 tools (got ${listedTools.length})`);
+for (const t of EXPECTED_TOOLS) {
   const tool = listedTools.find((x) => x.name === t);
   check(!!tool, `tools/list has ${t}`);
   if (t !== "read_note") check(!!tool?.inputSchema?.properties?.audience, `${t} exposes audience param`);
@@ -185,7 +204,53 @@ check(
   "batch_ask answers multiple questions in 1 call and strictly abstains ungrounded items",
 );
 
-// ---- Fast cacheable REST endpoints (/api/fast, /api/bootstrap-pack, /api/vault-pack) ----
+// ---- v3 Smart MCP tools: lookup_error, search_sections, get_facts, whats_new, verify_reference ----
+const leHit = (await call("lookup_error", { query: "ล็อกหน่วยต้นทุนแล้ว", audience: "user", limit: 3 })).text;
+check(
+  leHit.includes("ts-stock-bom-unit-locked") && !leHit.includes("audience: dev"),
+  "lookup_error(user) finds ts-stock-bom-unit-locked without dev leak",
+);
+const leTrap = (await call("lookup_error", { query: "สูตรทำแกงเขียวหวานไก่ใส่กะทิสด", audience: "user" })).text;
+check(leTrap.includes("🛑 Abstain"), "lookup_error strictly abstains on Thai trap");
+
+const ssHit = (await call("search_sections", { query: "ห้ามขายสินค้าต่ำกว่าทุน วงเงินเครดิตรวมเช็คคงค้าง ส่วนที่ 4", audience: "user", limit: 3, max_chars: 1000 })).text;
+check(
+  ssHit.includes("start-erp-options-9-tabs") && ssHit.includes("ส่วนที่ 4") && ssHit.includes("## Structured Facts") && !ssHit.includes("audience: dev"),
+  "search_sections(user) returns exact section excerpt + structured facts without dev leak",
+);
+
+const gfUser = (await call("get_facts", { slugs: ["start-erp-options-9-tabs", "tbl-ic-trans"], kinds: ["menu", "rule"], audience: "user", limit: 10 })).text;
+check(
+  gfUser.includes("[menu]") && gfUser.includes("1004") && !gfUser.includes("tbl-ic-trans") && !/\b(?:ic_trans|gl_journal|trans_flag)\b/.test(gfUser),
+  "get_facts(user) returns typed facts and strictly strips dev slugs & SQL jargon",
+);
+
+const wnUser = (await call("whats_new", { days: 30, audience: "user", limit: 10 })).text;
+check(wnUser.includes("[whats_new") && !wnUser.includes("| dev)"), "whats_new(user) returns recent updates without dev notes");
+
+const vrUser = JSON.parse((await call("verify_reference", { menus: ["4013", "4999"], tables: ["ic_trans"], columns: ["ic_trans.doc_no"], audience: "user" })).text || "{}");
+check(
+  vrUser.tablesRestricted === true &&
+    vrUser.ok === false &&
+    vrUser.menus?.valid?.some((m) => m.code === "4013") &&
+    vrUser.menus?.unknownMenus?.includes("4999") &&
+    (vrUser.tables?.valid?.length ?? -1) === 0 &&
+    (vrUser.tables?.invalid?.length ?? -1) === 0 &&
+    (vrUser.columns?.valid?.length ?? -1) === 0,
+  "verify_reference(user) validates menus and strictly refuses/omits SQL tables & columns",
+);
+
+const vrDev = JSON.parse((await call("verify_reference", { menus: ["4013"], tables: ["ic_trans", "ic_trans_typo"], columns: ["ic_trans.doc_no", "ic_trans.doc_noo"], audience: "dev" })).text || "{}");
+check(
+  vrDev.tablesRestricted === false &&
+    vrDev.tables?.valid?.some((t) => t.table === "ic_trans") &&
+    vrDev.tables?.invalid?.some((t) => t.table === "ic_trans_typo" && t.suggestions?.includes("ic_trans")) &&
+    vrDev.columns?.valid?.some((c) => c.ref === "ic_trans.doc_no") &&
+    vrDev.columns?.invalid?.some((c) => c.ref === "ic_trans.doc_noo" && c.suggestions?.includes("ic_trans.doc_no")),
+  "verify_reference(dev) validates SQL tables & table.column with fuzzy suggestions",
+);
+
+// ---- Fast cacheable REST endpoints (/api/fast, /api/bootstrap-pack, /api/vault-pack, v3 /api/* + OpenAPI 3.1) ----
 const origin = new URL(URL_).origin;
 const fastRes = await fetch(`${origin}/api/fast?q=${encodeURIComponent("เช็คเด้งทำยังไง")}&audience=user&mode=ultra`);
 const fastJson = await fastRes.json();
@@ -208,6 +273,67 @@ check(
 );
 const pack304 = await fetch(`${origin}/api/vault-pack`, { headers: { "If-None-Match": packEtag } });
 check(pack304.status === 304, `/api/vault-pack supports ETag 304 Not Modified (got ${pack304.status})`);
+
+// v3 REST API probes
+const errApiRes = await fetch(`${origin}/api/error?q=${encodeURIComponent("ล็อกหน่วยต้นทุนแล้ว")}&audience=user&limit=3`);
+const errApiJson = await errApiRes.json();
+check(
+  errApiRes.status === 200 && errApiJson.ok && errApiJson.hits?.[0]?.slug === "ts-stock-bom-unit-locked",
+  "/api/error returns matched Thai error fix",
+);
+
+const secApiRes = await fetch(`${origin}/api/sections?q=${encodeURIComponent("ห้ามขายสินค้าต่ำกว่าทุน วงเงินเครดิตรวมเช็คคงค้าง ส่วนที่ 4")}&audience=user&limit=3&max_chars=1000`);
+const secApiJson = await secApiRes.json();
+check(
+  secApiRes.status === 200 && secApiJson.ok && secApiJson.sections?.[0]?.slug === "start-erp-options-9-tabs",
+  "/api/sections returns surgical section excerpt + facts",
+);
+
+const factsApiRes = await fetch(`${origin}/api/facts?slugs=start-erp-options-9-tabs&kinds=menu&audience=user&limit=10`);
+const factsApiJson = await factsApiRes.json();
+check(
+  factsApiRes.status === 200 && factsApiJson.ok && factsApiJson.count > 0 && factsApiJson.facts.every((f) => f.kind === "menu"),
+  "/api/facts returns typed structured facts",
+);
+
+const wnApiRes = await fetch(`${origin}/api/whats-new?days=30&audience=user&limit=5`);
+const wnApiJson = await wnApiRes.json();
+check(
+  wnApiRes.status === 200 && wnApiJson.ok && wnApiJson.count > 0 && wnApiJson.items.every((i) => i.audience !== "dev"),
+  "/api/whats-new returns recent non-dev notes",
+);
+
+const verApiGet = await fetch(`${origin}/api/verify?menus=4013&tables=ic_trans&audience=user`);
+const verApiGetJson = await verApiGet.json();
+check(
+  verApiGet.status === 200 && verApiGetJson.tablesRestricted === true && verApiGetJson.tables?.valid?.length === 0,
+  "GET /api/verify(user) strictly refuses SQL tables",
+);
+
+const verApiPost = await fetch(`${origin}/api/verify`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ menus: ["4013"], tables: ["ic_trans"], columns: ["ic_trans.doc_no"], audience: "dev" }),
+});
+const verApiPostJson = await verApiPost.json();
+check(
+  verApiPost.status === 200 && verApiPostJson.ok === true && verApiPostJson.tablesRestricted === false && verApiPostJson.columns?.valid?.length === 1,
+  "POST /api/verify(dev) verifies menus, tables, and columns",
+);
+
+const gapsApiRes = await fetch(`${origin}/api/gaps?limit=20`);
+const gapsApiJson = await gapsApiRes.json();
+check(
+  gapsApiRes.status === 200 && gapsApiJson.ok === true && (gapsApiRes.headers.get("cache-control") ?? "").includes("no-store"),
+  "/api/gaps returns sanitized gap telemetry with Cache-Control: no-store",
+);
+
+const openApiRes = await fetch(`${origin}/api/openapi.json`);
+const openApiJson = await openApiRes.json();
+check(
+  openApiRes.status === 200 && openApiJson.openapi === "3.1.0" && openApiJson.paths?.["/api/verify"] && openApiJson.paths?.["/mcp"],
+  "/api/openapi.json serves valid OpenAPI 3.1.0 spec",
+);
 const mediaHits = JSON.parse((await call("search_brain", { query: "วิดีโอสอนใช้งาน YouTube คลิปสอน", limit: 3, audience: "user" })).text || "[]");
 check(
   Array.isArray(mediaHits[0]?.videos) && mediaHits[0].videos.length > 0 && Array.isArray(mediaHits[0]?.images) && mediaHits[0].images.length > 0,
