@@ -6,12 +6,14 @@
 //  4. Shrink guard on changed notes (rejects accidental >45% truncation vs git HEAD).
 //  5. Live 1:1 menu catalog parity (vault/start/menu-cat-1..9-*.md vs frontend bcMenu.json).
 //  6. API route grounding in vault/api/*.md against mounted Chi routes in router.go.
+//  7. SQL column grounding in ```sql blocks & vault/schema/*.md against real CREATE/ALTER TABLE columns.
 // Usage: node scripts/verify-grounding.mjs [--files vault/a.md,vault/b.md]
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { auditMenuCatalogParity, loadBcMenuTruth, loadLocalEnv, loadRouterTruth, matchRouterPath } from "./load-env.mjs";
+import { extractSymbolTruth } from "./symbol-truth.mjs";
 
 loadLocalEnv();
 
@@ -31,6 +33,63 @@ const BUILTIN_SQL_TABLES = new Set([
   "pg_namespace",
   "generate_series",
   "unnest",
+]);
+const SQL_ALIAS_STOPWORDS = new Set([
+  "where",
+  "on",
+  "left",
+  "right",
+  "inner",
+  "outer",
+  "full",
+  "cross",
+  "join",
+  "group",
+  "order",
+  "limit",
+  "offset",
+  "having",
+  "union",
+  "except",
+  "intersect",
+  "set",
+  "values",
+  "returning",
+  "using",
+  "and",
+  "or",
+  "as",
+  "into",
+  "select",
+  "from",
+  "lateral",
+  "natural",
+  "when",
+  "then",
+  "else",
+  "end",
+  "case",
+  "for",
+  "update",
+]);
+const PG_SYSTEM_COLUMNS = new Set(["roworder", "ctid", "xmin", "xmax", "cmin", "cmax", "tableoid", "oid"]);
+const SQL_TYPE_KEYWORDS = new Set([
+  "varchar",
+  "numeric",
+  "smallint",
+  "integer",
+  "bigint",
+  "boolean",
+  "date",
+  "timestamp",
+  "timestamptz",
+  "text",
+  "bytea",
+  "serial",
+  "bigserial",
+  "json",
+  "jsonb",
+  "uuid",
 ]);
 
 function walkFiles(dir, extFilter) {
@@ -112,6 +171,7 @@ const targetFiles =
 const isScoped = filesArgIdx !== -1;
 const { validMenus, validTables } = loadGroundTruth();
 const validRoutes = loadRouterTruth(SRC_DIR);
+const symbolTruth = extractSymbolTruth(SRC_DIR);
 const lineCache = new Map();
 const getLines = (p) => {
   if (!lineCache.has(p)) lineCache.set(p, fs.readFileSync(p, "utf8").split("\n").length);
@@ -122,6 +182,7 @@ const errors = [];
 const warnings = [];
 let checkedMenus = 0;
 let checkedTables = 0;
+let checkedColumns = 0;
 let checkedRoutes = 0;
 
 for (const file of targetFiles) {
@@ -202,6 +263,110 @@ for (const file of targetFiles) {
     }
   }
 
+  // 7. SQL column grounding in ```sql blocks & vault/schema/*.md against real CREATE/ALTER TABLE columns
+  if (DEV_FOLDERS.has(folder) && symbolTruth.tableCount > 50) {
+    for (const rawSql of extractSqlBlocks(body)) {
+      const sql = rawSql
+        .replace(/--[^\r\n]*/g, "")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/'(?:''|[^'])*'/g, "''");
+      const ctes = extractCteNames(sql);
+      const cteOrSubqueryAliases = new Set(ctes);
+      for (const sm of sql.matchAll(/\)\s+(?:AS\s+)?([a-z_][a-z0-9_]*)\b/gi)) {
+        const alias = sm[1].toLowerCase();
+        if (!SQL_ALIAS_STOPWORDS.has(alias)) cteOrSubqueryAliases.add(alias);
+      }
+
+      const aliasMap = new Map();
+      const bindAlias = (alias, tbl) => {
+        let bucket = aliasMap.get(alias);
+        if (!bucket) {
+          bucket = new Set();
+          aliasMap.set(alias, bucket);
+        }
+        bucket.add(tbl);
+      };
+
+      for (const tm of sql.matchAll(/\b(?:FROM|JOIN)\s+(?:public\.)?"?([a-z_][a-z0-9_]*)"?(?:\s+(?:AS\s+)?([a-z_][a-z0-9_]*))?/gi)) {
+        const tbl = tm[1].toLowerCase();
+        const alias = tm[2]?.toLowerCase();
+        if (ctes.has(tbl)) {
+          if (alias && !SQL_ALIAS_STOPWORDS.has(alias)) cteOrSubqueryAliases.add(alias);
+          continue;
+        }
+        if (!symbolTruth.tables.has(tbl)) continue;
+        bindAlias(tbl, tbl);
+        if (alias && !SQL_ALIAS_STOPWORDS.has(alias)) bindAlias(alias, tbl);
+      }
+
+      const seenMissingInBlock = new Set();
+      for (const qm of sql.matchAll(/\b([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\b/gi)) {
+        const alias = qm[1].toLowerCase();
+        const col = qm[2].toLowerCase();
+        if (cteOrSubqueryAliases.has(alias) || PG_SYSTEM_COLUMNS.has(col)) continue;
+        const boundTables = aliasMap.get(alias);
+        if (!boundTables) continue;
+        checkedColumns++;
+        let found = false;
+        for (const tbl of boundTables) {
+          if (symbolTruth.tables.get(tbl)?.has(col)) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          const key = `${alias}.${col}`;
+          if (seenMissingInBlock.has(key)) continue;
+          seenMissingInBlock.add(key);
+          const msg = `${relFromRoot}: SQL column "${alias}.${col}" not found on table [${[...boundTables].join("|")}] in D:/bcaiaccount DDL`;
+          if (isScoped) errors.push(msg);
+          else warnings.push(msg);
+        }
+      }
+    }
+
+    if (folder === "schema") {
+      let currentTables = [];
+      let inColTable = false;
+      for (const line of body.split("\n")) {
+        const trimmed = line.trim();
+        if (/^#{2,3}\s+/.test(trimmed)) {
+          const matchedTables = [];
+          for (const hm of trimmed.matchAll(/`([a-z][a-z0-9_]*)`/g)) {
+            const candidate = hm[1].toLowerCase();
+            if (symbolTruth.tables.has(candidate)) matchedTables.push(candidate);
+          }
+          if (matchedTables.length > 0) currentTables = matchedTables;
+          else if (/^##\s+/.test(trimmed)) currentTables = [];
+          inColTable = false;
+          continue;
+        }
+        if (!trimmed.startsWith("|")) {
+          inColTable = false;
+          continue;
+        }
+        if (currentTables.length === 0) continue;
+        const cells = trimmed.split("|").slice(1, -1).map((c) => c.trim());
+        if (cells.length < 2 || cells.every((c) => /^:?-+:?$/.test(c))) continue;
+        if (!inColTable) {
+          if (/คอลัมน์|column|ฟิลด์|field/i.test(cells[0])) inColTable = true;
+          continue;
+        }
+        for (const cm of cells[0].matchAll(/`([a-z][a-z0-9_]*)`/g)) {
+          const col = cm[1].toLowerCase();
+          if (PG_SYSTEM_COLUMNS.has(col) || SQL_TYPE_KEYWORDS.has(col) || symbolTruth.tables.has(col)) continue;
+          checkedColumns++;
+          const found = currentTables.some((tbl) => symbolTruth.tables.get(tbl)?.has(col));
+          if (!found) {
+            const msg = `${relFromRoot}: schema column "${col}" not found on table [${currentTables.join("|")}] in D:/bcaiaccount DDL`;
+            if (isScoped) errors.push(msg);
+            else warnings.push(msg);
+          }
+        }
+      }
+    }
+  }
+
   // 5. Shrink guard on scoped updated files
   if (isScoped) {
     const prev = gitPrevContent(relFromRoot);
@@ -212,7 +377,7 @@ for (const file of targetFiles) {
 }
 
 console.log(
-  `verify-grounding: checked ${targetFiles.length} notes (menus=${checkedMenus}, sqlTables=${checkedTables}, apiRoutes=${checkedRoutes}, groundTruth=${validMenus.size} menus / ${validTables.size} idents / ${validRoutes.size} routes)`,
+  `verify-grounding: checked ${targetFiles.length} notes (menus=${checkedMenus}, sqlTables=${checkedTables}, sqlColumns=${checkedColumns}, apiRoutes=${checkedRoutes}, groundTruth=${validMenus.size} menus / ${symbolTruth.tableCount} tables / ${symbolTruth.columnCount} columns / ${validRoutes.size} routes / ${symbolTruth.errorCount} errorStrings)`,
 );
 const scopedSet = isScoped ? new Set(targetFiles.map((f) => path.relative(ROOT, f).replace(/\\/g, "/"))) : null;
 const parity = auditMenuCatalogParity(ROOT, SRC_DIR, scopedSet);
