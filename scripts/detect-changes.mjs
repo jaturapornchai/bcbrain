@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
+import { diffGroundingLock, summarizeGroundingDiff } from "./grounding-lock.mjs";
 import { auditMenuCatalogParity, loadBcMenuTruth, loadLocalEnv } from "./load-env.mjs";
 
 loadLocalEnv();
@@ -274,6 +275,7 @@ export function detectChanges() {
   const uncoveredChangedFiles = changedFiles.filter((f) => !sourceToNotes.has(f) && files[f]);
   const { uncoveredMenus, uncoveredTables } = detectUncoveredEntities(coveredMenus, coveredTables);
   const menuParity = auditMenuCatalogParity(ROOT, SRC_DIR);
+  const groundingDiff = summarizeGroundingDiff(diffGroundingLock(SRC_DIR));
   const diffStatOut = gitReadOnly(SRC_DIR, ["diff", "--stat=120,80", "HEAD", "--", ...WATCH_ROOTS]);
   const diffHighlights = diffStatOut ? diffStatOut.split(/\r?\n/).filter(Boolean).slice(0, 25) : [];
 
@@ -283,6 +285,7 @@ export function detectChanges() {
     brokenNotes.length > 0 ||
     newCommits.length > 0 ||
     menuParity.mismatchedFiles.length > 0 ||
+    Boolean(groundingDiff?.hasDrift) ||
     pendingCount > 0;
 
   return {
@@ -298,6 +301,7 @@ export function detectChanges() {
     hasChanges,
     pendingCount,
     menuParityMismatches: menuParity.mismatchedFiles,
+    groundingDiff,
     diffHighlights,
     newCommits,
     addedFiles,
@@ -331,7 +335,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       `hasChanges=${report.hasChanges} | commits=${report.newCommits.length} | added=${report.addedFiles.length} modified=${report.modifiedFiles.length} deleted=${report.deletedFiles.length}`,
     );
     console.log(`brokenNotes=${report.brokenNotes.length} | impactedNotes=${report.impactedNotes.length} | uncoveredChanged=${report.uncoveredChangedFiles.length}`);
-    console.log(`uncoveredMenus=${report.uncoveredMenus.length} | uncoveredTables=${report.uncoveredTables.length}`);
+    console.log(
+      `uncoveredMenus=${report.uncoveredMenus.length} | uncoveredTables=${report.uncoveredTables.length} | groundingLock=${report.groundingDiff?.hasLock ? (report.groundingDiff.hasDrift ? "DRIFT" : "clean") : "none"}`,
+    );
     if (report.brokenNotes.length) {
       console.log("\nBroken source references:");
       for (const b of report.brokenNotes.slice(0, 15)) console.log(`  - ${b.note}: ${b.issues.join("; ")}`);

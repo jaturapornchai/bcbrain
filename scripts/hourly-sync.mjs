@@ -11,6 +11,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { detectChanges } from "./detect-changes.mjs";
+import { saveGroundingLock } from "./grounding-lock.mjs";
 import { loadBcMenuTruth, loadLocalEnv, redactLogText } from "./load-env.mjs";
 import { computeIncrementalDiffs, saveBaselineSnapshot } from "./sync-cache.mjs";
 
@@ -592,6 +593,7 @@ async function main() {
           ...(report.menuParityMismatches.length ? { menuParityMismatches: report.menuParityMismatches } : {}),
           ...(report.uncoveredMenus.length ? { uncoveredMenus: report.uncoveredMenus.slice(0, 15) } : {}),
           ...(report.uncoveredChangedFiles.length ? { uncoveredChangedFiles: report.uncoveredChangedFiles } : {}),
+          ...(report.groundingDiff?.hasDrift || (DIFF_OUT && report.groundingDiff) ? { groundingDiff: report.groundingDiff } : {}),
           ...(DIFF_OUT && report.changedFileDeltas?.length ? { diffs: computeIncrementalDiffs(SRC_DIR, report.changedFileDeltas) } : {}),
           selected,
           pendingAfterBatch: remainingPending.length,
@@ -662,7 +664,10 @@ async function main() {
       };
       fs.writeFileSync(STATE_FILE, JSON.stringify(nextState), "utf8");
       const snap = saveBaselineSnapshot(SRC_DIR, report.snapshot.files);
-      log(`FINALIZE DONE in ${((Date.now() - t0) / 1000).toFixed(1)}s (updated=${modifiedVault.length}, pending=${remainingPending.length}, cache=${snap.cachedFiles}f/${(snap.gzBytes / 1024).toFixed(0)}KB)`);
+      const glock = saveGroundingLock(SRC_DIR);
+      log(
+        `FINALIZE DONE in ${((Date.now() - t0) / 1000).toFixed(1)}s (updated=${modifiedVault.length}, pending=${remainingPending.length}, cache=${snap.cachedFiles}f/${(snap.gzBytes / 1024).toFixed(0)}KB, lock=${glock.menusCount}m/${glock.sqlTableCount}t/${glock.sqlColumnCount}c/${glock.errorStringsCount}e)`,
+      );
       return;
     }
 
@@ -677,7 +682,10 @@ async function main() {
       };
       fs.writeFileSync(STATE_FILE, JSON.stringify(nextState), "utf8");
       const snap = saveBaselineSnapshot(SRC_DIR, report.snapshot.files);
-      log(`RECORD-NOOP: Gates 1-3 clean, .sync-state.json & baseline cache updated (${snap.cachedFiles}f)`);
+      const glock = saveGroundingLock(SRC_DIR);
+      log(
+        `RECORD-NOOP: Gates 1-3 clean, .sync-state.json, baseline cache (${snap.cachedFiles}f) & grounding.lock.json (${glock.menusCount}m/${glock.sqlTableCount}t/${glock.sqlColumnCount}c) updated`,
+      );
       return;
     }
 
@@ -788,7 +796,10 @@ async function main() {
     };
     fs.writeFileSync(STATE_FILE, JSON.stringify(nextState), "utf8");
     const snap = saveBaselineSnapshot(SRC_DIR, report.snapshot.files);
-    log(`DONE in ${((Date.now() - t0) / 1000).toFixed(1)}s (updated=${finalUpdated.length}, pending=${remainingPending.length}, cost=$${totalCost.toFixed(4)}, cache=${snap.cachedFiles}f)`);
+    const glock = saveGroundingLock(SRC_DIR);
+    log(
+      `DONE in ${((Date.now() - t0) / 1000).toFixed(1)}s (updated=${finalUpdated.length}, pending=${remainingPending.length}, cost=$${totalCost.toFixed(4)}, cache=${snap.cachedFiles}f, lock=${glock.menusCount}m/${glock.sqlTableCount}t/${glock.sqlColumnCount}c)`,
+    );
   } catch (err) {
     rollbackBackups(backups);
     log(`ABORT & ROLLED BACK: ${err.message}`);
