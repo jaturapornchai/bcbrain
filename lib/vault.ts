@@ -14,6 +14,57 @@ import {
   type AudienceFilter,
   type RelationType,
 } from "./groups";
+import {
+  buildErrorIndex,
+  buildSectionIndex,
+  buildSectionSnippet,
+  buildSemanticIndex,
+  clearSectionNoteBuffers,
+  computeRrfScores,
+  encodeQueryVector,
+  estimateTokens,
+  extractNoteFacts,
+  extractStructuredFacts,
+  extractVaultRecencyMap,
+  queryErrorIndex,
+  scoreSectionIndex,
+  scoreSemanticVectors,
+  SEMANTIC_DIM,
+  topKIndices,
+  trimBlockAware,
+  type ErrorIndex,
+  type ErrorLookupEntry,
+  type FactKind,
+  type NoteRecency,
+  type NoteRecencyMeta,
+  type PreTokenizedSection,
+  type RrfSignalInput,
+  type SectionSearchHit,
+  type SectionSearchIndex,
+  type SemanticIndex,
+  type StructuredFact,
+  type TrimBlockOptions,
+  type TrimBlockResult,
+} from "./vault-retrieval";
+
+export {
+  computeRrfScores,
+  estimateTokens,
+  extractNoteFacts,
+  extractStructuredFacts,
+  SEMANTIC_DIM,
+  trimBlockAware,
+  type ErrorLookupEntry,
+  type FactKind,
+  type NoteRecency,
+  type NoteRecencyMeta,
+  type RrfSignalInput,
+  type SectionSearchHit,
+  type SemanticIndex,
+  type StructuredFact,
+  type TrimBlockOptions,
+  type TrimBlockResult,
+};
 
 export type Edge = {
   slug: string;
@@ -76,6 +127,10 @@ export type Note = {
   cleanBody?: string;
   tldr?: string;
   sections?: NoteSection[];
+  facts?: string[];
+  updatedAt?: string;
+  updatedTs?: number;
+  lastCommit?: string;
   links: string[];
   backlinks: string[];
   outEdges: Edge[];
@@ -92,6 +147,7 @@ export type SearchHit = {
   tags: string[];
   score: number;
   snippet: string;
+  bestSection?: string;
   images?: ImageMedia[];
   videos?: VideoMedia[];
 };
@@ -589,6 +645,13 @@ type SearchIndex = {
   isHub: Uint8Array;
   baseBuf: Float64Array;
   matchBuf: Int32Array;
+  graphBuf: Float64Array;
+  lexBuf: Float64Array;
+  rrfBuf: Float64Array;
+  semantic: SemanticIndex;
+  sectionIndex: SectionSearchIndex;
+  queryVecBuf: Float32Array;
+  semScoreBuf: Float32Array;
 };
 
 export type GraphNode = {
@@ -658,8 +721,11 @@ type VaultBundle = {
   grouped: Map<AudienceFilter, [string, Note[]][]>;
   searches: Map<string, SearchHit[]>;
   noteTokens: Map<string, NoteTokens> | null;
+  sectionTokens: Map<string, PreTokenizedSection[]>;
   indexes: Map<AudienceFilter, SearchIndex>;
   directIndex: DirectIndex | null;
+  errorIndex: ErrorIndex | null;
+  recencyMap: Map<string, NoteRecencyMeta> | null;
   vaultPackGzip: { gz: Buffer; etag: string; noteCount: number; rawBytes: number } | null;
   bootstrapPacks: Map<"user" | "dev", { text: string; etag: string; chars: number }>;
 };
@@ -682,8 +748,11 @@ function getBundle(): VaultBundle {
       grouped: new Map(),
       searches: new Map(),
       noteTokens: null,
+      sectionTokens: new Map(),
       indexes: new Map(),
       directIndex: null,
+      errorIndex: null,
+      recencyMap: null,
       vaultPackGzip: null,
       bootstrapPacks: new Map(),
     };
@@ -1232,7 +1301,14 @@ function getSearchIndex(b: VaultBundle, filter: AudienceFilter): SearchIndex {
   for (let i = 0; i < N; i++) {
     const n = notes[i];
     if (n.slug.endsWith("-overview") || n.folder === "root") isHub[i] = 1;
+    if (!n.sections) n.sections = splitPrecomputedSections(n.cleanBody ?? stripSeeAlso(n.body));
   }
+
+  const defaultIdf = Math.log(1 + N);
+  const idfLookup = (term: string) => postings.get(term)?.idf ?? defaultIdf;
+  const semantic = buildSemanticIndex(notes, idfLookup, tokenizeNormalized, allTokens);
+  const sectionIndex = buildSectionIndex(notes, tokenizeNormalized, normalizeText, b.sectionTokens);
+  getDirectIndex(b);
 
   const built: SearchIndex = {
     notes,
@@ -1249,6 +1325,13 @@ function getSearchIndex(b: VaultBundle, filter: AudienceFilter): SearchIndex {
     isHub,
     baseBuf: new Float64Array(N),
     matchBuf: new Int32Array(N),
+    graphBuf: new Float64Array(N),
+    lexBuf: new Float64Array(N),
+    rrfBuf: new Float64Array(N),
+    semantic,
+    sectionIndex,
+    queryVecBuf: new Float32Array(SEMANTIC_DIM),
+    semScoreBuf: new Float32Array(N),
   };
   b.indexes.set(filter, built);
   // Pre-warm multi-token synonym phrases once so uncached queries never scan full bodies for synonym expansion
@@ -1311,17 +1394,83 @@ let indexesWarmed = false;
 export function warmVaultIndexes(): void {
   if (indexesWarmed) return;
   const b = getBundle();
+  for (const n of b.notes.values()) {
+    if (!n.sections) n.sections = splitPrecomputedSections(n.cleanBody ?? stripSeeAlso(n.body));
+    if (!n.facts) n.facts = extractNoteFacts(n);
+  }
   getSearchIndex(b, "all");
   getSearchIndex(b, "user");
   getSearchIndex(b, "dev");
   getDirectIndex(b);
-  for (const n of b.notes.values()) {
-    if (!n.sections) n.sections = splitPrecomputedSections(n.cleanBody ?? stripSeeAlso(n.body));
-  }
+  getErrorIndex(b);
+  ensureRecency(b);
   indexesWarmed = true;
 }
 
-// ponytail: inverted-index BM25 + Thai-SQL synonym expansion + hub authority + 1-hop graph boost
+export function getSemanticIndexStats(filter: AudienceFilter = "all"): { dim: number; count: number; byteLength: number } {
+  const idx = getSearchIndex(getBundle(), filter);
+  return { dim: idx.semantic.dim, count: idx.semantic.count, byteLength: idx.semantic.byteLength };
+}
+
+export function searchSemantic(q: string, limit = 8, filter: AudienceFilter = "all"): (SearchHit & { cosine: number })[] {
+  const b = getBundle();
+  const ts = terms(q);
+  if (!ts.length) return [];
+  const idx = getSearchIndex(b, filter);
+  const N = idx.notes.length;
+  if (!N) return [];
+  const synTerms = expandSynonyms(ts);
+  const defaultIdf = Math.log(1 + N);
+  const qVec = encodeQueryVector(ts, synTerms, (t) => idx.postings.get(t)?.idf ?? defaultIdf, idx.queryVecBuf);
+  const scores = scoreSemanticVectors(idx.semantic, qVec, idx.semScoreBuf);
+  const topIds = topKIndices(scores, N, Math.min(limit, N), 0.05);
+  return topIds.map((docId) => {
+    const note = idx.notes[docId];
+    const cosine = Math.round(scores[docId] * 10000) / 10000;
+    const hit: SearchHit & { cosine: number } = {
+      slug: note.slug,
+      title: note.title,
+      folder: note.folder,
+      audience: note.audience,
+      tags: note.tags,
+      score: Math.round(cosine * 100),
+      cosine,
+      snippet: snippetFromLines(linesForNote(b, note), ts),
+    };
+    if (note.media?.images.length) hit.images = note.media.images.slice(0, 3);
+    if (note.media?.videos.length) hit.videos = note.media.videos.slice(0, 3);
+    return hit;
+  });
+}
+
+export function searchSections(q: string, limit = 8, filter: AudienceFilter = "all"): SectionSearchHit[] {
+  const b = getBundle();
+  const ts = terms(q);
+  if (!ts.length) return [];
+  const idx = getSearchIndex(b, filter);
+  const synTerms = expandSynonyms(ts);
+  const phrase = normalizeText(q.trim());
+  const menuCodes = ts.filter((t) => /^[1-9]\d{3}$/.test(t) || /^[1-9](?:\.\d+){1,3}$/.test(t));
+  const { touchedNoteCount, topSections } = scoreSectionIndex(idx.sectionIndex, ts, synTerms, phrase, menuCodes, Math.min(30, Math.max(limit, 8)));
+  clearSectionNoteBuffers(idx.sectionIndex, touchedNoteCount);
+  return topSections.slice(0, limit).map(({ secIdx, score, matched }) => {
+    const sec = idx.sectionIndex.sections[secIdx];
+    return {
+      slug: sec.slug,
+      title: sec.title,
+      folder: sec.folder,
+      audience: sec.audience,
+      sectionIndex: sec.sectionIndex,
+      heading: sec.heading,
+      score: Math.round(score),
+      matchedTerms: matched,
+      snippet: buildSectionSnippet(sec.raw, ts, normalizeText),
+      raw: sec.raw,
+    };
+  });
+}
+
+// ponytail: inverted-index BM25 + Section BM25 + 256-dim dense semantic + Direct Menu/SQL + 1-hop graph Multi-Signal RRF
 export function searchWithMeta(q: string, limit = 8, filter: AudienceFilter = "all"): SearchMetaResult {
   const ts = terms(q);
   const hits = search(q, limit, filter);
@@ -1367,8 +1516,10 @@ export function search(q: string, limit = 8, filter: AudienceFilter = "all"): Se
 
   const base = idx.baseBuf;
   const matched = idx.matchBuf;
+  const graphBuf = idx.graphBuf;
   base.fill(0);
   matched.fill(0);
+  graphBuf.fill(0);
 
   let idfSum = 0;
   for (let ti = 0; ti < ts.length; ti++) {
@@ -1414,10 +1565,40 @@ export function search(q: string, limit = 8, filter: AudienceFilter = "all"): Se
     }
   }
 
+  // Signal 1: Exact Direct Menu Code / SQL Table Match ranked list (O(1) direct index lookup)
+  const directRanked: number[] = [];
+  const directSeen = new Set<number>();
+  if (menuCodes.length || (filter !== "user" && identChunks.length)) {
+    const directIdx = getDirectIndex(b);
+    const pushDirect = (slug?: string) => {
+      if (!slug) return;
+      const docId = idx.slugToIdx.get(slug);
+      if (docId !== undefined && !directSeen.has(docId)) {
+        directSeen.add(docId);
+        directRanked.push(docId);
+      }
+    };
+    for (const code of menuCodes) {
+      const m = directIdx.menuByCode.get(code) ?? directIdx.menuByLegacy.get(code);
+      if (!m) continue;
+      for (const relSlug of m.relatedSlugs) pushDirect(relSlug);
+      pushDirect(m.catalogSlug);
+    }
+    if (filter !== "user") {
+      for (const ident of identChunks) {
+        const tbl = directIdx.tableByName.get(ident);
+        if (!tbl) continue;
+        pushDirect(tbl.schemaSlug);
+        for (const relSlug of tbl.relatedSlugs) pushDirect(relSlug);
+      }
+    }
+  }
+
   // Exact alias match, SQL table-name identifier match, and gated phrase scan
   const checkPhrase = phrase.length > 3 && phrase.length <= 48 && chunks.length <= 4 && ts.length > 1;
   const checkAliasChunks = chunks.length > 1;
   const minPhraseMatch = ts.length;
+  let topBase = 0;
   for (let i = 0; i < N; i++) {
     let sc = base[i];
     const hasBase = sc > 0;
@@ -1442,11 +1623,23 @@ export function search(q: string, limit = 8, filter: AudienceFilter = "all"): Se
       }
     }
     base[i] = sc;
+    if (sc > topBase) topBase = sc;
   }
 
-  // 1-hop graph boost (top 3 active neighbors) + hub authority on broad (>=3-term) queries
+  // Signal 2: Note-level BM25 top-K ranks
+  const bm25Ranked = topKIndices(base, N, 24, 0);
+
+  // Signal 3: Section-level BM25 (zero-alloc sparse O(postings) over ~2,000 "## Section" chunks)
+  const secIdxObj = idx.sectionIndex;
+  const { touchedNoteCount } = scoreSectionIndex(secIdxObj, ts, synTerms, phrase, menuCodes, 0);
+  const sectionRanked = topKIndices(secIdxObj.noteBestScore, N, 20, 0);
+
+  // Signal 4: 1-hop graph proximity + hub authority on broad (>=3-term) queries
   const broadQuery = ts.length >= 3;
-  const ranked: { idx: number; score: number }[] = [];
+  const lexBuf = idx.lexBuf;
+  const rrfBuf = idx.rrfBuf;
+  lexBuf.fill(0);
+  rrfBuf.fill(0);
   for (let i = 0; i < N; i++) {
     const sc = base[i];
     if (sc <= 0) continue;
@@ -1473,11 +1666,60 @@ export function search(q: string, limit = 8, filter: AudienceFilter = "all"): Se
       }
     }
     const graphBoost = (t1 + t2 + t3) * 0.08;
+    graphBuf[i] = graphBoost;
     const hubBoost =
       broadQuery && !identChunks.length && idx.isHub[i] && matched[i] >= maxMatched && activeCount >= 4
         ? sc * Math.min(0.22, Math.log2(activeCount) * 0.07)
         : 0;
-    ranked.push({ idx: i, score: sc + graphBoost + hubBoost });
+    lexBuf[i] = sc + graphBoost + hubBoost;
+  }
+  const graphRanked = topKIndices(graphBuf, N, 20, 0);
+
+  // Signal 5: Lightweight 256-dim Dense Semantic Cosine Similarity (runs when BM25 is not already clear-high or sparse)
+  const bm25High = maxMatched === ts.length && topBase >= 45 && bm25Ranked.length >= limit;
+  let semRanked: number[] = [];
+  let semScores: Float32Array | null = null;
+  if (!bm25High) {
+    const defaultIdf = Math.log(1 + N);
+    const qVec = encodeQueryVector(ts, synTerms, (t) => idx.postings.get(t)?.idf ?? defaultIdf, idx.queryVecBuf);
+    semScores = scoreSemanticVectors(idx.semantic, qVec, idx.semScoreBuf);
+    semRanked = topKIndices(semScores, N, 20, 0.16);
+  }
+
+  // Zero-alloc Multi-Signal Reciprocal Rank Fusion (Exact Menu/SQL + Note BM25 + Section BM25 + 1-Hop Graph + Semantic)
+  const RRF_K = 40;
+  const addRrf = (ids: number[], weight: number) => {
+    for (let r = 0; r < ids.length; r++) rrfBuf[ids[r]] += weight / (RRF_K + r + 1);
+  };
+  if (directRanked.length) addRrf(directRanked, 1.5);
+  if (bm25Ranked.length) addRrf(bm25Ranked, 1.4);
+  if (sectionRanked.length) addRrf(sectionRanked, bm25High ? 0.6 : 1.05);
+  if (graphRanked.length) addRrf(graphRanked, 0.45);
+  if (semRanked.length) addRrf(semRanked, 1.05);
+
+  const coverageRatio = maxMatched / Math.max(1, ts.length);
+  const weakTrapGuard = coverageRatio < 0.5 && topBase < 18;
+  const anchor = Math.min(75, Math.max(0, topBase));
+  const rrfScale = bm25High ? anchor * 2.0 : Math.max(16, anchor) * 3.6;
+
+  const ranked: { idx: number; score: number }[] = [];
+  for (let docId = 0; docId < N; docId++) {
+    const lex = lexBuf[docId];
+    if (lex > 0) {
+      const rawFused = lex + rrfBuf[docId] * rrfScale;
+      // Preserve strict trap abstention: never let RRF push an out-of-domain low-coverage query over topScore=18
+      ranked.push({ idx: docId, score: weakTrapGuard ? Math.min(17, rawFused) : rawFused });
+    }
+  }
+  // Admit high-similarity semantic fallback candidates when BM25 is weak/sparse (strictly bounded below abstain threshold)
+  if (semScores && semRanked.length) {
+    for (let k = 0; k < Math.min(8, semRanked.length); k++) {
+      const docId = semRanked[k];
+      if (lexBuf[docId] <= 0 && semScores[docId] >= 0.24) {
+        const finalScore = Math.min(15, semScores[docId] * 28 + rrfBuf[docId] * 50);
+        if (finalScore > 0) ranked.push({ idx: docId, score: finalScore });
+      }
+    }
   }
 
   ranked.sort((a, b2) => b2.score - a.score);
@@ -1492,10 +1734,16 @@ export function search(q: string, limit = 8, filter: AudienceFilter = "all"): Se
       score: Math.round(score),
       snippet: snippetFromLines(linesForNote(b, note), ts),
     };
+    const bestSecIdx = secIdxObj.noteBestSecIdx[docId];
+    if (bestSecIdx >= 0) {
+      const heading = secIdxObj.sections[bestSecIdx].heading;
+      if (heading && heading !== note.title) hit.bestSection = heading;
+    }
     if (note.media?.images.length) hit.images = note.media.images.slice(0, 3);
     if (note.media?.videos.length) hit.videos = note.media.videos.slice(0, 3);
     return hit;
   });
+  clearSectionNoteBuffers(secIdxObj, touchedNoteCount);
   if (b.searches.size >= 256) {
     const oldest = b.searches.keys().next().value;
     if (oldest !== undefined) b.searches.delete(oldest);
@@ -1708,11 +1956,25 @@ export function getNoteTldr(n: Note): string {
   return n.tldr;
 }
 
-// Fast zero-split excerpt using pre-split & pre-normalized note sections
-export function excerptNote(n: Note, ts: string[], budget: number, stripFooter = true): string {
-  if (!stripFooter) return excerpt(n.body, ts, budget, false);
+export function getNoteFacts(n: Note): string[] {
+  if (n.facts) return n.facts;
+  n.cleanBody ??= stripSeeAlso(n.body);
+  n.facts = extractNoteFacts(n);
+  return n.facts;
+}
+
+// Fast block-aware excerpt using pre-split & pre-normalized note sections (never slices mid-table row, mid-list step, or mid-code-fence)
+export function excerptNote(
+  n: Note,
+  ts: string[],
+  budget: number,
+  stripFooter = true,
+  trimOpts?: TrimBlockOptions,
+): string {
+  if (!stripFooter) return excerpt(n.body, ts, budget, false, trimOpts);
   const clean = n.cleanBody ?? (n.cleanBody = stripSeeAlso(n.body));
-  if (clean.length <= budget) return clean;
+  const fitsToken = trimOpts?.maxTokens === undefined || estimateTokens(clean) <= trimOpts.maxTokens;
+  if (clean.length <= budget && fitsToken) return clean;
   const secs = n.sections ?? (n.sections = splitPrecomputedSections(clean));
   const hits = new Int32Array(secs.length);
   for (let si = 0; si < secs.length; si++) {
@@ -1733,6 +1995,10 @@ export function excerptNote(n: Note, ts: string[], budget: number, stripFooter =
       used += secs[i].raw.length;
     }
   }
+  // If intro alone left room for part of the top matching section, include it and let trimBlockAware trim cleanly at block boundaries
+  if (keep.size === 1 && order.length > 0 && hits[order[0]] > 0 && budget - used >= 160) {
+    keep.add(order[0]);
+  }
   const omitted: string[] = [];
   const keptRaw: string[] = [];
   for (let i = 0; i < secs.length; i++) {
@@ -1740,11 +2006,12 @@ export function excerptNote(n: Note, ts: string[], budget: number, stripFooter =
     else if (secs[i].heading) omitted.push(secs[i].heading);
   }
   const out = keptRaw.join("\n");
-  let cut = out.length > budget ? out.slice(0, budget) : out;
-  if (out.length > budget) {
-    const fenceCount = (cut.match(/^```/gm) ?? []).length;
-    if (fenceCount % 2 === 1) cut += "\n```";
-    cut += " …";
+  const trimmed = trimBlockAware(out, budget, trimOpts);
+  let cut = trimmed.text;
+  if (trimmed.truncated) {
+    const lastLine = cut.slice(cut.lastIndexOf("\n") + 1).trim();
+    const endsAtomicLine = lastLine.endsWith("```") || lastLine.startsWith("|") || lastLine.endsWith("|");
+    cut = endsAtomicLine ? `${cut}\n…` : `${cut} …`;
   }
   return `${cut}\n\n[excerpt — ${omitted.length ? `omitted sections: ${omitted.slice(0, 6).join(" | ")}${omitted.length > 6 ? " …" : ""}. ` : ""}read_note for the full note]`;
 }
@@ -1865,10 +2132,17 @@ export function getBootstrapPack(audience: "user" | "dev"): { text: string; etag
   return pack;
 }
 
-// long notes for ask_brain / quick_answer: intro plus matching "## " sections within budget, optionally stripping duplicated "ดูต่อที่เกี่ยวข้อง" footers
-export function excerpt(body: string, ts: string[], budget: number, stripFooter = false): string {
+// long notes for ask_brain / quick_answer: intro plus matching "## " sections within budget, block-aware trimming (never slices mid-table/list/code)
+export function excerpt(
+  body: string,
+  ts: string[],
+  budget: number,
+  stripFooter = false,
+  trimOpts?: TrimBlockOptions,
+): string {
   const source = stripFooter ? stripSeeAlso(body) : body;
-  if (source.length <= budget) return source;
+  const fitsToken = trimOpts?.maxTokens === undefined || estimateTokens(source) <= trimOpts.maxTokens;
+  if (source.length <= budget && fitsToken) return source;
   const parts = source.split(/\n(?=## )/);
   const hits = parts.map((p) => {
     const np = normalizeText(p);
@@ -1881,19 +2155,80 @@ export function excerpt(body: string, ts: string[], budget: number, stripFooter 
   });
   const keep = new Set([0]);
   let used = parts[0].length;
-  for (const i of parts.map((_, i) => i).slice(1).sort((a, b) => hits[b] - hits[a])) {
+  const order = parts.map((_, i) => i).slice(1).sort((a, b) => hits[b] - hits[a]);
+  for (const i of order) {
     if (used + parts[i].length <= budget) keep.add(i), (used += parts[i].length);
+  }
+  if (keep.size === 1 && order.length > 0 && hits[order[0]] > 0 && budget - used >= 160) {
+    keep.add(order[0]);
   }
   const omitted = parts.filter((_, i) => !keep.has(i)).map((p) => p.split("\n")[0].replace(/^#+\s*/, ""));
   const out = parts.filter((_, i) => keep.has(i)).join("\n");
-  let cut = out.length > budget ? out.slice(0, budget) : out;
-  if (out.length > budget) {
-    // Never leave an unclosed markdown/SQL code fence when trimming long notes
-    const fenceCount = (cut.match(/^```/gm) ?? []).length;
-    if (fenceCount % 2 === 1) cut += "\n```";
-    cut += " …";
+  const trimmed = trimBlockAware(out, budget, trimOpts);
+  let cut = trimmed.text;
+  if (trimmed.truncated) {
+    const lastLine = cut.slice(cut.lastIndexOf("\n") + 1).trim();
+    const endsAtomicLine = lastLine.endsWith("```") || lastLine.startsWith("|") || lastLine.endsWith("|");
+    cut = endsAtomicLine ? `${cut}\n…` : `${cut} …`;
   }
   return `${cut}\n\n[excerpt — ${omitted.length ? `omitted sections: ${omitted.slice(0, 6).join(" | ")}${omitted.length > 6 ? " …" : ""}. ` : ""}read_note for the full note]`;
+}
+
+// ---------- O(1) Error-Message Lookup Index & Temporal Recency Metadata ----------
+function getErrorIndex(b: VaultBundle): ErrorIndex {
+  if (b.errorIndex) return b.errorIndex;
+  b.errorIndex = buildErrorIndex([...b.notes.values()], tokenizeNormalized, normalizeText);
+  return b.errorIndex;
+}
+
+export function lookupError(query: string, audience: AudienceFilter = "all", limit = 5): ErrorLookupEntry[] {
+  const idx = getErrorIndex(getBundle());
+  return queryErrorIndex(idx, query, audience, limit, tokenizeNormalized, normalizeText);
+}
+
+export function getErrorCatalog(audience: AudienceFilter = "all"): ErrorLookupEntry[] {
+  const idx = getErrorIndex(getBundle());
+  return idx.entries.filter((e) => matchesAudience(e.audience, audience));
+}
+
+function ensureRecency(b: VaultBundle): Map<string, NoteRecencyMeta> {
+  if (b.recencyMap) return b.recencyMap;
+  const map = extractVaultRecencyMap(VAULT_DIR, b.notes.values(), syncCommit, b.builtAt);
+  for (const [slug, meta] of map) {
+    const n = b.notes.get(slug);
+    if (n) {
+      n.updatedAt = meta.updatedAt;
+      n.updatedTs = meta.updatedTs;
+      n.lastCommit = meta.lastCommit;
+    }
+  }
+  b.recencyMap = map;
+  return map;
+}
+
+export function getWhatsNew(days = 7, audience: AudienceFilter = "all", limit = 20): NoteRecency[] {
+  const b = getBundle();
+  const map = ensureRecency(b);
+  const maxItems = Math.min(100, Math.max(1, limit));
+  const cutoff = Date.now() - Math.max(0, days) * 86_400_000;
+  const rows: NoteRecency[] = [];
+  for (const n of b.notes.values()) {
+    if (!matchesAudience(n.audience, audience)) continue;
+    const meta = map.get(n.slug);
+    if (!meta || meta.updatedTs < cutoff) continue;
+    rows.push({
+      slug: n.slug,
+      title: n.title,
+      folder: n.folder,
+      audience: n.audience,
+      updatedAt: meta.updatedAt,
+      updatedTs: meta.updatedTs,
+      lastCommit: meta.lastCommit,
+      tldr: getNoteTldr(n),
+    });
+  }
+  rows.sort((a, c) => c.updatedTs - a.updatedTs || a.slug.localeCompare(c.slug));
+  return rows.slice(0, maxItems);
 }
 
 // ---------- O(1) Direct Menu Code (1001–9070) & SQL Table Lookup Index ----------
