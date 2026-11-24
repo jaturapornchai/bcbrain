@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { getGapReport, recordGap, type GapReason, type GapReport } from "./gap-log";
+import { getGroundingStats, verifyReferences, type VerifyReferenceInput, type VerifyReferenceResult } from "./grounding-runtime";
 import { matchesAudience, RELATION_LABEL, RELATION_TYPES, type AudienceFilter } from "./groups";
 import { emitMcpEvent, type McpEventHit, type McpToolName } from "./mcp-events";
 import {
@@ -8,18 +10,25 @@ import {
   excerptNote,
   findMedia,
   getNote,
+  getNoteFacts,
   getNoteTldr,
+  getWhatsNew,
   listVaultRows,
   lookupDirect,
+  lookupError,
   search,
+  searchSections,
   searchWithMeta,
   stripSeeAlso,
   syncCommit,
   terms,
   traverseGraph,
+  trimBlockAware,
   updatedAt,
+  vault,
   vaultFolders,
   warmVaultIndexes,
+  type FactKind,
   type Note,
   type NoteMedia,
 } from "./vault";
@@ -28,21 +37,25 @@ if (process.env.NODE_ENV === "production") {
   warmVaultIndexes();
 }
 
-export const SERVER_INFO = { name: "bcbrain", version: "2.3.0" } as const;
+export const SERVER_INFO = { name: "bcbrain", version: "3.0.0" } as const;
 export const DEFAULT_PROTOCOL_VERSION = "2025-03-26";
 export const MAX_BODY_BYTES = 32 * 1024;
 export const RATE_WINDOW_MS = 60_000;
 export const RATE_LIMIT_MAX = 300;
 const RATE_MAX_KEYS = 4096;
 
-const INSTRUCTIONS = `BC Brain = ultra-fast dual-audience knowledge base for BC Ai Account & BC suite (sales, purchasing, inventory, AR/AP, cash/bank, assets, GL, VAT/WHT, POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Market, Dashboard, MonitorMap, WorkMonitor, Company Brain), verified against real source code.
+const INSTRUCTIONS = `BC Brain v3 = ultra-fast dual-audience knowledge base for BC Ai Account & BC suite (sales, purchasing, inventory, AR/AP, cash/bank, assets, GL, VAT/WHT, POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Market, Dashboard, MonitorMap, WorkMonitor, Company Brain), verified against real source code (hybrid RRF, section BM25, 256-dim semantic, structured facts, O(1) error index, and ground-truth verifier).
 
-FASTEST TOOL SELECTION (minimize round-trips & token latency — do NOT pre-read playbooks unless needing full scripts):
-1. quick_answer — DEFAULT for real-time Q&A, Call Center, voice/LINE bots, and focused lookups: 1 call (~2k chars normal; pass mode: "ultra" for ~600-char TL;DR ultra-low-latency voice/chat). Set include_media: true for screenshots/YouTube links.
+FASTEST TOOL SELECTION (15 tools — minimize round-trips & token latency; do NOT pre-read playbooks unless needing full scripts):
+1. quick_answer — DEFAULT for real-time Q&A, Call Center, voice/LINE bots, and focused lookups: 1 call (~2k chars normal, ~1.4k fast, or ~600-char TL;DR ultra) with top structured facts. Set include_media: true for screenshots/YouTube links.
 2. batch_ask — Answer 1–5 questions in ONE single call (defaults to mode: "ultra") when user asks compound/multi-part questions.
 3. lookup_menu — INSTANT O(1) lookup for 4-digit menu codes (1001–9070), screen names, or SQL table names (ic_trans, gl_journal, etc.).
-4. batch_read — Read 1–5 known slugs in ONE call (optional query & max_chars_per_note) instead of sequential read_note loops.
-5. ask_brain — Multi-note synthesis with 1-hop graph & aggregated media (use compact: true or max_notes: 2 for speed).
+4. lookup_error — INSTANT O(1) Thai validation/error alert lookup returning exact cause, fix snippet, and canonical note slug.
+5. search_sections — Surgical ## Section BM25 search returning block-aware excerpts + structured facts without whole-note bloat.
+6. get_facts — Typed structured facts ([menu], [rule], [limit], [error], [formula]) filtered by query, slugs, or kinds.
+7. verify_reference — Anti-hallucination ground-truth verifier for 4-digit menu codes (all modes) and SQL tables/table.column refs (dev/all only; strictly blocked in user mode).
+8. whats_new — Recently updated knowledge base notes feed (days/audience/limit).
+9. batch_read / ask_brain — Read 1–5 known slugs or synthesize multi-note answers with 1-hop graph & aggregated media.
 
 AUDIENCE ISOLATION (MANDATORY):
 - Dev (SQL, schema, trans_flag, GL Dr/Cr, API, architecture; optional full guide: playbook-dev): pass audience: "dev" (or "all" for UI+tech). Use exact table/column/trans_flag names, PostgreSQL NUMERIC (no float), and COALESCE(last_status, 0) = 0.
@@ -53,7 +66,45 @@ GROUNDING: Answer ONLY from verified notes. If abstained (🛑 Abstain) or missi
 export const FULL_INSTRUCTIONS = `${INSTRUCTIONS}\nKnowledge last updated: ${updatedAt} (Thai time)${syncCommit ? ` · source bcaiaccount@${syncCommit}` : ""}.`;
 
 const AUDIENCE_ENUM = z.enum(["all", "user", "dev"]);
+const SMART_AUDIENCE_ENUM = z.enum(["all", "user", "dev", "both"]);
+const FACT_KIND_ENUM = z.enum(["menu", "rule", "limit", "error", "formula"]);
 const ANNOTATIONS = { readOnlyHint: true, openWorldHint: false } as const;
+
+export function normalizeRestAudience(raw?: string | null, defaultFilter: AudienceFilter = "user"): AudienceFilter {
+  if (raw === "user") return "user";
+  if (raw === "dev") return "dev";
+  if (raw === "all" || raw === "both") return "all";
+  return defaultFilter;
+}
+
+function normalizeToolAudience(raw?: "all" | "user" | "dev" | "both", defaultFilter: AudienceFilter = "all"): AudienceFilter {
+  if (raw === "user") return "user";
+  if (raw === "dev") return "dev";
+  if (raw === "all" || raw === "both") return "all";
+  return defaultFilter;
+}
+
+const USER_TECH_LEAK_RE =
+  /\b(?:SELECT|FROM|WHERE|JOIN|INSERT|UPDATE|DELETE|COALESCE|NUMERIC|VARCHAR|BIGINT|trans_flag|last_status|ic_trans|ic_trans_detail|ic_inventory|gl_journal|ar_customer|ap_supplier|cb_chq_list|erp_option|fa_asset|bc_user_list|bc_mcp_access_tokens)\b|\b[a-z]{2,12}_[a-z0-9]+(?:_[a-z0-9]+)+\b|\.(?:go|tsx?|sql):\d+/i;
+const FACT_PREFIX_RE = /^\[(menu|rule|limit|error|formula)\]\s+(.+)$/;
+
+type ParsedFact = { kind: FactKind; text: string; formatted: string };
+
+function safeNoteFacts(n: Note, filter: AudienceFilter, kinds?: Set<FactKind>, maxPerNote = 8): ParsedFact[] {
+  if (!matchesAudience(n.audience, filter)) return [];
+  const out: ParsedFact[] = [];
+  for (const formatted of getNoteFacts(n)) {
+    const m = formatted.match(FACT_PREFIX_RE);
+    if (!m) continue;
+    const kind = m[1] as FactKind;
+    const text = m[2];
+    if (kinds && kinds.size > 0 && !kinds.has(kind)) continue;
+    if (filter === "user" && USER_TECH_LEAK_RE.test(text)) continue;
+    out.push({ kind, text, formatted });
+    if (out.length >= maxPerNote) break;
+  }
+  return out;
+}
 
 export type ToolResult = { content: [{ type: "text"; text: string }]; isError?: boolean };
 const textResult = (t: string, isError?: boolean): ToolResult =>
@@ -68,9 +119,33 @@ type CachedPayload = {
   audience: AudienceFilter;
   abstained?: boolean;
   confidence?: "high" | "medium" | "low";
+  topScore?: number;
+  facts?: string[];
   resultJson: string; // pre-serialized JSON fragment for {"content":[{"type":"text","text":...}]}
 };
 const responseCache = new Map<string, CachedPayload>();
+
+const GAP_TRACKED_TOOLS = new Set<McpToolName>([
+  "ask_brain",
+  "quick_answer",
+  "search_brain",
+  "lookup_error",
+  "search_sections",
+]);
+
+function maybeRecordToolGap(tool: McpToolName, rawArg: string, payload: CachedPayload): void {
+  if (!GAP_TRACKED_TOOLS.has(tool)) return;
+  if (!payload.abstained && payload.totalHits > 0 && payload.confidence !== "low") return;
+  const reason: GapReason =
+    payload.totalHits === 0 ? "zero_hit" : payload.abstained ? "abstain" : "low_conf";
+  recordGap({
+    tool,
+    query: rawArg,
+    audience: payload.audience,
+    reason,
+    topScore: payload.topScore,
+  });
+}
 
 let logEnabled = true;
 export function setMcpLogging(enabled: boolean): void {
@@ -93,6 +168,7 @@ function runCachedTool(
     if (logEnabled) {
       process.stdout.write(`[mcp] tool=${tool} audience=${hit.audience} hits=${hit.totalHits} ms=${ms.toFixed(1)} cached=1\n`);
     }
+    maybeRecordToolGap(tool, rawArg, hit);
     emitMcpEvent({ tool, audience: hit.audience, rawArg, hits: hit.hits, totalHits: hit.totalHits, ms });
     return { result: textResult(hit.text), resultJson: hit.resultJson, payload: hit, ms, cached: true };
   }
@@ -108,6 +184,7 @@ function runCachedTool(
   if (logEnabled) {
     process.stdout.write(`[mcp] tool=${tool} audience=${full.audience} hits=${full.totalHits} ms=${ms.toFixed(1)}\n`);
   }
+  maybeRecordToolGap(tool, rawArg, full);
   emitMcpEvent({ tool, audience: full.audience, rawArg, hits: full.hits, totalHits: full.totalHits, ms });
   return { result: res, resultJson: full.resultJson, payload: full, ms, cached: false };
 }
@@ -203,20 +280,24 @@ function noteText(
 function buildQuickAnswerPayload(
   question: string,
   filter: AudienceFilter,
-  mode: "normal" | "ultra",
+  mode: "normal" | "ultra" | "fast",
   maxChars: number | undefined,
   withMedia: boolean,
+  withFacts = true,
 ): Omit<CachedPayload, "resultJson"> {
-  const budget = maxChars ?? (mode === "ultra" ? 700 : 2000);
+  const defaultBudget = mode === "ultra" ? 700 : mode === "fast" ? 1400 : 2000;
+  const budget = maxChars ?? defaultBudget;
   const { hits, confidence, totalTerms, bestMatchedTerms, topScore } = searchWithMeta(question, 3, filter);
   if (!hits.length) {
     return {
-      text: `🛑 Abstain — No matching notes (audience=${filter}). Do not guess—try lookup_menu or search_brain.`,
+      text: `🛑 Abstain — No matching notes (audience=${filter}). Do not guess—try lookup_menu, lookup_error, or search_brain.`,
       hits: [],
       totalHits: 0,
       audience: filter,
       abstained: true,
       confidence: "low",
+      topScore: 0,
+      facts: [],
     };
   }
   const coverage = bestMatchedTerms / Math.max(1, totalTerms);
@@ -232,6 +313,8 @@ function buildQuickAnswerPayload(
       audience: filter,
       abstained: true,
       confidence: "low",
+      topScore,
+      facts: [],
     };
   }
 
@@ -246,7 +329,15 @@ function buildQuickAnswerPayload(
         : "";
     const mediaLine =
       withMedia && filter !== "dev" ? formatInlineMediaLine(collectRelatedMedia([top.slug], filter, 1, 1, 1)) : "";
-    const outText = `[quick_answer:ultra | audience=${filter} | confidence=${confidence} | slug: ${top.slug}]\n# ${top.title}\n${body.trim()}${src}${mediaLine}`;
+    const topFacts = safeNoteFacts(top, filter, undefined, 3).map((f) => f.formatted);
+    const baseText = `[quick_answer:ultra | audience=${filter} | confidence=${confidence} | slug: ${top.slug}]\n# ${top.title}\n${body.trim()}${src}${mediaLine}`;
+    let outText = baseText;
+    if (withFacts && topFacts.length) {
+      const twoFacts = `\nfacts: ${topFacts.slice(0, 2).join(" | ")}`;
+      const oneFact = `\nfacts: ${topFacts[0]}`;
+      if (baseText.length + twoFacts.length <= 980) outText = `${baseText}${twoFacts}`;
+      else if (baseText.length + oneFact.length <= 980) outText = `${baseText}${oneFact}`;
+    }
     return {
       text: outText,
       hits: [{ slug: top.slug, title: top.title, folder: top.folder }],
@@ -254,6 +345,8 @@ function buildQuickAnswerPayload(
       audience: filter,
       abstained: false,
       confidence,
+      topScore,
+      facts: topFacts,
     };
   }
 
@@ -265,8 +358,16 @@ function buildQuickAnswerPayload(
   const ts = terms(question);
   const showDevSources = filter === "dev";
   const caps = picked.length === 1 ? [budget] : [Math.round(budget * 0.65), Math.max(450, Math.round(budget * 0.35))];
+  const collectedFacts: string[] = [];
+  const seenFact = new Set<string>();
   const blocks = picked.map((h, i) => {
     const n = getNote(h.slug)!;
+    for (const f of safeNoteFacts(n, filter, undefined, 2)) {
+      if (!seenFact.has(f.formatted) && collectedFacts.length < 3) {
+        seenFact.add(f.formatted);
+        collectedFacts.push(f.formatted);
+      }
+    }
     const body = excerptNote(n, ts, caps[i], true);
     const src =
       showDevSources && n.audience === "dev" && n.sources.length
@@ -292,7 +393,17 @@ function buildQuickAnswerPayload(
     3,
   ).map((g) => g.slug);
   const relLine = relatedSlugs.length ? `\nrelated: ${relatedSlugs.join(", ")}` : "";
-  const outText = `[quick_answer | audience=${filter} | confidence=${confidence} | coverage=${bestMatchedTerms}/${totalTerms}]\n\n${blocks.join("\n\n---\n\n")}${mediaLine}${relLine}`;
+  const headerTag = mode === "fast" ? "quick_answer:fast" : "quick_answer";
+  const baseText = `[${headerTag} | audience=${filter} | confidence=${confidence} | coverage=${bestMatchedTerms}/${totalTerms}]\n\n${blocks.join("\n\n---\n\n")}${mediaLine}${relLine}`;
+  let outText = baseText;
+  if (withFacts && collectedFacts.length) {
+    const factsLine = `\nfacts: ${collectedFacts.slice(0, 3).join(" | ")}`;
+    if (baseText.length + factsLine.length <= 2950) {
+      outText = `${baseText}${factsLine}`;
+    } else if (baseText.length + collectedFacts[0].length + 8 <= 2950) {
+      outText = `${baseText}\nfacts: ${collectedFacts[0]}`;
+    }
+  }
   return {
     text: outText,
     hits: picked.map((h) => ({ slug: h.slug, title: h.title, folder: h.folder })),
@@ -300,6 +411,8 @@ function buildQuickAnswerPayload(
     audience: filter,
     abstained: false,
     confidence,
+    topScore,
+    facts: collectedFacts,
   };
 }
 
@@ -307,15 +420,16 @@ function buildQuickAnswerPayload(
 const QUICK_ANSWER_SCHEMA = z.object({
   question: z.string().min(2).max(500),
   audience: AUDIENCE_ENUM.optional(),
-  mode: z.enum(["normal", "ultra"]).optional(),
+  mode: z.enum(["normal", "ultra", "fast"]).optional(),
   max_chars: z.number().int().min(300).max(4500).optional(),
   include_media: z.boolean().optional(),
+  include_facts: z.boolean().optional(),
 });
 
 const BATCH_ASK_SCHEMA = z.object({
   questions: z.array(z.string().min(2).max(300)).min(1).max(5),
   audience: AUDIENCE_ENUM.optional(),
-  mode: z.enum(["normal", "ultra"]).optional(),
+  mode: z.enum(["normal", "ultra", "fast"]).optional(),
   max_chars_per_answer: z.number().int().min(300).max(2500).optional(),
   include_media: z.boolean().optional(),
 });
@@ -377,11 +491,51 @@ const FIND_MEDIA_SCHEMA = z.object({
   audience: AUDIENCE_ENUM.optional(),
 });
 
+const LOOKUP_ERROR_SCHEMA = z.object({
+  query: z.string().min(1).max(300),
+  audience: SMART_AUDIENCE_ENUM.optional(),
+  limit: z.number().int().min(1).max(15).optional(),
+});
+
+const SEARCH_SECTIONS_SCHEMA = z.object({
+  query: z.string().min(1).max(300),
+  audience: SMART_AUDIENCE_ENUM.optional(),
+  limit: z.number().int().min(1).max(15).optional(),
+  max_chars: z.number().int().min(200).max(6000).optional(),
+});
+
+const GET_FACTS_SCHEMA = z.object({
+  query: z.string().max(300).optional(),
+  slugs: z.array(z.string().min(1).max(120)).max(10).optional(),
+  kinds: z.array(FACT_KIND_ENUM).max(5).optional(),
+  audience: SMART_AUDIENCE_ENUM.optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+});
+
+const WHATS_NEW_SCHEMA = z.object({
+  days: z.number().int().min(1).max(365).optional(),
+  audience: SMART_AUDIENCE_ENUM.optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+});
+
+const VERIFY_REFERENCE_SCHEMA = z.object({
+  menus: z.array(z.string().min(1).max(20)).max(50).optional(),
+  tables: z.array(z.string().min(1).max(100)).max(50).optional(),
+  columns: z.array(z.string().min(1).max(160)).max(100).optional(),
+  audience: SMART_AUDIENCE_ENUM.optional(),
+});
+
 // ---------- Static MCP Tool Descriptors (JSON Schema draft-07, pre-built ONCE) ----------
 const AUDIENCE_JSON_PROP = {
   type: "string",
   enum: ["all", "user", "dev"],
   description: 'Audience zone: "user" (plain Thai guides/sales), "dev" (schema/SQL/API/architecture), or "all" (default).',
+};
+
+const SMART_AUDIENCE_JSON_PROP = {
+  type: "string",
+  enum: ["user", "dev", "both", "all"],
+  description: 'Audience zone: "user" (plain Thai guides/sales, zero SQL/code), "dev" (schema/SQL/API/architecture), or "both"/"all" (default).',
 };
 
 const FOLDERS_DESC =
@@ -393,16 +547,17 @@ export const TOOL_DESCRIPTORS = [
     name: "quick_answer",
     title: "Ultra-fast single-shot answer",
     description:
-      "FASTEST default tool for real-time Q&A, Call Center, voice/LINE bots, and focused lookups. Returns ~2,000 chars (mode: 'normal') or ~600-char TL;DR (mode: 'ultra') in 1 call with strict anti-hallucination abstention.",
+      "FASTEST default tool for real-time Q&A, Call Center, voice/LINE bots, and focused lookups. Returns ~2,000 chars ('normal'), ~1,400 chars ('fast'), or ~600-char TL;DR ('ultra') with top structured facts in 1 call and strict anti-hallucination abstention.",
     inputSchema: {
       $schema: "http://json-schema.org/draft-07/schema#",
       type: "object",
       properties: {
         question: { type: "string", minLength: 2, maxLength: 500, description: "Thai or English question." },
         audience: AUDIENCE_JSON_PROP,
-        mode: { type: "string", enum: ["normal", "ultra"], description: "'normal' (~2000 chars) or 'ultra' (~600-char TL;DR for voice/LINE bots)." },
-        max_chars: { type: "integer", minimum: 300, maximum: 4500, description: "Char budget (default 2000 normal, 700 ultra)." },
+        mode: { type: "string", enum: ["normal", "ultra", "fast"], description: "'normal' (~2000 chars), 'fast' (~1400 chars), or 'ultra' (~600-char TL;DR for voice/LINE bots)." },
+        max_chars: { type: "integer", minimum: 300, maximum: 4500, description: "Char budget (default 2000 normal, 1400 fast, 700 ultra)." },
         include_media: { type: "boolean", description: "Append 1 compact YouTube/screenshot line (default false for max speed)." },
+        include_facts: { type: "boolean", description: "Attach concise structured facts line when budget permits (default true)." },
       },
       required: ["question"],
       additionalProperties: false,
@@ -426,8 +581,8 @@ export const TOOL_DESCRIPTORS = [
           description: "1–5 questions to answer in one call.",
         },
         audience: AUDIENCE_JSON_PROP,
-        mode: { type: "string", enum: ["normal", "ultra"], description: "Default 'ultra' (TL;DR) or 'normal'." },
-        max_chars_per_answer: { type: "integer", minimum: 300, maximum: 2500, description: "Char cap per answer (default 700 ultra, 1400 normal)." },
+        mode: { type: "string", enum: ["normal", "ultra", "fast"], description: "Default 'ultra' (TL;DR), 'fast', or 'normal'." },
+        max_chars_per_answer: { type: "integer", minimum: 300, maximum: 2500, description: "Char cap per answer (default 700 ultra, 1400 normal/fast)." },
         include_media: { type: "boolean", description: "Append compact media line per answer (default false)." },
       },
       required: ["questions"],
@@ -502,7 +657,7 @@ export const TOOL_DESCRIPTORS = [
     name: "search_brain",
     title: "Search notes",
     description:
-      "Keyword search (Thai word segmentation + SQL table/identifier matching + BM25). Supports audience ('all' | 'user' | 'dev'). Default limit 5 for low latency.",
+      "Hybrid multi-signal RRF search (Thai segmentation + BM25 + section BM25 + 256-dim semantic + SQL/menu direct match). Supports audience ('all' | 'user' | 'dev'). Default limit 5 for low latency.",
     inputSchema: {
       $schema: "http://json-schema.org/draft-07/schema#",
       type: "object",
@@ -591,6 +746,122 @@ export const TOOL_DESCRIPTORS = [
     },
     annotations: ANNOTATIONS,
   },
+  {
+    name: "lookup_error",
+    title: "O(1) Thai validation & error message lookup",
+    description:
+      "Instant O(1) lookup for real BC Ai Account Thai error/validation alerts. Returns exact error message, cause + fix snippet, and canonical troubleshoot/howto note slug, with strict 🛑 Abstain on unmatched queries.",
+    inputSchema: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      type: "object",
+      properties: {
+        query: { type: "string", minLength: 1, maxLength: 300, description: "Thai error alert or validation message." },
+        audience: SMART_AUDIENCE_JSON_PROP,
+        limit: { type: "integer", minimum: 1, maximum: 15, description: "Max matched error entries (default 5)." },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    annotations: ANNOTATIONS,
+  },
+  {
+    name: "search_sections",
+    title: "Surgical ## Section BM25 search",
+    description:
+      "Search individual ## Section chunks across the vault and return exact block-aware Markdown excerpts (never slicing mid-table, mid-list, or mid-code-fence) plus structured facts for matched slugs.",
+    inputSchema: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      type: "object",
+      properties: {
+        query: { type: "string", minLength: 1, maxLength: 300, description: "Focused Thai or technical query." },
+        audience: SMART_AUDIENCE_JSON_PROP,
+        limit: { type: "integer", minimum: 1, maximum: 15, description: "Max sections to return (default 5)." },
+        max_chars: { type: "integer", minimum: 200, maximum: 6000, description: "Max chars per section excerpt (default 1200)." },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    annotations: ANNOTATIONS,
+  },
+  {
+    name: "get_facts",
+    title: "Get structured typed facts ([menu], [rule], [limit], [error], [formula])",
+    description:
+      "Extract pre-computed typed facts ([menu], [rule], [limit], [error], [formula]) for explicit slugs or top search matches, with strict audience isolation (zero SQL/code jargon in user mode).",
+    inputSchema: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      type: "object",
+      properties: {
+        query: { type: "string", maxLength: 300, description: "Optional search query to select top relevant notes." },
+        slugs: {
+          type: "array",
+          items: { type: "string", minLength: 1, maxLength: 120 },
+          maxItems: 10,
+          description: "Optional explicit note slugs.",
+        },
+        kinds: {
+          type: "array",
+          items: { type: "string", enum: ["menu", "rule", "limit", "error", "formula"] },
+          maxItems: 5,
+          description: "Optional fact kinds filter.",
+        },
+        audience: SMART_AUDIENCE_JSON_PROP,
+        limit: { type: "integer", minimum: 1, maximum: 50, description: "Max total facts returned (default 20)." },
+      },
+      additionalProperties: false,
+    },
+    annotations: ANNOTATIONS,
+  },
+  {
+    name: "whats_new",
+    title: "Recently updated knowledge base notes",
+    description:
+      "Return recently updated BC Brain notes within the last N days, sorted newest-first with ISO dates, titles, folders, and TL;DR summaries.",
+    inputSchema: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      type: "object",
+      properties: {
+        days: { type: "integer", minimum: 1, maximum: 365, description: "Lookback window in days (default 7)." },
+        audience: SMART_AUDIENCE_JSON_PROP,
+        limit: { type: "integer", minimum: 1, maximum: 50, description: "Max notes to return (default 20)." },
+      },
+      additionalProperties: false,
+    },
+    annotations: ANNOTATIONS,
+  },
+  {
+    name: "verify_reference",
+    title: "Anti-hallucination ground-truth verifier",
+    description:
+      "Verify 4-digit BC menu codes (all modes) and SQL table / table.column references (dev/both/all modes only) against compiled real source ground truth. Strictly refuses and omits SQL tables/columns in audience='user' mode.",
+    inputSchema: {
+      $schema: "http://json-schema.org/draft-07/schema#",
+      type: "object",
+      properties: {
+        menus: {
+          type: "array",
+          items: { type: "string", minLength: 1, maxLength: 20 },
+          maxItems: 50,
+          description: "4-digit BC menu codes to verify (e.g. ['4013', '1005']).",
+        },
+        tables: {
+          type: "array",
+          items: { type: "string", minLength: 1, maxLength: 100 },
+          maxItems: 50,
+          description: "SQL table names to verify (dev/both/all only; strictly blocked in user mode).",
+        },
+        columns: {
+          type: "array",
+          items: { type: "string", minLength: 1, maxLength: 160 },
+          maxItems: 100,
+          description: "SQL 'table.column' references to verify (dev/both/all only; strictly blocked in user mode).",
+        },
+        audience: SMART_AUDIENCE_JSON_PROP,
+      },
+      additionalProperties: false,
+    },
+    annotations: ANNOTATIONS,
+  },
 ];
 
 // Pre-serialized static JSON fragments for 0-allocation hot methods
@@ -605,20 +876,209 @@ type ToolEntry = {
   run: (args: Record<string, unknown>) => ToolRunResult;
 };
 
+const FACT_FOLDER_PRIORITY_USER: Record<string, number> = {
+  start: 0,
+  howto: 1,
+  troubleshoot: 2,
+  sales: 3,
+  faq: 4,
+  reports: 5,
+  systems: 6,
+  glossary: 7,
+  playbook: 8,
+  root: 9,
+};
+
+const FACT_FOLDER_PRIORITY_DEV: Record<string, number> = {
+  "dev-playbook": 0,
+  doctypes: 1,
+  schema: 2,
+  api: 3,
+  queries: 4,
+  architecture: 5,
+  root: 6,
+};
+
+export type FactResultItem = {
+  kind: FactKind;
+  text: string;
+  formatted: string;
+  slug: string;
+  title: string;
+  folder: string;
+};
+
+function collectFactsCore(opts: {
+  query?: string;
+  slugs?: string[];
+  kinds?: FactKind[];
+  audience: AudienceFilter;
+  limit: number;
+}): { facts: FactResultItem[]; matchedNotes: McpEventHit[]; filteredSlugs: string[] } {
+  const filter = opts.audience;
+  const maxFacts = Math.min(50, Math.max(1, opts.limit));
+  const kindSet = opts.kinds?.length ? new Set<FactKind>(opts.kinds) : undefined;
+  const targetNotes: Note[] = [];
+  const seenNote = new Set<string>();
+  const filteredSlugs: string[] = [];
+
+  if (opts.slugs?.length) {
+    for (const rawSlug of opts.slugs) {
+      const n = getNote(rawSlug);
+      if (!n) continue;
+      if (!matchesAudience(n.audience, filter)) {
+        filteredSlugs.push(n.slug);
+        continue;
+      }
+      if (!seenNote.has(n.slug)) {
+        seenNote.add(n.slug);
+        targetNotes.push(n);
+      }
+    }
+  }
+
+  const q = opts.query?.trim() ?? "";
+  if (q) {
+    for (const h of search(q, 6, filter)) {
+      const n = getNote(h.slug);
+      if (n && matchesAudience(n.audience, filter) && !seenNote.has(n.slug)) {
+        seenNote.add(n.slug);
+        targetNotes.push(n);
+      }
+    }
+  }
+
+  if (!opts.slugs?.length && !q) {
+    const priMap = filter === "dev" ? FACT_FOLDER_PRIORITY_DEV : FACT_FOLDER_PRIORITY_USER;
+    const pool = [...vault().values()]
+      .filter((n) => matchesAudience(n.audience, filter) && n.slug !== "index")
+      .sort((a, b) => (priMap[a.folder] ?? 20) - (priMap[b.folder] ?? 20) || a.slug.localeCompare(b.slug));
+    for (const n of pool) {
+      targetNotes.push(n);
+      if (targetNotes.length >= 40) break;
+    }
+  }
+
+  const facts: FactResultItem[] = [];
+  const seenText = new Set<string>();
+  const matchedNotesMap = new Map<string, McpEventHit>();
+
+  for (const n of targetNotes) {
+    const noteFacts = safeNoteFacts(n, filter, kindSet, 8);
+    for (const f of noteFacts) {
+      const dedupKey = `${f.kind}\0${f.text.toLowerCase()}`;
+      if (seenText.has(dedupKey)) continue;
+      seenText.add(dedupKey);
+      facts.push({
+        kind: f.kind,
+        text: f.text,
+        formatted: f.formatted,
+        slug: n.slug,
+        title: n.title,
+        folder: n.folder,
+      });
+      if (!matchedNotesMap.has(n.slug)) {
+        matchedNotesMap.set(n.slug, { slug: n.slug, title: n.title, folder: n.folder });
+      }
+      if (facts.length >= maxFacts) break;
+    }
+    if (facts.length >= maxFacts) break;
+  }
+
+  return { facts, matchedNotes: [...matchedNotesMap.values()], filteredSlugs };
+}
+
+export type SectionExcerptItem = {
+  slug: string;
+  title: string;
+  folder: string;
+  audience: "user" | "dev" | "both";
+  heading: string;
+  score: number;
+  matchedTerms: number;
+  excerpt: string;
+  truncated: boolean;
+  facts: string[];
+};
+
+function searchSectionsCore(opts: {
+  query: string;
+  audience: AudienceFilter;
+  limit: number;
+  maxChars: number;
+}): {
+  sections: SectionExcerptItem[];
+  abstained: boolean;
+  confidence: "high" | "medium" | "low";
+  topScore: number;
+} {
+  const filter = opts.audience;
+  const lim = Math.min(15, Math.max(1, opts.limit));
+  const maxChars = Math.min(6000, Math.max(200, opts.maxChars));
+  const rawHits = searchSections(opts.query, lim, filter);
+  if (!rawHits.length) {
+    return { sections: [], abstained: true, confidence: "low", topScore: 0 };
+  }
+
+  const ts = terms(opts.query);
+  const topScore = rawHits[0].score;
+  const bestMatched = rawHits[0].matchedTerms;
+  const coverage = bestMatched / Math.max(1, ts.length);
+  const confidence: "high" | "medium" | "low" =
+    (coverage >= 0.6 && topScore >= 24) || (ts.length <= 1 && topScore >= 18)
+      ? "high"
+      : coverage >= 0.45 && topScore >= 14
+        ? "medium"
+        : "low";
+
+  const factsBySlug = new Map<string, string[]>();
+  const sections: SectionExcerptItem[] = [];
+  for (const hit of rawHits) {
+    if (!matchesAudience(hit.audience, filter)) continue;
+    const trimmed = trimBlockAware(hit.raw, maxChars);
+    let noteFacts = factsBySlug.get(hit.slug);
+    if (!noteFacts) {
+      const note = getNote(hit.slug);
+      noteFacts = note ? safeNoteFacts(note, filter, undefined, 4).map((f) => f.formatted) : [];
+      factsBySlug.set(hit.slug, noteFacts);
+    }
+    sections.push({
+      slug: hit.slug,
+      title: hit.title,
+      folder: hit.folder,
+      audience: hit.audience,
+      heading: hit.heading,
+      score: hit.score,
+      matchedTerms: hit.matchedTerms,
+      excerpt: trimmed.text,
+      truncated: trimmed.truncated,
+      facts: noteFacts,
+    });
+  }
+
+  return {
+    sections,
+    abstained: sections.length === 0,
+    confidence: sections.length === 0 ? "low" : confidence,
+    topScore: sections[0]?.score ?? 0,
+  };
+}
+
 const TOOL_MAP = new Map<string, ToolEntry>([
   [
     "quick_answer",
     {
       schema: QUICK_ANSWER_SCHEMA,
       run: (raw) => {
-        const { question, audience, mode, max_chars, include_media } = raw as z.infer<typeof QUICK_ANSWER_SCHEMA>;
+        const { question, audience, mode, max_chars, include_media, include_facts } = raw as z.infer<typeof QUICK_ANSWER_SCHEMA>;
         const filter: AudienceFilter = audience ?? "all";
         const m = mode ?? "normal";
-        const budget = max_chars ?? (m === "ultra" ? 700 : 2000);
+        const budget = max_chars ?? (m === "ultra" ? 700 : m === "fast" ? 1400 : 2000);
         const withMedia = Boolean(include_media);
-        const key = `${filter}|${m}|${budget}|${withMedia ? 1 : 0}|${question.trim()}`;
+        const withFacts = include_facts !== false;
+        const key = `${filter}|${m}|${budget}|${withMedia ? 1 : 0}|${withFacts ? 1 : 0}|${question.trim()}`;
         return runCachedTool("quick_answer", key, question, () =>
-          buildQuickAnswerPayload(question, filter, m, budget, withMedia),
+          buildQuickAnswerPayload(question, filter, m, budget, withMedia, withFacts),
         );
       },
     },
@@ -639,7 +1099,7 @@ const TOOL_MAP = new Map<string, ToolEntry>([
           const allHits: McpEventHit[] = [];
           const seen = new Set<string>();
           const blocks = normQs.map((q, idx) => {
-            const sub = buildQuickAnswerPayload(q, filter, m, budget, withMedia);
+            const sub = buildQuickAnswerPayload(q, filter, m, budget, withMedia, true);
             for (const h of sub.hits) {
               if (!seen.has(h.slug) && allHits.length < 6) {
                 seen.add(h.slug);
@@ -783,6 +1243,9 @@ const TOOL_MAP = new Map<string, ToolEntry>([
               hits: [],
               totalHits: 0,
               audience: filter,
+              abstained: true,
+              confidence: "low",
+              topScore: 0,
             };
           }
           const coverage = bestMatchedTerms / Math.max(1, totalTerms);
@@ -796,6 +1259,9 @@ const TOOL_MAP = new Map<string, ToolEntry>([
               hits: hits.slice(0, 2).map((h) => ({ slug: h.slug, title: h.title, folder: h.folder })),
               totalHits: hits.length,
               audience: filter,
+              abstained: true,
+              confidence: "low",
+              topScore,
             };
           }
           let selectedHits = confidence === "low" ? hits.slice(0, Math.min(2, maxHitCount)) : hits.slice(0, maxHitCount);
@@ -846,6 +1312,9 @@ const TOOL_MAP = new Map<string, ToolEntry>([
             hits: selectedHits.map((h) => ({ slug: h.slug, title: h.title, folder: h.folder })),
             totalHits: selectedHits.length,
             audience: filter,
+            abstained: false,
+            confidence,
+            topScore,
           };
         });
       },
@@ -862,6 +1331,9 @@ const TOOL_MAP = new Map<string, ToolEntry>([
         const key = `${filter}|${lim}|${query.trim()}`;
         return runCachedTool("search_brain", key, query, () => {
           const hits = search(query, lim, filter);
+          const topScore = hits[0]?.score ?? 0;
+          const confidence: "high" | "medium" | "low" =
+            hits.length === 0 || topScore < 18 ? "low" : topScore >= 35 ? "high" : "medium";
           const compactHits = hits.map((h) => ({
             slug: h.slug,
             title: h.title,
@@ -870,6 +1342,7 @@ const TOOL_MAP = new Map<string, ToolEntry>([
             tags: h.tags,
             score: h.score,
             snippet: h.snippet.length > 150 ? `${h.snippet.slice(0, 147)}...` : h.snippet,
+            ...(h.bestSection ? { bestSection: h.bestSection } : {}),
             ...(h.images?.length ? { images: h.images.slice(0, 2).map((img) => ({ alt: img.alt, url: img.url })) } : {}),
             ...(h.videos?.length ? { videos: h.videos.slice(0, 2).map((v) => ({ title: v.title, url: v.url, videoId: v.videoId })) } : {}),
           }));
@@ -878,6 +1351,9 @@ const TOOL_MAP = new Map<string, ToolEntry>([
             hits: hits.slice(0, 6).map((h) => ({ slug: h.slug, title: h.title, folder: h.folder })),
             totalHits: hits.length,
             audience: filter,
+            abstained: hits.length === 0,
+            confidence,
+            topScore,
           };
         });
       },
@@ -1043,17 +1519,291 @@ const TOOL_MAP = new Map<string, ToolEntry>([
       },
     },
   ],
+  [
+    "lookup_error",
+    {
+      schema: LOOKUP_ERROR_SCHEMA,
+      run: (raw) => {
+        const { query, audience, limit } = raw as z.infer<typeof LOOKUP_ERROR_SCHEMA>;
+        const filter = normalizeToolAudience(audience, "all");
+        const lim = limit ?? 5;
+        const q = query.trim();
+        const key = `${filter}|${lim}|${q}`;
+        return runCachedTool("lookup_error", key, q, () => {
+          const entries = lookupError(q, filter, lim);
+          if (!entries.length) {
+            return {
+              text: `🛑 Abstain — No verified BC error message found for "${q}" (audience=${filter}). Do not guess—try search_sections or quick_answer.`,
+              hits: [],
+              totalHits: 0,
+              audience: filter,
+              abstained: true,
+              confidence: "low",
+              topScore: 0,
+            };
+          }
+          const lines = [`[lookup_error | audience=${filter} | hits=${entries.length}]`, ""];
+          const eventHits: McpEventHit[] = [];
+          const seenSlug = new Set<string>();
+          entries.forEach((e, i) => {
+            lines.push(
+              `${i + 1}. **"${e.errorText}"**\n   - cause/fix: ${e.fixSnippet}\n   - slug: \`${e.slug}\` | folder: ${e.folder} | audience: ${e.audience} — ${e.title}`,
+            );
+            if (!seenSlug.has(e.slug) && eventHits.length < 6) {
+              seenSlug.add(e.slug);
+              eventHits.push({ slug: e.slug, title: e.title, folder: e.folder });
+            }
+          });
+          return {
+            text: lines.join("\n"),
+            hits: eventHits,
+            totalHits: entries.length,
+            audience: filter,
+            abstained: false,
+            confidence: "high",
+            topScore: 100,
+          };
+        });
+      },
+    },
+  ],
+  [
+    "search_sections",
+    {
+      schema: SEARCH_SECTIONS_SCHEMA,
+      run: (raw) => {
+        const { query, audience, limit, max_chars } = raw as z.infer<typeof SEARCH_SECTIONS_SCHEMA>;
+        const filter = normalizeToolAudience(audience, "all");
+        const lim = limit ?? 5;
+        const cap = max_chars ?? 1200;
+        const q = query.trim();
+        const key = `${filter}|${lim}|${cap}|${q}`;
+        return runCachedTool("search_sections", key, q, () => {
+          const res = searchSectionsCore({ query: q, audience: filter, limit: lim, maxChars: cap });
+          if (res.abstained) {
+            return {
+              text: `🛑 Abstain — No matching sections found for "${q}" (audience=${filter}). Do not guess—try search_brain or quick_answer.`,
+              hits: [],
+              totalHits: 0,
+              audience: filter,
+              abstained: true,
+              confidence: "low",
+              topScore: 0,
+            };
+          }
+          const blocks: string[] = [];
+          const eventHits: McpEventHit[] = [];
+          const seenSlug = new Set<string>();
+          const allFacts: string[] = [];
+          const seenFact = new Set<string>();
+
+          for (const sec of res.sections) {
+            const srcNote = filter === "dev" ? getNote(sec.slug) : undefined;
+            const srcLine =
+              filter === "dev" && srcNote?.audience === "dev" && srcNote.sources.length
+                ? `\nverified_sources: ${srcNote.sources.slice(0, 4).join(", ")}`
+                : "";
+            blocks.push(
+              `### ${sec.heading}\nslug: ${sec.slug} | folder: ${sec.folder} | audience: ${sec.audience} | score: ${sec.score}\n\n${sec.excerpt}${srcLine}`,
+            );
+            if (!seenSlug.has(sec.slug) && eventHits.length < 6) {
+              seenSlug.add(sec.slug);
+              eventHits.push({ slug: sec.slug, title: sec.title, folder: sec.folder });
+            }
+            for (const f of sec.facts) {
+              if (!seenFact.has(f) && allFacts.length < 8) {
+                seenFact.add(f);
+                allFacts.push(`${f} (${sec.slug})`);
+              }
+            }
+          }
+          const factsBlock = allFacts.length
+            ? `\n\n---\n\n## Structured Facts\n${allFacts.map((f) => `- ${f}`).join("\n")}`
+            : "";
+          return {
+            text: `[search_sections | audience=${filter} | confidence=${res.confidence} | sections=${res.sections.length}]\n\n${blocks.join("\n\n---\n\n")}${factsBlock}`,
+            hits: eventHits,
+            totalHits: res.sections.length,
+            audience: filter,
+            abstained: false,
+            confidence: res.confidence,
+            topScore: res.topScore,
+          };
+        });
+      },
+    },
+  ],
+  [
+    "get_facts",
+    {
+      schema: GET_FACTS_SCHEMA,
+      run: (raw) => {
+        const { query, slugs, kinds, audience, limit } = raw as z.infer<typeof GET_FACTS_SCHEMA>;
+        const filter = normalizeToolAudience(audience, "all");
+        const lim = limit ?? 20;
+        const normSlugs = slugs?.map((s) => s.trim()).filter(Boolean) ?? [];
+        const normKinds = kinds ?? [];
+        const q = query?.trim() ?? "";
+        const rawArg = q || normSlugs.join(",") || (normKinds.length ? `kinds=${normKinds.join(",")}` : "*");
+        const key = `${filter}|${lim}|${q}|${normSlugs.join(",")}|${normKinds.join(",")}`;
+        return runCachedTool("get_facts", key, rawArg, () => {
+          const res = collectFactsCore({
+            query: q || undefined,
+            slugs: normSlugs.length ? normSlugs : undefined,
+            kinds: normKinds.length ? normKinds : undefined,
+            audience: filter,
+            limit: lim,
+          });
+          if (!res.facts.length) {
+            return {
+              text: `No matching structured facts found (audience=${filter}). Try broader query, different kinds, or read_note.`,
+              hits: [],
+              totalHits: 0,
+              audience: filter,
+            };
+          }
+          const lines = [
+            `[get_facts | audience=${filter} | count=${res.facts.length}]`,
+            ...res.facts.map((f) => `- ${f.formatted} (slug: ${f.slug})`),
+          ];
+          return {
+            text: lines.join("\n"),
+            hits: res.matchedNotes.slice(0, 6),
+            totalHits: res.facts.length,
+            audience: filter,
+          };
+        });
+      },
+    },
+  ],
+  [
+    "whats_new",
+    {
+      schema: WHATS_NEW_SCHEMA,
+      run: (raw) => {
+        const { days, audience, limit } = raw as z.infer<typeof WHATS_NEW_SCHEMA>;
+        const filter = normalizeToolAudience(audience, "all");
+        const d = days ?? 7;
+        const lim = limit ?? 20;
+        const key = `${filter}|${d}|${lim}`;
+        return runCachedTool("whats_new", key, `days=${d}`, () => {
+          const rows = getWhatsNew(d, filter, lim);
+          if (!rows.length) {
+            return {
+              text: `No notes updated within the last ${d} day(s) (audience=${filter}). Try increasing days (e.g. days: 30).`,
+              hits: [],
+              totalHits: 0,
+              audience: filter,
+            };
+          }
+          const lines = [
+            `[whats_new | days=${d} | audience=${filter} | count=${rows.length}]`,
+            ...rows.map((r) => {
+              const summary = r.tldr.replace(/\s+/g, " ").trim().slice(0, 140);
+              return `- **${r.updatedAt.slice(0, 10)}** \`${r.slug}\` (${r.folder} | ${r.audience}) — **${r.title}**: ${summary}`;
+            }),
+          ];
+          return {
+            text: lines.join("\n"),
+            hits: rows.slice(0, 6).map((r) => ({ slug: r.slug, title: r.title, folder: r.folder })),
+            totalHits: rows.length,
+            audience: filter,
+          };
+        });
+      },
+    },
+  ],
+  [
+    "verify_reference",
+    {
+      schema: VERIFY_REFERENCE_SCHEMA,
+      run: (raw) => {
+        const { menus, tables, columns, audience } = raw as z.infer<typeof VERIFY_REFERENCE_SCHEMA>;
+        const filter = normalizeToolAudience(audience, "all");
+        const rawArg = [
+          menus?.length ? `menus=${menus.length}` : "",
+          tables?.length ? `tables=${tables.length}` : "",
+          columns?.length ? `cols=${columns.length}` : "",
+        ]
+          .filter(Boolean)
+          .join(" ") || "empty";
+        const key = `${filter}|m:${(menus ?? []).join(",")}|t:${(tables ?? []).join(",")}|c:${(columns ?? []).join(",")}`;
+        return runCachedTool("verify_reference", key, rawArg, () => {
+          const res = verifyReferences({ menus, tables, columns, audience: filter });
+          const totalChecked =
+            res.summary.checkedMenus + res.summary.checkedTables + res.summary.checkedColumns;
+          return {
+            text: JSON.stringify(res),
+            hits: [],
+            totalHits: totalChecked,
+            audience: filter,
+          };
+        });
+      },
+    },
+  ],
 ]);
 
-// ---------- Public Fast REST API helper (/api/fast) ----------
+// ---------- Server Manifest & Capabilities (v3.0.0) ----------
+export function getManifest() {
+  return {
+    name: SERVER_INFO.name,
+    version: SERVER_INFO.version,
+    protocolVersion: DEFAULT_PROTOCOL_VERSION,
+    updatedAt,
+    ...(syncCommit ? { syncCommit } : {}),
+    toolCount: TOOL_DESCRIPTORS.length,
+    tools: TOOL_DESCRIPTORS.map((t) => ({ name: t.name, title: t.title })),
+    capabilities: {
+      hybridRrf: true,
+      sectionBm25: true,
+      semanticVectors256d: true,
+      structuredFacts: true,
+      errorIndex: true,
+      groundingVerifier: true,
+      gapTelemetry: true,
+      recencyFeed: true,
+      openApiVersion: "3.1.0",
+    },
+    grounding: getGroundingStats(),
+    endpoints: {
+      mcp: "/mcp",
+      fast: "/api/fast",
+      error: "/api/error",
+      sections: "/api/sections",
+      facts: "/api/facts",
+      whatsNew: "/api/whats-new",
+      verify: "/api/verify",
+      gaps: "/api/gaps",
+      bootstrapPack: "/api/bootstrap-pack",
+      vaultPack: "/api/vault-pack",
+      openApi: "/api/openapi.json",
+      healthz: "/healthz",
+    },
+  };
+}
+
+// ---------- Public Fast REST API helpers (/api/*) ----------
 export function runFastRestQuery(opts: {
   q?: string;
   menu?: string;
   audience?: AudienceFilter;
-  mode?: "normal" | "ultra";
+  mode?: "normal" | "ultra" | "fast";
   includeMedia?: boolean;
   maxChars?: number;
-}): { ok: boolean; kind: "menu" | "answer"; audience: AudienceFilter; mode: string; answer: string; abstained: boolean; confidence: string; hits: McpEventHit[]; ms: number; cached: boolean } {
+}): {
+  ok: boolean;
+  kind: "menu" | "answer";
+  audience: AudienceFilter;
+  mode: string;
+  answer: string;
+  abstained: boolean;
+  confidence: string;
+  facts: string[];
+  hits: McpEventHit[];
+  ms: number;
+  cached: boolean;
+} {
   const filter: AudienceFilter = opts.audience ?? "user";
   if (opts.menu?.trim()) {
     const entry = TOOL_MAP.get("lookup_menu")!;
@@ -1066,6 +1816,7 @@ export function runFastRestQuery(opts: {
       answer: out.result.content[0].text,
       abstained: out.payload?.totalHits === 0,
       confidence: out.payload?.totalHits ? "high" : "low",
+      facts: [],
       hits: out.payload?.hits ?? [],
       ms: Math.round((out.ms ?? 0) * 100) / 100,
       cached: Boolean(out.cached),
@@ -1082,6 +1833,7 @@ export function runFastRestQuery(opts: {
       answer: "Missing query parameter ?q=... (min 2 chars) or ?menu=4013",
       abstained: true,
       confidence: "low",
+      facts: [],
       hits: [],
       ms: 0,
       cached: false,
@@ -1094,6 +1846,7 @@ export function runFastRestQuery(opts: {
     mode: m,
     max_chars: opts.maxChars,
     include_media: Boolean(opts.includeMedia),
+    include_facts: true,
   });
   return {
     ok: true,
@@ -1103,10 +1856,193 @@ export function runFastRestQuery(opts: {
     answer: out.result.content[0].text,
     abstained: Boolean(out.payload?.abstained),
     confidence: out.payload?.confidence ?? "medium",
+    facts: out.payload?.facts ?? [],
     hits: out.payload?.hits ?? [],
     ms: Math.round((out.ms ?? 0) * 100) / 100,
     cached: Boolean(out.cached),
   };
+}
+
+export function runErrorRestQuery(opts: {
+  q?: string;
+  audience?: AudienceFilter;
+  limit?: number;
+}): {
+  ok: boolean;
+  error?: string;
+  query: string;
+  audience: AudienceFilter;
+  count: number;
+  abstained: boolean;
+  hits: { errorText: string; fixSnippet: string; slug: string; title: string; folder: string; audience: "user" | "dev" | "both" }[];
+  ms: number;
+} {
+  const t0 = performance.now();
+  const filter: AudienceFilter = opts.audience ?? "user";
+  const q = opts.q?.trim() ?? "";
+  if (!q) {
+    return {
+      ok: false,
+      error: "Missing query parameter ?q=...",
+      query: "",
+      audience: filter,
+      count: 0,
+      abstained: true,
+      hits: [],
+      ms: 0,
+    };
+  }
+  const lim = Math.min(15, Math.max(1, opts.limit ?? 5));
+  const entries = lookupError(q, filter, lim);
+  const abstained = entries.length === 0;
+  if (abstained) {
+    recordGap({ tool: "lookup_error", query: q, audience: filter, reason: "zero_hit", topScore: 0 });
+  }
+  return {
+    ok: true,
+    query: q,
+    audience: filter,
+    count: entries.length,
+    abstained,
+    hits: entries.map((e) => ({
+      errorText: e.errorText,
+      fixSnippet: e.fixSnippet,
+      slug: e.slug,
+      title: e.title,
+      folder: e.folder,
+      audience: e.audience,
+    })),
+    ms: Math.round((performance.now() - t0) * 100) / 100,
+  };
+}
+
+export function runSectionsRestQuery(opts: {
+  q?: string;
+  audience?: AudienceFilter;
+  limit?: number;
+  maxChars?: number;
+}): {
+  ok: boolean;
+  error?: string;
+  query: string;
+  audience: AudienceFilter;
+  count: number;
+  abstained: boolean;
+  sections: SectionExcerptItem[];
+  ms: number;
+} {
+  const t0 = performance.now();
+  const filter: AudienceFilter = opts.audience ?? "user";
+  const q = opts.q?.trim() ?? "";
+  if (!q) {
+    return {
+      ok: false,
+      error: "Missing query parameter ?q=...",
+      query: "",
+      audience: filter,
+      count: 0,
+      abstained: true,
+      sections: [],
+      ms: 0,
+    };
+  }
+  const res = searchSectionsCore({
+    query: q,
+    audience: filter,
+    limit: opts.limit ?? 5,
+    maxChars: opts.maxChars ?? 1200,
+  });
+  if (res.abstained || res.confidence === "low") {
+    recordGap({
+      tool: "search_sections",
+      query: q,
+      audience: filter,
+      reason: res.abstained ? "zero_hit" : "low_conf",
+      topScore: res.topScore,
+    });
+  }
+  return {
+    ok: true,
+    query: q,
+    audience: filter,
+    count: res.sections.length,
+    abstained: res.abstained,
+    sections: res.sections,
+    ms: Math.round((performance.now() - t0) * 100) / 100,
+  };
+}
+
+export function runFactsRestQuery(opts: {
+  q?: string;
+  slugs?: string[];
+  kinds?: FactKind[];
+  audience?: AudienceFilter;
+  limit?: number;
+}): {
+  ok: boolean;
+  audience: AudienceFilter;
+  count: number;
+  facts: FactResultItem[];
+  ms: number;
+} {
+  const t0 = performance.now();
+  const filter: AudienceFilter = opts.audience ?? "user";
+  const res = collectFactsCore({
+    query: opts.q,
+    slugs: opts.slugs,
+    kinds: opts.kinds,
+    audience: filter,
+    limit: opts.limit ?? 20,
+  });
+  return {
+    ok: true,
+    audience: filter,
+    count: res.facts.length,
+    facts: res.facts,
+    ms: Math.round((performance.now() - t0) * 100) / 100,
+  };
+}
+
+export function runWhatsNewRestQuery(opts: {
+  days?: number;
+  audience?: AudienceFilter;
+  limit?: number;
+}): {
+  ok: boolean;
+  days: number;
+  audience: AudienceFilter;
+  count: number;
+  items: { slug: string; title: string; folder: string; audience: "user" | "dev" | "both"; updatedAt: string; tldr: string }[];
+  ms: number;
+} {
+  const t0 = performance.now();
+  const filter: AudienceFilter = opts.audience ?? "user";
+  const days = Math.min(365, Math.max(1, Math.floor(opts.days ?? 7)));
+  const lim = Math.min(50, Math.max(1, Math.floor(opts.limit ?? 20)));
+  const rows = getWhatsNew(days, filter, lim);
+  return {
+    ok: true,
+    days,
+    audience: filter,
+    count: rows.length,
+    items: rows.map((r) => ({
+      slug: r.slug,
+      title: r.title,
+      folder: r.folder,
+      audience: r.audience,
+      updatedAt: r.updatedAt,
+      tldr: r.tldr,
+    })),
+    ms: Math.round((performance.now() - t0) * 100) / 100,
+  };
+}
+
+export function runVerifyRestQuery(opts: VerifyReferenceInput): VerifyReferenceResult {
+  return verifyReferences(opts);
+}
+
+export function runGapsRestQuery(limit = 50): { ok: true } & GapReport {
+  return { ok: true, ...getGapReport(limit) };
 }
 
 // ---------- Headers & Rate Limiting ----------

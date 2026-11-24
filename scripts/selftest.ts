@@ -21,8 +21,22 @@ registerHooks({
 });
 
 const { GROUPS, RELATION_TYPES, groupOf, inferRelation, matchesAudience } = await import("../lib/groups.ts");
+const { clearGaps, getGapReport } = await import("../lib/gap-log.ts");
+const { getGroundingStats, verifyReferences } = await import("../lib/grounding-runtime.ts");
+const { getOpenApiSpec } = await import("../lib/openapi.ts");
 const { collectRelatedMedia, connectedNeighbors, excerpt, excerptNote, expandSynonyms, extractNoteMedia, findMedia, getBootstrapPack, getNote, getNoteTldr, getVaultPackGzip, graph, lookupDirect, parseYouTubeUrl, renderNote, resolveBcImageUrl, search, searchWithMeta, stripSeeAlso, terms, traverseGraph, vault } = await import("../lib/vault.ts");
-const { dispatchJsonRpcRaw, runFastRestQuery } = await import("../lib/mcp-engine.ts");
+const {
+  dispatchJsonRpcRaw,
+  getManifest,
+  runErrorRestQuery,
+  runFactsRestQuery,
+  runFastRestQuery,
+  runGapsRestQuery,
+  runSectionsRestQuery,
+  runVerifyRestQuery,
+  runWhatsNewRestQuery,
+  SERVER_INFO,
+} = await import("../lib/mcp-engine.ts");
 type NoteType = import("../lib/vault.ts").Note;
 
 // 1. Groups & Audience contract
@@ -490,4 +504,186 @@ const batchAskRaw = dispatchJsonRpcRaw({
 });
 assert.ok(batchAskRaw && batchAskRaw.includes("Q1:") && batchAskRaw.includes("Q2:") && batchAskRaw.includes("🛑 Abstain"), "batch_ask answers grounded Q1 and abstains Q2");
 
-console.log(`selftest ok (1005=${JSON.stringify(lang1005.hits.slice(0, 3).map((h) => h.slug))}, 1015=${fmt1015.hits[0]?.slug}, pack=${(vpack.gz.length / 1024).toFixed(0)}KB gz)`);
+// 15. MCP v3.0.0: 15 tools, Ground-Truth Runtime Index, 5 new smart tools, Gap Telemetry, REST runners & OpenAPI 3.1.0
+const rpcCall = (method: string, params?: Record<string, unknown>) => {
+  const raw = dispatchJsonRpcRaw({ jsonrpc: "2.0", id: 901, method, params });
+  assert.ok(raw, `JSON-RPC ${method} returned payload`);
+  return JSON.parse(raw!) as { result?: { serverInfo?: { name: string; version: string }; tools?: { name: string }[]; content?: { text: string }[]; isError?: boolean }; error?: unknown };
+};
+const callTool = (name: string, args: Record<string, unknown>) => {
+  const r = rpcCall("tools/call", { name, arguments: args });
+  assert.equal(r.error, undefined, `${name} JSON-RPC error: ${JSON.stringify(r.error)}`);
+  return { text: r.result?.content?.[0]?.text ?? "", isError: Boolean(r.result?.isError) };
+};
+
+const initRes = rpcCall("initialize", { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "selftest", version: "1" } });
+assert.equal(initRes.result?.serverInfo?.version, "3.0.0", "MCP server version bumped to 3.0.0");
+assert.equal(SERVER_INFO.version, "3.0.0");
+
+const manifest = getManifest();
+assert.equal(manifest.version, "3.0.0", "getManifest reports v3.0.0");
+assert.equal(manifest.toolCount, 15, `getManifest reports 15 tools (got ${manifest.toolCount})`);
+assert.equal(manifest.capabilities.hybridRrf, true);
+assert.equal(manifest.capabilities.sectionBm25, true);
+assert.equal(manifest.capabilities.structuredFacts, true);
+assert.equal(manifest.capabilities.errorIndex, true);
+assert.equal(manifest.capabilities.groundingVerifier, true);
+
+const toolsList = rpcCall("tools/list").result?.tools ?? [];
+assert.equal(toolsList.length, 15, `tools/list must expose exactly 15 tools (got ${toolsList.length})`);
+for (const expectedTool of [
+  "quick_answer",
+  "batch_ask",
+  "lookup_menu",
+  "batch_read",
+  "ask_brain",
+  "search_brain",
+  "traverse_brain",
+  "read_note",
+  "list_notes",
+  "find_media",
+  "lookup_error",
+  "search_sections",
+  "get_facts",
+  "whats_new",
+  "verify_reference",
+]) {
+  assert.ok(toolsList.some((t) => t.name === expectedTool), `tools/list includes ${expectedTool}`);
+}
+
+// 15a. lookup_error (hit + Thai trap abstain + strict user isolation)
+const errHit = callTool("lookup_error", { query: "ล็อกหน่วยต้นทุนแล้ว", audience: "user", limit: 3 });
+assert.ok(!errHit.isError && errHit.text.includes("ts-stock-bom-unit-locked") && !errHit.text.includes("audience: dev"), `lookup_error hit: ${errHit.text}`);
+const errTrap = callTool("lookup_error", { query: "สูตรทำแกงเขียวหวานไก่ใส่กะทิสด", audience: "user" });
+assert.ok(!errTrap.isError && errTrap.text.includes("🛑 Abstain"), "lookup_error strictly abstains on Thai trap");
+const devOnlyErrMsg = "รายการนี้เลือกประเภทเป็นเงินเชื่อ / เครดิต ระบบปิดการรับ/จ่ายชำระเงิน";
+const errIsoUser = callTool("lookup_error", { query: devOnlyErrMsg, audience: "user" });
+assert.ok(!errIsoUser.text.includes("audience: dev"), "lookup_error(user) never leaks dev notes");
+const errIsoDev = callTool("lookup_error", { query: devOnlyErrMsg, audience: "dev" });
+assert.ok(!errIsoDev.text.includes("🛑 Abstain") && !errIsoDev.text.includes("audience: user"), "lookup_error(dev) hits dev validation note without user notes");
+
+// 15b. search_sections (surgical precision + block-aware + structured facts + user isolation)
+const secRes = callTool("search_sections", {
+  query: "ห้ามขายสินค้าต่ำกว่าทุน วงเงินเครดิตรวมเช็คคงค้าง ส่วนที่ 4",
+  audience: "user",
+  limit: 3,
+  max_chars: 1000,
+});
+assert.ok(
+  !secRes.isError &&
+    secRes.text.includes("start-erp-options-9-tabs") &&
+    secRes.text.includes("ส่วนที่ 4") &&
+    secRes.text.includes("## Structured Facts"),
+  `search_sections precision + facts failed: ${secRes.text.slice(0, 300)}`,
+);
+const secIso = callTool("search_sections", { query: "ic_trans_detail gl_journal SELECT", audience: "user", limit: 5 });
+assert.ok(!secIso.text.includes("audience: dev") && !secIso.text.includes("verified_sources:"), "search_sections(user) zero dev leaks");
+
+// 15c. get_facts (typed facts + kinds filter + 0 SQL/code in user mode)
+const USER_SQL_RE = /\b(?:SELECT|FROM|WHERE|COALESCE|NUMERIC|trans_flag|last_status|ic_trans|gl_journal|ar_customer)\b|\.(?:go|tsx?|sql):\d+/i;
+const factsSlug = callTool("get_facts", { slugs: ["start-erp-options-9-tabs", "tbl-ic-trans"], kinds: ["menu", "rule"], audience: "user", limit: 10 });
+assert.ok(factsSlug.text.includes("[menu]") && factsSlug.text.includes("1004"), "get_facts returns typed [menu] fact for 1004");
+assert.ok(!factsSlug.text.includes("tbl-ic-trans") && !USER_SQL_RE.test(factsSlug.text), "get_facts(user) strictly blocks dev slug and SQL jargon");
+const factsQuery = callTool("get_facts", { query: "ตารางราคา 4 รุ่น", kinds: ["limit"], audience: "user", limit: 10 });
+assert.ok(factsQuery.text.includes("[limit]") && !USER_SQL_RE.test(factsQuery.text), "get_facts(query, kinds=['limit']) returns user-safe limits");
+const factsDev = callTool("get_facts", { slugs: ["doc-calc-vat-discount"], kinds: ["formula"], audience: "dev", limit: 10 });
+assert.ok(factsDev.text.includes("[formula]"), "get_facts(dev) returns [formula] facts");
+
+// 15d. whats_new (recency + audience isolation)
+const wnUser = callTool("whats_new", { days: 30, audience: "user", limit: 10 });
+assert.ok(!wnUser.isError && wnUser.text.includes("[whats_new") && !wnUser.text.includes("| dev)"), "whats_new(user) returns recent non-dev notes");
+const wnDev = callTool("whats_new", { days: 30, audience: "dev", limit: 10 });
+assert.ok(!wnDev.isError && wnDev.text.includes("[whats_new") && !wnDev.text.includes("| user)"), "whats_new(dev) returns recent non-user notes");
+
+// 15e. Ground-Truth Runtime Index & verify_reference (menus, dev tables/columns, forbidden tables, strict user SQL refusal)
+const gStats = getGroundingStats();
+assert.ok(gStats.available && gStats.menuCount >= 700 && gStats.tableCount >= 500 && gStats.columnCount >= 8000, `grounding-index loaded: ${JSON.stringify(gStats)}`);
+
+const verMenuUser = JSON.parse(callTool("verify_reference", { menus: ["4013", "1005", "4999"], audience: "user" }).text);
+assert.equal(verMenuUser.tablesRestricted, true, "verify_reference(user) sets tablesRestricted=true");
+assert.ok(verMenuUser.menus.valid.some((m: { code: string; label: string }) => m.code === "4013" && m.label.length > 2), "4013 valid with Thai label");
+assert.ok(verMenuUser.menus.valid.some((m: { code: string }) => m.code === "1005"), "1005 valid");
+assert.ok(verMenuUser.menus.unknownMenus.includes("4999"), "4999 flagged in unknownMenus");
+assert.ok(verMenuUser.menus.invalid[0]?.suggestions?.length > 0, "invalid menu includes nearest menu suggestions");
+
+const verSqlRefusedUser = JSON.parse(
+  callTool("verify_reference", {
+    menus: ["4013"],
+    tables: ["ic_trans", "totally_fake_table"],
+    columns: ["ic_trans.doc_no"],
+    audience: "user",
+  }).text,
+);
+assert.equal(verSqlRefusedUser.tablesRestricted, true, "user mode strictly restricts SQL verification");
+assert.equal(verSqlRefusedUser.ok, false, "user mode refuses SQL table/column request");
+assert.equal(verSqlRefusedUser.tables.valid.length, 0, "user mode leaks 0 valid SQL tables");
+assert.equal(verSqlRefusedUser.tables.invalid.length, 0, "user mode leaks 0 invalid SQL tables");
+assert.equal(verSqlRefusedUser.columns.valid.length, 0, "user mode leaks 0 valid SQL columns");
+assert.equal(verSqlRefusedUser.columns.invalid.length, 0, "user mode leaks 0 invalid SQL columns");
+assert.ok(!JSON.stringify(verSqlRefusedUser).includes("ic_trans"), "user verify_reference output never echoes or leaks requested SQL table names");
+
+const verDev = JSON.parse(
+  callTool("verify_reference", {
+    menus: ["4013"],
+    tables: ["ic_trans", "ic_trans_typo", "bc_user_list"],
+    columns: ["ic_trans.doc_no", "ic_trans.doc_noo", "fake_tbl.col"],
+    audience: "dev",
+  }).text,
+);
+assert.equal(verDev.tablesRestricted, false, "dev mode permits SQL verification");
+assert.ok(verDev.tables.valid.some((t: { table: string; columnCount: number }) => t.table === "ic_trans" && t.columnCount > 50), "dev validates ic_trans");
+const typoTbl = verDev.tables.invalid.find((t: { table: string }) => t.table === "ic_trans_typo");
+assert.ok(typoTbl && typoTbl.suggestions.includes("ic_trans"), `dev suggests ic_trans for ic_trans_typo: ${JSON.stringify(typoTbl)}`);
+const forbTbl = verDev.tables.invalid.find((t: { table: string }) => t.table === "bc_user_list");
+assert.ok(forbTbl && forbTbl.suggestions.length === 0, "forbidden security table bc_user_list is never valid and gives zero hints");
+assert.ok(verDev.columns.valid.some((c: { ref: string }) => c.ref === "ic_trans.doc_no"), "dev validates ic_trans.doc_no");
+const typoCol = verDev.columns.invalid.find((c: { ref: string }) => c.ref === "ic_trans.doc_noo");
+assert.ok(typoCol && typoCol.suggestions.includes("ic_trans.doc_no"), `dev suggests ic_trans.doc_no for typo: ${JSON.stringify(typoCol)}`);
+assert.equal(verifyReferences({ menus: ["4013"], tables: ["ic_trans"], columns: ["ic_trans.doc_no"], audience: "dev" }).ok, true, "verifyReferences ok=true when all valid");
+
+// 15f. Gap Telemetry capture on abstain / zero-hit (and PII sanitization)
+clearGaps();
+callTool("quick_answer", { question: "สูตรทำแกงเขียวหวานไก่ใส่กะทิสด", audience: "user" });
+callTool("ask_brain", { question: "วิธีปลูกทุเรียนภูเขาไฟ", audience: "user" });
+callTool("lookup_error", { query: "ยานอวกาศลงจอดบนดวงจันทร์ไม่ได้", audience: "user" });
+callTool("search_sections", { query: "zzzzUnmatchedSectionToken99999", audience: "user" });
+const mockLeakEmail = ["person", "example.org"].join("@");
+callTool("search_brain", { query: `zzzzZeroHitQuery99999 ${mockLeakEmail}`, audience: "user" });
+const gapRep = getGapReport(50);
+assert.ok(gapRep.totalRecorded >= 5, `gap-log captured all 5 abstain/zero-hit calls (got ${gapRep.totalRecorded})`);
+assert.ok(gapRep.byReason.abstain >= 2 && gapRep.byReason.zero_hit >= 2, `gap-log tracks abstain & zero_hit: ${JSON.stringify(gapRep.byReason)}`);
+assert.ok(!JSON.stringify(gapRep).includes(mockLeakEmail), "gap-log strictly sanitizes emails before storing");
+
+// 15g. quick_answer mode='fast' + structured facts + REST runners
+const fastModeRes = runFastRestQuery({ q: "เปิดบิลขายออกใบกำกับภาษีทำยังไง", audience: "user", mode: "fast" });
+assert.ok(fastModeRes.ok && !fastModeRes.abstained && fastModeRes.answer.startsWith("[quick_answer:fast"), "quick_answer mode=fast works");
+assert.ok(Array.isArray(fastModeRes.facts) && fastModeRes.facts.every((f) => !USER_SQL_RE.test(f)), "runFastRestQuery attaches user-safe structured facts");
+assert.equal(runErrorRestQuery({ q: "ล็อกหน่วยต้นทุนแล้ว", audience: "user", limit: 3 }).hits[0]?.slug, "ts-stock-bom-unit-locked");
+assert.equal(runSectionsRestQuery({ q: "ห้ามขายสินค้าต่ำกว่าทุน วงเงินเครดิตรวมเช็คคงค้าง ส่วนที่ 4", audience: "user", limit: 3, maxChars: 900 }).sections[0]?.slug, "start-erp-options-9-tabs");
+assert.ok(runFactsRestQuery({ slugs: ["start-erp-options-9-tabs"], audience: "user", limit: 10 }).count > 0);
+assert.ok(runWhatsNewRestQuery({ days: 30, audience: "user", limit: 5 }).count > 0);
+assert.equal(runVerifyRestQuery({ menus: ["4013"], audience: "user" }).ok, true);
+assert.ok(runGapsRestQuery(10).ok && runGapsRestQuery(10).totalRecorded >= 5);
+
+// 15h. OpenAPI 3.1.0 spec validation
+const spec = getOpenApiSpec() as { openapi?: string; info?: { version?: string }; servers?: { url?: string }[]; paths?: Record<string, unknown> };
+assert.equal(spec.openapi, "3.1.0", "OpenAPI version is 3.1.0");
+assert.equal(spec.info?.version, "3.0.0", "OpenAPI info.version is 3.0.0");
+assert.equal(spec.servers?.[0]?.url, "https://brain.bcsmethai.com", "OpenAPI server URL matches production");
+for (const p of [
+  "/api/fast",
+  "/api/error",
+  "/api/sections",
+  "/api/facts",
+  "/api/whats-new",
+  "/api/verify",
+  "/api/gaps",
+  "/api/bootstrap-pack",
+  "/api/vault-pack",
+  "/healthz",
+  "/mcp",
+]) {
+  assert.ok(spec.paths && p in spec.paths, `OpenAPI spec documents ${p}`);
+}
+
+console.log(`selftest ok (v${SERVER_INFO.version}, tools=${toolsList.length}, grounding=${gStats.menuCount}m/${gStats.tableCount}t/${gStats.columnCount}c, 1005=${JSON.stringify(lang1005.hits.slice(0, 3).map((h) => h.slug))}, 1015=${fmt1015.hits[0]?.slug}, pack=${(vpack.gz.length / 1024).toFixed(0)}KB gz)`);

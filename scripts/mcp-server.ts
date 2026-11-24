@@ -37,14 +37,25 @@ if (!process.env.SYNC_COMMIT) {
 const {
   checkRateLimit,
   CORS_HEADERS,
+  getManifest,
   handleJsonRpcPayload,
   JSON_HEADERS,
   MAX_BODY_BYTES,
+  normalizeRestAudience,
+  runErrorRestQuery,
+  runFactsRestQuery,
   runFastRestQuery,
+  runGapsRestQuery,
+  runSectionsRestQuery,
+  runVerifyRestQuery,
+  runWhatsNewRestQuery,
   SERVER_INFO,
 } = await import("../lib/mcp-engine.ts");
+const { getOpenApiSpec } = await import("../lib/openapi.ts");
 const { recentMcpEvents, subscribeMcpEvents } = await import("../lib/mcp-events.ts");
 const { getBootstrapPack, getVaultPackGzip, syncCommit, vault, warmVaultIndexes } = await import("../lib/vault.ts");
+type FactKind = import("../lib/vault.ts").FactKind;
+const VALID_FACT_KINDS = new Set<FactKind>(["menu", "rule", "limit", "error", "formula"]);
 
 // Pre-warm ALL indexes, pre-split sections, bootstrap packs, and gzipped vault pack BEFORE listening
 const tWarm = performance.now();
@@ -136,6 +147,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (pathname === "/healthz") {
+    const manifest = getManifest();
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
     res.end(
       JSON.stringify({
@@ -143,9 +155,261 @@ const server = http.createServer((req, res) => {
         service: "bcbrain-mcp",
         version: SERVER_INFO.version,
         notes: vault().size,
+        tools: manifest.toolCount,
+        capabilities: manifest.capabilities,
         commit: syncCommit || undefined,
       }),
     );
+    return;
+  }
+
+  if (pathname === "/api/openapi.json" && method === "GET") {
+    const body = JSON.stringify(getOpenApiSpec());
+    const etag = `"bcopenapi-${syncCommit || "local"}-${crypto.createHash("sha256").update(body).digest("hex").slice(0, 12)}"`;
+    const cacheHeader = "public, max-age=300, s-maxage=600, stale-while-revalidate=3600";
+    if (req.headers["if-none-match"] === etag) {
+      res.writeHead(304, { ETag: etag, "Cache-Control": cacheHeader, "Access-Control-Allow-Origin": "*" });
+      res.end();
+      return;
+    }
+    res.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": cacheHeader,
+      ETag: etag,
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(body);
+    return;
+  }
+
+  if (pathname === "/api/gaps" && method === "GET") {
+    const rl = checkRateLimit(clientIp(req));
+    if (!rl.ok) {
+      sendJson(res, 429, '{"ok":false,"error":"Rate limit exceeded"}', { "Retry-After": String(rl.retryAfterSec) });
+      return;
+    }
+    const limParam = Number(url.searchParams.get("limit") ?? "");
+    const lim = Number.isFinite(limParam) && limParam >= 1 && limParam <= 256 ? Math.floor(limParam) : 50;
+    res.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(JSON.stringify(runGapsRestQuery(lim)));
+    return;
+  }
+
+  if (pathname === "/api/error" && method === "GET") {
+    const rl = checkRateLimit(clientIp(req));
+    if (!rl.ok) {
+      sendJson(res, 429, '{"ok":false,"error":"Rate limit exceeded"}', { "Retry-After": String(rl.retryAfterSec) });
+      return;
+    }
+    const audience = normalizeRestAudience(url.searchParams.get("audience"), "user");
+    const limParam = Number(url.searchParams.get("limit") ?? "");
+    const limit = Number.isFinite(limParam) && limParam >= 1 && limParam <= 15 ? Math.floor(limParam) : 5;
+    const result = runErrorRestQuery({ q: url.searchParams.get("q") ?? undefined, audience, limit });
+    const body = JSON.stringify(result);
+    const { ms: _ms, ...stable } = result;
+    const etag = `"bcerr-${syncCommit || "local"}-${crypto.createHash("sha256").update(JSON.stringify(stable)).digest("hex").slice(0, 12)}"`;
+    const cacheHeader = result.ok ? "public, max-age=120, s-maxage=300, stale-while-revalidate=600" : "no-store";
+    if (result.ok && req.headers["if-none-match"] === etag) {
+      res.writeHead(304, { ETag: etag, "Cache-Control": cacheHeader, "Access-Control-Allow-Origin": "*" });
+      res.end();
+      return;
+    }
+    res.writeHead(result.ok ? 200 : 400, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": cacheHeader,
+      ...(result.ok ? { ETag: etag } : {}),
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(body);
+    return;
+  }
+
+  if (pathname === "/api/sections" && method === "GET") {
+    const rl = checkRateLimit(clientIp(req));
+    if (!rl.ok) {
+      sendJson(res, 429, '{"ok":false,"error":"Rate limit exceeded"}', { "Retry-After": String(rl.retryAfterSec) });
+      return;
+    }
+    const audience = normalizeRestAudience(url.searchParams.get("audience"), "user");
+    const limParam = Number(url.searchParams.get("limit") ?? "");
+    const limit = Number.isFinite(limParam) && limParam >= 1 && limParam <= 15 ? Math.floor(limParam) : 5;
+    const mcParam = Number(url.searchParams.get("max_chars") ?? "");
+    const maxChars = Number.isFinite(mcParam) && mcParam >= 200 && mcParam <= 6000 ? Math.floor(mcParam) : 1200;
+    const result = runSectionsRestQuery({ q: url.searchParams.get("q") ?? undefined, audience, limit, maxChars });
+    const body = JSON.stringify(result);
+    const { ms: _ms, ...stable } = result;
+    const etag = `"bcsec-${syncCommit || "local"}-${crypto.createHash("sha256").update(JSON.stringify(stable)).digest("hex").slice(0, 12)}"`;
+    const cacheHeader = result.ok ? "public, max-age=120, s-maxage=300, stale-while-revalidate=600" : "no-store";
+    if (result.ok && req.headers["if-none-match"] === etag) {
+      res.writeHead(304, { ETag: etag, "Cache-Control": cacheHeader, "Access-Control-Allow-Origin": "*" });
+      res.end();
+      return;
+    }
+    res.writeHead(result.ok ? 200 : 400, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": cacheHeader,
+      ...(result.ok ? { ETag: etag } : {}),
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(body);
+    return;
+  }
+
+  if (pathname === "/api/facts" && method === "GET") {
+    const rl = checkRateLimit(clientIp(req));
+    if (!rl.ok) {
+      sendJson(res, 429, '{"ok":false,"error":"Rate limit exceeded"}', { "Retry-After": String(rl.retryAfterSec) });
+      return;
+    }
+    const audience = normalizeRestAudience(url.searchParams.get("audience"), "user");
+    const slugs = url.searchParams.get("slugs")?.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 10);
+    const kinds = url.searchParams
+      .get("kinds")
+      ?.split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter((k): k is FactKind => VALID_FACT_KINDS.has(k as FactKind));
+    const limParam = Number(url.searchParams.get("limit") ?? "");
+    const limit = Number.isFinite(limParam) && limParam >= 1 && limParam <= 50 ? Math.floor(limParam) : 20;
+    const result = runFactsRestQuery({
+      q: url.searchParams.get("q") ?? undefined,
+      slugs: slugs?.length ? slugs : undefined,
+      kinds: kinds?.length ? kinds : undefined,
+      audience,
+      limit,
+    });
+    const body = JSON.stringify(result);
+    const { ms: _ms, ...stable } = result;
+    const etag = `"bcfacts-${syncCommit || "local"}-${crypto.createHash("sha256").update(JSON.stringify(stable)).digest("hex").slice(0, 12)}"`;
+    const cacheHeader = "public, max-age=120, s-maxage=300, stale-while-revalidate=600";
+    if (req.headers["if-none-match"] === etag) {
+      res.writeHead(304, { ETag: etag, "Cache-Control": cacheHeader, "Access-Control-Allow-Origin": "*" });
+      res.end();
+      return;
+    }
+    res.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": cacheHeader,
+      ETag: etag,
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(body);
+    return;
+  }
+
+  if (pathname === "/api/whats-new" && method === "GET") {
+    const rl = checkRateLimit(clientIp(req));
+    if (!rl.ok) {
+      sendJson(res, 429, '{"ok":false,"error":"Rate limit exceeded"}', { "Retry-After": String(rl.retryAfterSec) });
+      return;
+    }
+    const audience = normalizeRestAudience(url.searchParams.get("audience"), "user");
+    const daysParam = Number(url.searchParams.get("days") ?? "");
+    const days = Number.isFinite(daysParam) && daysParam >= 1 && daysParam <= 365 ? Math.floor(daysParam) : 7;
+    const limParam = Number(url.searchParams.get("limit") ?? "");
+    const limit = Number.isFinite(limParam) && limParam >= 1 && limParam <= 50 ? Math.floor(limParam) : 20;
+    const result = runWhatsNewRestQuery({ days, audience, limit });
+    const body = JSON.stringify(result);
+    const { ms: _ms, ...stable } = result;
+    const etag = `"bcnew-${syncCommit || "local"}-${crypto.createHash("sha256").update(JSON.stringify(stable)).digest("hex").slice(0, 12)}"`;
+    const cacheHeader = "public, max-age=120, s-maxage=300, stale-while-revalidate=600";
+    if (req.headers["if-none-match"] === etag) {
+      res.writeHead(304, { ETag: etag, "Cache-Control": cacheHeader, "Access-Control-Allow-Origin": "*" });
+      res.end();
+      return;
+    }
+    res.writeHead(200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": cacheHeader,
+      ETag: etag,
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(body);
+    return;
+  }
+
+  if (pathname === "/api/verify" && (method === "GET" || method === "POST")) {
+    const rl = checkRateLimit(clientIp(req));
+    if (!rl.ok) {
+      sendJson(res, 429, '{"ok":false,"error":"Rate limit exceeded"}', { "Retry-After": String(rl.retryAfterSec) });
+      return;
+    }
+    if (method === "GET") {
+      const audience = normalizeRestAudience(url.searchParams.get("audience"), "user");
+      const menus = url.searchParams.get("menus")?.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 50);
+      const tables = url.searchParams.get("tables")?.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 50);
+      const columns = url.searchParams.get("columns")?.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 100);
+      if (!menus?.length && !tables?.length && !columns?.length) {
+        sendJson(res, 400, '{"ok":false,"error":"Provide at least one of ?menus=, ?tables=, or ?columns="}');
+        return;
+      }
+      const result = runVerifyRestQuery({ menus, tables, columns, audience });
+      const body = JSON.stringify(result);
+      const etag = `"bcverify-${syncCommit || "local"}-${crypto.createHash("sha256").update(body).digest("hex").slice(0, 12)}"`;
+      const cacheHeader = "public, max-age=120, s-maxage=300, stale-while-revalidate=600";
+      if (req.headers["if-none-match"] === etag) {
+        res.writeHead(304, { ETag: etag, "Cache-Control": cacheHeader, "Access-Control-Allow-Origin": "*" });
+        res.end();
+        return;
+      }
+      res.writeHead(200, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": cacheHeader,
+        ETag: etag,
+        "Access-Control-Allow-Origin": "*",
+      });
+      res.end(body);
+      return;
+    }
+
+    const lenHeader = Number(req.headers["content-length"] ?? "0");
+    if (Number.isFinite(lenHeader) && lenHeader > MAX_BODY_BYTES) {
+      sendJson(res, 413, '{"ok":false,"error":"Request body too large (max 32 KB)."}');
+      return;
+    }
+    const chunks: Buffer[] = [];
+    let totalBytes = 0;
+    let aborted = false;
+    req.on("data", (chunk: Buffer) => {
+      if (aborted) return;
+      totalBytes += chunk.length;
+      if (totalBytes > MAX_BODY_BYTES) {
+        aborted = true;
+        sendJson(res, 413, '{"ok":false,"error":"Request body too large (max 32 KB)."}');
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      if (aborted) return;
+      let parsed: Record<string, unknown>;
+      try {
+        const val = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        if (!val || typeof val !== "object" || Array.isArray(val)) throw new Error("expected object");
+        parsed = val as Record<string, unknown>;
+      } catch {
+        sendJson(res, 400, '{"ok":false,"error":"Invalid JSON body."}');
+        return;
+      }
+      const audience = normalizeRestAudience(typeof parsed.audience === "string" ? parsed.audience : null, "user");
+      const toArr = (v: unknown, max: number) =>
+        Array.isArray(v) ? v.map((x) => (typeof x === "string" ? x.trim() : "")).filter(Boolean).slice(0, max) : undefined;
+      const menus = toArr(parsed.menus, 50);
+      const tables = toArr(parsed.tables, 50);
+      const columns = toArr(parsed.columns, 100);
+      if (!menus?.length && !tables?.length && !columns?.length) {
+        sendJson(res, 400, '{"ok":false,"error":"Provide at least one non-empty array: menus, tables, or columns."}');
+        return;
+      }
+      sendJson(res, 200, JSON.stringify(runVerifyRestQuery({ menus, tables, columns, audience })));
+    });
+    req.on("error", () => {
+      if (!res.headersSent) sendJson(res, 400, '{"ok":false,"error":"Failed to read request body."}');
+    });
     return;
   }
 
@@ -215,9 +479,9 @@ const server = http.createServer((req, res) => {
       );
       return;
     }
-    const rawAud = url.searchParams.get("audience");
-    const audience = rawAud === "dev" || rawAud === "all" ? rawAud : "user";
-    const mode = url.searchParams.get("mode") === "normal" ? "normal" : "ultra";
+    const audience = normalizeRestAudience(url.searchParams.get("audience"), "user");
+    const rawMode = url.searchParams.get("mode");
+    const mode = rawMode === "normal" || rawMode === "fast" ? rawMode : "ultra";
     const media = url.searchParams.get("media") === "1" || url.searchParams.get("media") === "true";
     const maxCharsParam = Number(url.searchParams.get("max_chars") ?? "");
     const maxChars = Number.isFinite(maxCharsParam) && maxCharsParam >= 300 && maxCharsParam <= 4500 ? Math.floor(maxCharsParam) : undefined;
@@ -231,7 +495,9 @@ const server = http.createServer((req, res) => {
       maxChars,
     });
     const body = format === "text" ? result.answer : JSON.stringify(result);
-    const etag = `"bcfast-${syncCommit || "local"}-${crypto.createHash("sha256").update(body).digest("hex").slice(0, 12)}"`;
+    const { ms: _ms, cached: _cached, ...stable } = result;
+    const etagSeed = format === "text" ? result.answer : JSON.stringify(stable);
+    const etag = `"bcfast-${syncCommit || "local"}-${crypto.createHash("sha256").update(etagSeed).digest("hex").slice(0, 12)}"`;
     const cacheHeader = result.ok
       ? "public, max-age=120, s-maxage=300, stale-while-revalidate=600"
       : "no-store";
