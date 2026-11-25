@@ -593,13 +593,30 @@ func TestRealPackIfProvided(t *testing.T) {
 			}
 		}
 	}
-	// Out-of-domain Thai traps must return 0 hits on LookupError
-	for _, trap := range []string{"สูตรทำแกงเขียวหวานไก่ใส่กะทิสด", "วิธีปลูกทุเรียนภูเขาไฟ", "ยานอวกาศ ดาวอังคาร บั้งไฟพญานาค คอนโดหรู"} {
+	// Out-of-domain Thai traps must return 0 hits on LookupError AND strictly abstain on ask_brain / quick_answer
+	mcpSrv := NewMCPService(eng, NewEventBus(), NewGapLog(""), false)
+	for _, trap := range []string{
+		"สูตรทำแกงเขียวหวานไก่ใส่กะทิสด",
+		"วิธีปลูกทุเรียนภูเขาไฟ",
+		"ยานอวกาศ ดาวอังคาร บั้งไฟพญานาค คอนโดหรู",
+		"วิธีซ่อมแอร์บ้านน้ำหยดและล้างคอยล์เย็น",
+		"สูตรหมักหมูย่างเกาหลีน้ำจิ้มแจ่ว",
+		"อากาศวันนี้ฝนตกไหม",
+	} {
 		if hits := eng.LookupError(trap, "user", 5); len(hits) != 0 {
 			t.Fatalf("LookupError(%q, user) false positive: %+v", trap, hits)
 		}
+		meta := eng.SearchWithMeta(trap, 5, "all")
+		askBytes, _, err := mcpSrv.callTool("ask_brain", map[string]any{"question": trap})
+		if err != nil || !strings.Contains(string(askBytes), "🛑 Abstain") {
+			t.Fatalf("ask_brain(%q) failed to abstain (err=%v conf=%s matched=%d/%d top=%d): %s", trap, err, meta.Confidence, meta.BestMatchedTerms, meta.TotalTerms, meta.TopScore, sliceRunes(string(askBytes), 200))
+		}
+		qaBytes, _, err := mcpSrv.callTool("quick_answer", map[string]any{"question": trap, "audience": "user"})
+		if err != nil || !strings.Contains(string(qaBytes), "🛑 Abstain") {
+			t.Fatalf("quick_answer(%q, user) failed to abstain (err=%v): %s", trap, err, sliceRunes(string(qaBytes), 200))
+		}
 	}
-	// 366-note x [300, 700, 1200] excerpt sweep: 0 corrupted table rows & 0 unclosed code fences
+	// Full-vault x [300, 700, 1200] excerpt sweep: 0 corrupted table rows & 0 unclosed code fences
 	sweepTerms := []string{"ขาย", "ตาราง", "sql", "เมนู"}
 	for _, n := range pack.Notes {
 		for _, b := range []int{300, 700, 1200} {

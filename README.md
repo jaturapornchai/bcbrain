@@ -2,11 +2,11 @@
 
 **เว็บไซต์สมอง 3D:** [brain.bcsmethai.com](https://brain.bcsmethai.com) · **MCP Endpoint:** `https://brain.bcsmethai.com/mcp` · **Skill (`/bcbrain`):** [SKILL.md](https://brain.bcsmethai.com/skills/bcbrain/SKILL.md) · **เว็บไซต์หลัก:** [bcaccount.com](https://bcaccount.com) · **YouTube Playlist:** [BC Ai Account](https://www.youtube.com/playlist?list=PLO9P7tPZLXB0)
 
-[![สมอง BC — 366 เซลล์ความรู้ · 2,321 ไซแนปส์](docs/images/brain-3d-overview.png)](https://brain.bcsmethai.com)
+[![สมอง BC — 380 เซลล์ความรู้ · 2,478 ไซแนปส์](docs/images/brain-3d-overview.png)](https://brain.bcsmethai.com)
 
 ## Objective
-คลังความรู้ระบบ **BC Ai Account** และระบบในชุด BC สกัดจากซอร์สโค้ดจริงใน `d:\bcaiaccount` ควบคู่กับข้อมูลเว็บไซต์หลัก `d:\bcaiwebsite-live` (`www.bcaccount.com`) และเพลย์ลิสต์วิดีโอสอนใช้งาน YouTube (`PLO9P7tPZLXB0`) รวม **366 โน้ต · 2,321 ไซแนปส์ (18 ชนิดความสัมพันธ์) ใน 16 โฟลเดอร์** รองรับ 2 กลุ่มเป้าหมายในระบบเดียว:
-1. **โซนผู้ใช้ทั่วไป (`audience: "user"` — 9 โฟลเดอร์, 225 โน้ต)**: คู่มือภาษาไทยที่คนทั่วไปอ่านเข้าใจ (`playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`) สำหรับเจ้าของกิจการ พนักงานบัญชี Call Center และฝ่ายขาย ครบทั้งสารบัญรหัสเมนู 4 หลักทั้ง **735 หน้าจอ** (`1001`–`9070`), ตารางราคา 4 รุ่นและโครงการสำนักงานบัญชี Partner, ตัวเชื่อมรูปภาพหน้าจอจริงจาก `www.bcaccount.com` และการ์ดวิดีโอ YouTube (`PLO9P7tPZLXB0`), คีย์ลัด/เมนูคลิกขวา, ปฏิทินภาษี/บทความความรู้ และคู่มือแก้ปัญหาหน้างาน (ไม่มีศัพท์โค้ดปน)
+คลังความรู้ระบบ **BC Ai Account** และระบบในชุด BC สกัดจากซอร์สโค้ดจริงใน `d:\bcaiaccount` ควบคู่กับข้อมูลเว็บไซต์หลัก `d:\bcaiwebsite-live` (`www.bcaccount.com`) และเพลย์ลิสต์วิดีโอสอนใช้งาน YouTube (`PLO9P7tPZLXB0`) รวม **380 โน้ต · 2,478 ไซแนปส์ (18 ชนิดความสัมพันธ์) ใน 16 โฟลเดอร์** รองรับ 2 กลุ่มเป้าหมายในระบบเดียว:
+1. **โซนผู้ใช้ทั่วไป (`audience: "user"` — 9 โฟลเดอร์, 239 โน้ต)**: คู่มือภาษาไทยที่คนทั่วไปอ่านเข้าใจ (`playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`) สำหรับเจ้าของกิจการ พนักงานบัญชี Call Center และฝ่ายขาย ครบทั้งสารบัญรหัสเมนู 4 หลักทั้ง **735 หน้าจอ** (`1001`–`9070`), ตารางราคา 4 รุ่นและโครงการสำนักงานบัญชี Partner, ตัวเชื่อมรูปภาพหน้าจอจริงจาก `www.bcaccount.com` และการ์ดวิดีโอ YouTube (`PLO9P7tPZLXB0`), คีย์ลัด/เมนูคลิกขวา, ปฏิทินภาษี/บทความความรู้ และคู่มือแก้ปัญหาหน้างานภาษาคนจริงครบทุกใบ (ไม่มีศัพท์โค้ดปน)
 2. **โซนนักพัฒนา (`audience: "dev"` — 6 โฟลเดอร์, 140 โน้ต)**: เอกสารเทคนิคสำหรับนักพัฒนาและ AI เขียนโค้ดต่อยอด (`dev-playbook`, `schema`, `queries`, `api`, `doctypes`, `architecture`) ครอบคลุม Data Dictionary, คำสั่ง PostgreSQL `SELECT`/`WITH`, รหัส `trans_flag`, ผังบัญชี Dr/Cr, API/MCP Contract และสถาปัตยกรรมระบบ (พร้อมหน้าดัชนีกลาง `root` `index` = `both` อีก 1 โน้ต)
 
 เปิดสาธารณะ 3 ช่องทางพร้อมรองรับ Google SEO & AI Search (GEO/AEO):
@@ -47,6 +47,7 @@
 - `components/Brain3D.tsx`, `components/Shell.tsx`, `app/page.tsx`, `app/n/page.tsx`, `app/n/[slug]/page.tsx` — หน้าเว็บสมอง 3 มิติ (ใช้พิกัดที่คำนวณจากเซิร์ฟเวอร์ทันที) และหน้าคลังโน้ตพร้อมตัวสลับโหมด 3 ปุ่ม
 - `app/layout.tsx`, `app/robots.ts`, `app/sitemap.ts`, `public/llms.txt`, `public/sync-meta.json`, `public/grounding-index.json`, `app/icon.png`, `app/opengraph-image.png`, `next.config.ts` — Metadata, OpenGraph/Twitter Image, Sitemap/Robots/LLMs index และ HTTP Security & `Cache-Control` headers
 - `.agents/skills/bcbrain/SKILL.md`, `public/skills/bcbrain/SKILL.md` — Skill `/bcbrain` สำหรับเชื่อมและเรียกใช้สมอง BC ผ่าน MCP (หรือ HTTP JSON-RPC fallback) ดาวน์โหลดได้ที่ `/skills/bcbrain/SKILL.md`
+- `docs/client-prompts.md` — คู่มือและ Prompt สำเร็จรูปสำหรับอัปเกรดระบบลูกข่ายหลัก (`D:\yalecom`, `D:\jarvisbcaiaccount`) และ AI ตัวอื่นให้ใช้งาน BC Brain v3.0.0 ครบทั้ง 15 Tools และ OpenAPI 3.1.0
 
 ## Config
 | ค่า | ที่ไหน | ความหมาย |
@@ -72,7 +73,7 @@ npm install
 npm run dev              # http://localhost:3000
 npx tsc --noEmit         # ตรวจ TypeScript
 npm test                 # selftest: groups, isolation, ตัดคำไทย, BM25, O(1) lookup, sync-cache, กัน XSS, ตัวสแกนความลับ
-npm run test:deep        # deep-test: 6 มิติ (ตัดคำ/คำพ้อง 27 ข้อ, ค้นหา 116 เคส, แยกโซน 366 โน้ต, กราฟ 3D/XSS/PNG, fuzz, throughput)
+npm run test:deep        # deep-test: 6 มิติ (ตัดคำ/คำพ้อง 27 ข้อ, ค้นหา 116 เคส, แยกโซน 380 โน้ต, กราฟ 3D/XSS/PNG, fuzz, throughput)
 node scripts/test-retrieval-v2.ts   # ทดสอบ retrieval v3 (block-aware trim, semantic RRF, facts, sections, error index, whats_new, traps)
 go vet -C cmd/bcbrain-mcp ./... && go test -C cmd/bcbrain-mcp -v ./...  # ทดสอบ Go Sidecar 15 Tools + REST + ETag 304
 npm run check            # ตรวจโน้ตใน vault (ส่ง path ของ bcaiaccount และ --strict เพื่อตรวจเข้มงวด)

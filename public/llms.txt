@@ -1,12 +1,12 @@
 # สมอง BC (BC Brain · v3.0.0)
 
-> Dual-audience knowledge base of the BC Ai Account product suite (Thai accounting/ERP for SMEs plus POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Market, Dashboard, MonitorMap, WorkMonitor, Company Brain), verified against real source code and powered by a compiled Go MCP & REST sidecar (`< 1 ms`) with Hybrid Multi-Signal RRF, Section BM25, 256-dim semantic fallback, structured facts, O(1) Thai error index, and runtime ground-truth verification.
+> Dual-audience knowledge base of the BC Ai Account product suite (**380 notes · 2,478 synapses** across 16 folders: **239 user**, **140 dev**, **1 both** — Thai accounting/ERP for SMEs plus POS, AutoCare, e-Tax, WMS, TMS, Procure, CRM, LINE OA, Market, Dashboard, MonitorMap, WorkMonitor, Company Brain), verified against real source code and powered by a compiled Go MCP & REST sidecar (`< 1 ms`) with Hybrid Multi-Signal RRF, Section BM25, 256-dim semantic fallback, structured facts, O(1) Thai error index, and runtime ground-truth verification.
 
 ## Audience Zones (`audience` filter)
-- `user`: Plain-Thai guides for end users, Call Center, and pre-sale assistants (`playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`). Zero SQL/code jargon; SQL table/column verification strictly refused.
-- `dev`: Technical specifications for developers and coding agents (`dev-playbook`, `schema`, `queries`, `api`, `doctypes`, `architecture`) — table schemas, PostgreSQL `SELECT`/`WITH` queries, `trans_flag` catalog, GL Dr/Cr rules, API/MCP contracts.
-- `both`: Shared core map (`root` / `index.md`), included in both `"user"` and `"dev"` filters.
-- `all`: Full knowledge base across every zone.
+- `user` (239 notes, 9 folders): Plain-Thai, human-language guides enriched for end users, Call Center, and pre-sale assistants (`playbook`, `start`, `howto`, `troubleshoot`, `faq`, `reports`, `systems`, `glossary`, `sales`). Zero SQL/code jargon; SQL table/column verification strictly refused.
+- `dev` (140 notes, 6 folders): Technical specifications for developers and coding agents (`dev-playbook`, `schema`, `queries`, `api`, `doctypes`, `architecture`) — table schemas, PostgreSQL `SELECT`/`WITH` queries, `trans_flag` catalog, GL Dr/Cr rules, API/MCP contracts.
+- `both` (1 note): Shared core map (`root` / `index.md`), included in both `"user"` and `"dev"` filters.
+- `all` (380 notes): Full knowledge base across every zone.
 
 ## For AI agents (MCP v3.0.0 — 15 Tools)
 - MCP endpoint (Streamable HTTP, compiled Go sidecar `< 1 ms`): https://brain.bcsmethai.com/mcp
@@ -46,6 +46,7 @@
 - **Call Center / Sales / Voice mode**: Call `lookup_error(..., audience: "user")` for screen alerts, `quick_answer(..., audience: "user", include_media: true)` or `lookup_menu(..., audience: "user")` directly (no extra playbook round-trip needed; `playbook-call-center` / `playbook-sales` remain available for full scripts). Cite both exact Thai menu breadcrumb paths AND 4-digit menu codes (`1001`–`9070` across 735 screens), include verified screenshot links (`https://bcaccount.com/...`) and YouTube tutorials (`PLO9P7tPZLXB0`), and answer in plain Thai without code/SQL jargon. Cite official pricing/support facts strictly from `sales-pricing-packages`, `sales-accounting-partner`, and `sales-support-implementation-contact` (prices exclude 7% VAT and external AI API costs; never invent custom discounts).
 - **Developer mode**: Call `quick_answer(..., audience: "dev")`, `lookup_menu("<table_name>", audience: "dev")`, `verify_reference({ tables, columns, audience: "dev" })`, or `batch_read(..., audience: "dev")` directly (full map in `playbook-dev`). Follow `dev-rules-accounting-sql` (`NUMERIC`, `COALESCE(last_status, 0) = 0`).
 - **Slash Skill (`/bcbrain`)**: Installable skill instructions at https://brain.bcsmethai.com/skills/bcbrain/SKILL.md (handles `/bcbrain`, `/bcbrain dev`, `/bcbrain all`, `/bcbrain setup`, and stateless HTTP JSON-RPC fallback).
+- **Client Upgrade Prompts (`docs/client-prompts.md`)**: Ready-to-paste v3.0.0 integration prompts for `D:\yalecom` (BC Call Center + J.A.R.V.I.S), `D:\jarvisbcaiaccount` (Owner + Public Line), and general MCP/OpenAPI clients.
 
 ## Pages
 - [Home: 3D neural map](https://brain.bcsmethai.com/)

@@ -272,26 +272,46 @@ func (t *Tokenizer) segmentThaiRun(runes []rune) []string {
 	items := make([]segItem, 0, n/2+1)
 	i := 0
 	for i < n {
+		prevOOV := len(items) > 0 && items[len(items)-1].oov
+		blockMatch := false
+		if prevOOV {
+			prev := items[len(items)-1]
+			// Never start a dictionary word directly after an OOV Thai leading vowel (เ แ โ ใ ไ)
+			// or after a lone initial OOV consonant (e.g. ป+ลูก in ปลูก -> keep ป+ลูก together as OOV)
+			if isThaiLeadingVowel(runes[prev.end-1]) {
+				blockMatch = true
+			} else if prev.end-prev.start == 1 && isThaiConsonant(runes[prev.start]) && (len(items) == 1 || !items[len(items)-2].oov) {
+				blockMatch = true
+			}
+		}
+
 		node := t.root
 		var cands []int
-		for j := i; j < n; j++ {
-			if node.children == nil {
-				break
-			}
-			nxt := node.children[runes[j]]
-			if nxt == nil {
-				break
-			}
-			node = nxt
-			length := j - i + 1
-			if node.freq > 0 {
-				if length == 1 && !t.stop[string(runes[i:j+1])] && node.freq < 80 {
-					continue
+		if !blockMatch {
+			for j := i; j < n; j++ {
+				if node.children == nil {
+					break
 				}
-				if j+1 < n && isThaiCombiningOrTone(runes[j+1]) {
-					continue
+				nxt := node.children[runes[j]]
+				if nxt == nil {
+					break
 				}
-				cands = append(cands, j+1)
+				node = nxt
+				length := j - i + 1
+				if node.freq > 0 {
+					if length == 1 && !t.stop[string(runes[i:j+1])] && node.freq < 80 {
+						continue
+					}
+					if j+1 < n && isThaiCombiningOrTone(runes[j+1]) {
+						continue
+					}
+					// While inside an OOV span, require a strong domain word (freq >= 30) so unknown
+					// Thai words (e.g. ทุเรียน, ภูเขาไฟ) are not shredded into rare tails (เรียน, ไฟ)
+					if prevOOV && node.freq < 30 {
+						continue
+					}
+					cands = append(cands, j+1)
+				}
 			}
 		}
 
@@ -335,7 +355,7 @@ func (t *Tokenizer) segmentThaiRun(runes []rune) []string {
 		}
 		chunkStart := oovStart
 		for k := oovStart + 2; k < oovEnd; k++ {
-			if isThaiLeadingVowel(runes[k]) && k-chunkStart >= 2 {
+			if isThaiLeadingVowel(runes[k]) && k-chunkStart >= 3 && oovEnd-k >= 3 {
 				out = append(out, string(runes[chunkStart:k]))
 				chunkStart = k
 			}

@@ -966,6 +966,23 @@ func (e *Engine) Search(q string, limit int, filter string) []SearchHit {
 	return res
 }
 
+func noteHasExactToken(n *Note, t string) bool {
+	if n.Tokens.Body[t] > 0 {
+		return true
+	}
+	for _, x := range n.Tokens.Title {
+		if x == t {
+			return true
+		}
+	}
+	for _, x := range n.Tokens.Meta {
+		if x == t {
+			return true
+		}
+	}
+	return false
+}
+
 // SearchWithMeta matches lib/vault.ts searchWithMeta() confidence and anti-hallucination thresholds 1:1.
 func (e *Engine) SearchWithMeta(q string, limit int, filter string) SearchMetaResult {
 	ts := e.tok.Terms(q)
@@ -983,6 +1000,12 @@ func (e *Engine) SearchWithMeta(q string, limit int, filter string) SearchMetaRe
 	bestMatched := 0
 	if topNote != nil {
 		for _, t := range ts {
+			if utf8.RuneCountInString(t) <= 2 && isAllThai(t) {
+				if noteHasExactToken(topNote, t) {
+					bestMatched++
+				}
+				continue
+			}
 			if strings.Contains(topNote.Haystack.Title, t) ||
 				strings.Contains(topNote.Haystack.Meta, t) ||
 				strings.Contains(topNote.Haystack.Body, t) {

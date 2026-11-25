@@ -5,7 +5,7 @@ description: เชื่อมและค้นสมอง BC (https://brain.
 
 # สมอง BC (`/bcbrain` · v3.0.0)
 
-Skill สำหรับให้ AI เชื่อมต่อและดึงความรู้จาก **สมอง BC v3.0.0** (`https://brain.bcsmethai.com/mcp`) ซึ่งขับเคลื่อนด้วย **Compiled Go Sidecar (`< 1 ms`) + Hybrid Multi-Signal RRF + Section BM25 + Grounding Verifier** สกัดจากซอร์สโค้ดจริงของ **BC Ai Account** และระบบในชุด BC รองรับทั้งโซนผู้ใช้ทั่วไป (`user`) และโซนนักพัฒนา (`dev`)
+Skill สำหรับให้ AI เชื่อมต่อและดึงความรู้จาก **สมอง BC v3.0.0** (`https://brain.bcsmethai.com/mcp` · **380 โน้ต · 2,478 ไซแนปส์**: 239 โน้ตโซน `user` ภาษาคนจริงสำหรับ Call Center/ฝ่ายขาย, 140 โน้ตโซน `dev`, 1 โน้ต `both`) ซึ่งขับเคลื่อนด้วย **Compiled Go Sidecar (`< 1 ms`) + Hybrid Multi-Signal RRF + Section BM25 + Grounding Verifier** สกัดจากซอร์สโค้ดจริงของ **BC Ai Account** และระบบในชุด BC รองรับทั้งโซนผู้ใช้ทั่วไป (`user`) และโซนนักพัฒนา (`dev`) (ดูชุด Prompt อัปเกรดระบบลูกข่ายเพิ่มเติมได้ที่ `docs/client-prompts.md`)
 
 ## 1. รูปแบบคำสั่ง `/bcbrain` (Slash Modes)
 
